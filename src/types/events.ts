@@ -60,4 +60,15 @@ export type WorkflowEvent =
       level: 'workflow' | 'agent' | 'prompt';
       success: boolean;
       node: WorkflowNode;
+    }
+  // Cache events
+  | {
+      type: 'cacheHit';
+      key: string;
+      node: WorkflowNode;
+    }
+  | {
+      type: 'cacheMiss';
+      key: string;
+      node: WorkflowNode;
     };

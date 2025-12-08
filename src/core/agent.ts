@@ -22,6 +22,8 @@ import type { Prompt } from './prompt.js';
 import { MCPHandler } from './mcp-handler.js';
 import { generateId } from '../utils/id.js';
 import { getExecutionContext } from './context.js';
+import { generateCacheKey, defaultCache } from '../cache/index.js';
+import type { CacheKeyInputs } from '../cache/index.js';
 
 /**
  * Result from a prompt execution including metadata
@@ -179,6 +181,57 @@ export class Agent {
     // Get execution context for event emission
     const ctx = getExecutionContext();
 
+    // Merge configuration: Prompt > Overrides > Config
+    const effectiveSystem =
+      prompt.systemOverride ?? overrides?.system ?? this.config.system;
+
+    const effectiveModel = overrides?.model ?? this.model;
+    const effectiveMaxTokens = overrides?.maxTokens ?? this.config.maxTokens ?? 4096;
+    const effectiveTemperature =
+      overrides?.temperature ?? this.config.temperature;
+
+    // Check cache if enabled
+    const cacheEnabled = this.config.enableCache && !overrides?.disableCache;
+    let cacheKey: string | undefined;
+
+    if (cacheEnabled) {
+      const cacheInputs: CacheKeyInputs = {
+        user: prompt.buildUserMessage(),
+        data: prompt.getData(),
+        system: effectiveSystem,
+        model: effectiveModel,
+        temperature: effectiveTemperature,
+        maxTokens: effectiveMaxTokens,
+        tools: this.config.tools,
+        mcps: this.config.mcps,
+        skills: this.config.skills,
+        responseFormat: prompt.getResponseFormat(),
+      };
+      cacheKey = generateCacheKey(cacheInputs);
+
+      const cached = await defaultCache.get(cacheKey) as PromptResult<T> | undefined;
+      if (cached) {
+        // Emit cache hit event
+        if (ctx) {
+          this.emitWorkflowEvent({
+            type: 'cacheHit',
+            key: cacheKey,
+            node: ctx.workflowNode,
+          });
+        }
+        return cached;
+      }
+
+      // Emit cache miss event
+      if (ctx) {
+        this.emitWorkflowEvent({
+          type: 'cacheMiss',
+          key: cacheKey,
+          node: ctx.workflowNode,
+        });
+      }
+    }
+
     // Emit prompt start event if in workflow context
     if (ctx) {
       this.emitWorkflowEvent({
@@ -190,10 +243,6 @@ export class Agent {
       });
     }
 
-    // Merge configuration: Prompt > Overrides > Config
-    const effectiveSystem =
-      prompt.systemOverride ?? overrides?.system ?? this.config.system;
-
     const effectiveTools = this.mergeTools(
       prompt.toolsOverride ?? overrides?.tools ?? this.config.tools
     );
@@ -204,10 +253,6 @@ export class Agent {
       this.config.hooks
     );
 
-    const effectiveModel = overrides?.model ?? this.model;
-    const effectiveMaxTokens = overrides?.maxTokens ?? this.config.maxTokens ?? 4096;
-    const effectiveTemperature =
-      overrides?.temperature ?? this.config.temperature;
     const effectiveStop = overrides?.stop;
 
     // Set up environment variables
@@ -354,12 +399,19 @@ export class Agent {
         });
       }
 
-      return {
+      const result: PromptResult<T> = {
         data: validated,
         usage: totalUsage,
         duration,
         toolCalls: toolCallCount,
       };
+
+      // Store in cache if enabled
+      if (cacheEnabled && cacheKey) {
+        await defaultCache.set(cacheKey, result, { prefix: this.id });
+      }
+
+      return result;
     } finally {
       // Restore environment
       this.restoreEnvironment(originalEnv);

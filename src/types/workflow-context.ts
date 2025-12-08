@@ -6,6 +6,10 @@
  */
 
 import type { WorkflowNode } from './workflow.js';
+import type { ReflectionAPI } from './reflection.js';
+
+// Re-export ReflectionAPI for backward compatibility
+export type { ReflectionAPI } from './reflection.js';
 
 /**
  * Handle for querying the event tree
@@ -65,18 +69,19 @@ export interface EventMetrics {
 }
 
 /**
- * Placeholder for reflection API (Phase 3)
+ * Agent interface for context revision (minimal to avoid circular deps)
  */
-export interface ReflectionAPI {
-  /**
-   * Get reflection status
-   */
-  isEnabled(): boolean;
+export interface AgentLike {
+  prompt<T>(prompt: PromptLike<T>): Promise<T>;
+}
 
-  /**
-   * Trigger reflection on the current context
-   */
-  triggerReflection(reason?: string): Promise<void>;
+/**
+ * Prompt interface for context revision (minimal to avoid circular deps)
+ */
+export interface PromptLike<T> {
+  id: string;
+  buildUserMessage(): string;
+  validateResponse(data: unknown): T;
 }
 
 /**
@@ -109,12 +114,25 @@ export interface WorkflowContext {
   spawnWorkflow<T>(workflow: { run(): Promise<T> }): Promise<T>;
 
   /**
+   * Replace the last prompt result with a new one (context revision)
+   * The previous prompt node is marked as 'revised' and the new result is attached as sibling
+   *
+   * @param newPrompt The new prompt to execute
+   * @param agent The agent to use for execution
+   * @returns Result of the new prompt
+   */
+  replaceLastPromptResult<T>(
+    newPrompt: PromptLike<T>,
+    agent: AgentLike
+  ): Promise<T>;
+
+  /**
    * Access to the event tree for this workflow
    */
   readonly eventTree: EventTreeHandle;
 
   /**
-   * Reflection API (placeholder for Phase 3)
+   * Reflection API for error handling and retry logic
    */
   readonly reflection: ReflectionAPI;
 }
