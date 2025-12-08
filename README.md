@@ -89,6 +89,12 @@ const result = await agent.prompt(prompt);
 - [Agents](docs/agent.md) - LLM execution with caching and reflection
 - [Prompts](docs/prompt.md) - Type-safe prompt definitions with Zod
 
+### For AI Agents
+
+Full documentation in a single file: [`llms_full.txt`](llms_full.txt)
+
+Generate with `npm run generate:llms`
+
 ## Core Concepts
 
 ### Workflows
@@ -203,7 +209,9 @@ Contributions and issues are welcome.
 
 ## Support
 
-https://buymeacoffee.com/dustindsch2
+If Groundswell helps you build something great, consider fueling future development:
+
+<a href="https://buymeacoffee.com/dustindsch2" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"></a>
 
 ## License
 
