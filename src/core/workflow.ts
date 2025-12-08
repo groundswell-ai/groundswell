@@ -4,15 +4,43 @@ import type {
   WorkflowEvent,
   WorkflowObserver,
 } from '../types/index.js';
+import type { WorkflowContext, WorkflowConfig, WorkflowResult } from '../types/workflow-context.js';
 import { generateId } from '../utils/id.js';
 import { WorkflowLogger } from './logger.js';
 import { getObservedState } from '../decorators/observed-state.js';
+import { createWorkflowContext } from './workflow-context.js';
 
 /**
- * Abstract base class for all workflows
- * Provides parent/child management, logging, events, and state snapshots
+ * Executor function type for functional workflows
  */
-export abstract class Workflow {
+export type WorkflowExecutor<T = unknown> = (ctx: WorkflowContext) => Promise<T>;
+
+/**
+ * Base class for all workflows
+ * Supports both class-based (subclass with run()) and functional (executor) patterns
+ *
+ * @example Class-based pattern:
+ * ```ts
+ * class MyWorkflow extends Workflow {
+ *   async run() {
+ *     this.setStatus('running');
+ *     // workflow logic
+ *     this.setStatus('completed');
+ *   }
+ * }
+ * ```
+ *
+ * @example Functional pattern:
+ * ```ts
+ * const workflow = new Workflow({ name: 'MyWorkflow' }, async (ctx) => {
+ *   await ctx.step('step1', async () => {
+ *     // step logic
+ *   });
+ * });
+ * await workflow.run();
+ * ```
+ */
+export class Workflow<T = unknown> {
   /** Unique identifier for this workflow instance */
   public readonly id: string;
 
@@ -34,20 +62,43 @@ export abstract class Workflow {
   /** Observers (only populated on root workflow) */
   private observers: WorkflowObserver[] = [];
 
+  /** Optional executor function for functional workflows */
+  private executor?: WorkflowExecutor<T>;
+
+  /** Workflow configuration */
+  private config: WorkflowConfig;
+
   /**
    * Create a new workflow instance
+   *
+   * @overload Class-based pattern
    * @param name Human-readable name (defaults to class name)
    * @param parent Optional parent workflow
+   *
+   * @overload Functional pattern
+   * @param config Workflow configuration
+   * @param executor Executor function
    */
-  constructor(name?: string, parent?: Workflow) {
+  constructor(name?: string | WorkflowConfig, parentOrExecutor?: Workflow | WorkflowExecutor<T>) {
     this.id = generateId();
-    this.parent = parent ?? null;
+
+    // Parse overloaded arguments
+    if (typeof name === 'object' && name !== null) {
+      // Functional pattern: constructor(config, executor)
+      this.config = name;
+      this.executor = parentOrExecutor as WorkflowExecutor<T>;
+      this.parent = null;
+    } else {
+      // Class-based pattern: constructor(name, parent)
+      this.config = { name: name ?? this.constructor.name };
+      this.parent = (parentOrExecutor as Workflow) ?? null;
+    }
 
     // Create the node representation
     this.node = {
       id: this.id,
-      name: name ?? this.constructor.name,
-      parent: parent?.node ?? null,
+      name: this.config.name ?? this.constructor.name,
+      parent: this.parent?.node ?? null,
       children: [],
       status: 'idle',
       logs: [],
@@ -59,8 +110,8 @@ export abstract class Workflow {
     this.logger = new WorkflowLogger(this.node, this.getRootObservers());
 
     // Attach to parent if provided
-    if (parent) {
-      parent.attachChild(this);
+    if (this.parent) {
+      this.parent.attachChild(this);
     }
   }
 
@@ -125,7 +176,7 @@ export abstract class Workflow {
   /**
    * Emit an event to all root observers
    */
-  protected emitEvent(event: WorkflowEvent): void {
+  public emitEvent(event: WorkflowEvent): void {
     this.node.events.push(event);
 
     const observers = this.getRootObservers();
@@ -170,7 +221,7 @@ export abstract class Workflow {
   /**
    * Update workflow status and sync with node
    */
-  protected setStatus(status: WorkflowStatus): void {
+  public setStatus(status: WorkflowStatus): void {
     this.status = status;
     this.node.status = status;
   }
@@ -183,8 +234,69 @@ export abstract class Workflow {
   }
 
   /**
-   * Abstract run method - must be implemented by subclasses
-   * This is the main entry point for workflow execution
+   * Run the workflow
+   *
+   * For functional workflows (created with executor), runs the executor function.
+   * For class-based workflows (subclasses), this should be overridden.
+   *
+   * @returns Workflow result
    */
-  public abstract run(...args: unknown[]): Promise<unknown>;
+  public async run(..._args: unknown[]): Promise<T | WorkflowResult<T>> {
+    if (this.executor) {
+      return this.runFunctional();
+    }
+
+    // Class-based workflows must override this method
+    throw new Error(
+      'Workflow.run() must be overridden in subclass or provide executor in constructor'
+    );
+  }
+
+  /**
+   * Run a functional workflow with context
+   */
+  private async runFunctional(): Promise<WorkflowResult<T>> {
+    if (!this.executor) {
+      throw new Error('No executor provided');
+    }
+
+    const startTime = Date.now();
+    this.setStatus('running');
+
+    // Create workflow context
+    const ctx = createWorkflowContext(
+      this as unknown as Parameters<typeof createWorkflowContext>[0],
+      this.parent?.id,
+      this.config.enableReflection
+    );
+
+    try {
+      const result = await this.executor(ctx);
+      this.setStatus('completed');
+
+      return {
+        data: result,
+        node: this.node,
+        duration: Date.now() - startTime,
+      };
+    } catch (error) {
+      this.setStatus('failed');
+
+      // Emit error event
+      this.emitEvent({
+        type: 'error',
+        node: this.node,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          original: error,
+          workflowId: this.id,
+          stack: error instanceof Error ? error.stack : undefined,
+          state: {},
+          logs: [],
+        },
+      });
+
+      throw error;
+    }
+  }
 }
