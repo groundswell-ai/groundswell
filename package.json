@@ -16,7 +16,18 @@
     "build": "tsc",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "start:all": "tsx examples/index.ts",
+    "start:basic": "tsx examples/examples/01-basic-workflow.ts",
+    "start:decorators": "tsx examples/examples/02-decorator-options.ts",
+    "start:parent-child": "tsx examples/examples/03-parent-child.ts",
+    "start:observers": "tsx examples/examples/04-observers-debugger.ts",
+    "start:errors": "tsx examples/examples/05-error-handling.ts",
+    "start:concurrent": "tsx examples/examples/06-concurrent-tasks.ts",
+    "start:agent-loops": "tsx examples/examples/07-agent-loops.ts",
+    "start:sdk-features": "tsx examples/examples/08-sdk-features.ts",
+    "start:reflection": "tsx examples/examples/09-reflection.ts",
+    "start:introspection": "tsx examples/examples/10-introspection.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.1",
