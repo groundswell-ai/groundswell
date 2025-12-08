@@ -21,6 +21,10 @@ npm run start:parent-child
 npm run start:observers
 npm run start:errors
 npm run start:concurrent
+npm run start:agent-loops
+npm run start:sdk-features
+npm run start:reflection
+npm run start:introspection
 ```
 
 ## Examples Overview
@@ -88,23 +92,69 @@ Parallel execution patterns:
 - Fan-out / fan-in architecture
 - Performance benchmarks
 
+### 7. Agent Loops with Observability (`07-agent-loops.ts`)
+
+Run: `npx tsx examples/examples/07-agent-loops.ts`
+
+Agent.prompt() within workflow loops:
+- Using Agent.prompt() within ctx.step() loops
+- Multiple agents for different item types
+- Full event tree visualization with timing
+- State snapshots at each iteration
+- Cache hit/miss tracking
+
+### 8. SDK Features Integration (`08-sdk-features.ts`)
+
+Run: `npx tsx examples/examples/08-sdk-features.ts`
+
+Anthropic SDK integration:
+- Custom tool definitions with handlers
+- MCP server configuration (inprocess)
+- Pre/Post tool hooks for logging and validation
+- Skills integration with system prompt content
+- Environment variable pass-through
+
+### 9. Multi-level Reflection (`09-reflection.ts`)
+
+Run: `npx tsx examples/examples/09-reflection.ts`
+
+Reflection at all three levels:
+- Prompt-level reflection (enableReflection on prompt)
+- Agent-level reflection (agent.reflect() method)
+- Workflow-level reflection (step failure retry)
+- Reflection events in tree output
+- Error recovery with revised prompts
+
+### 10. Introspection Tools Demo (`10-introspection.ts`)
+
+Run: `npx tsx examples/examples/10-introspection.ts`
+
+Agent self-awareness and hierarchy navigation:
+- inspect_current_node - "Where am I?"
+- read_ancestor_chain - "What's above me?"
+- list_siblings_children - "What's around me?"
+- inspect_prior_outputs - "What happened before?"
+- inspect_cache_status - "Is this cached?"
+- request_spawn_workflow - "Can I create children?"
+
 ## Project Structure
 
 ```
-workflow-examples/
-├── src/
-│   ├── examples/
-│   │   ├── 01-basic-workflow.ts
-│   │   ├── 02-decorator-options.ts
-│   │   ├── 03-parent-child.ts
-│   │   ├── 04-observers-debugger.ts
-│   │   ├── 05-error-handling.ts
-│   │   └── 06-concurrent-tasks.ts
-│   ├── utils/
-│   │   └── helpers.ts
-│   └── index.ts
-├── package.json
-├── tsconfig.json
+examples/
+├── examples/
+│   ├── 01-basic-workflow.ts
+│   ├── 02-decorator-options.ts
+│   ├── 03-parent-child.ts
+│   ├── 04-observers-debugger.ts
+│   ├── 05-error-handling.ts
+│   ├── 06-concurrent-tasks.ts
+│   ├── 07-agent-loops.ts
+│   ├── 08-sdk-features.ts
+│   ├── 09-reflection.ts
+│   └── 10-introspection.ts
+├── utils/
+│   └── helpers.ts
+├── index.ts
 └── README.md
 ```
 

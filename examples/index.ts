@@ -22,6 +22,10 @@ import { runParentChildExample } from './examples/03-parent-child.js';
 import { runObserversDebuggerExample } from './examples/04-observers-debugger.js';
 import { runErrorHandlingExample } from './examples/05-error-handling.js';
 import { runConcurrentTasksExample } from './examples/06-concurrent-tasks.js';
+import { runAgentLoopsExample } from './examples/07-agent-loops.js';
+import { runSDKFeaturesExample } from './examples/08-sdk-features.js';
+import { runReflectionExample } from './examples/09-reflection.js';
+import { runIntrospectionExample } from './examples/10-introspection.js';
 
 const BANNER = `
 ╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
@@ -47,6 +51,10 @@ Available Examples:
   4. Observers & Debugger    - Real-time monitoring and debugging
   5. Error Handling          - Error wrapping, recovery patterns
   6. Concurrent Tasks        - Parallel execution patterns
+  7. Agent Loops             - Agent.prompt() in loops with observability
+  8. SDK Features            - Tools, MCPs, hooks, skills integration
+  9. Multi-level Reflection  - Workflow, agent, prompt reflection
+ 10. Introspection Tools     - Agent self-awareness and hierarchy navigation
 
   A. Run All Examples
   Q. Quit
@@ -76,6 +84,10 @@ async function runAllExamples(): Promise<void> {
     { name: '4. Observers & Debugger', fn: runObserversDebuggerExample },
     { name: '5. Error Handling', fn: runErrorHandlingExample },
     { name: '6. Concurrent Tasks', fn: runConcurrentTasksExample },
+    { name: '7. Agent Loops', fn: runAgentLoopsExample },
+    { name: '8. SDK Features', fn: runSDKFeaturesExample },
+    { name: '9. Multi-level Reflection', fn: runReflectionExample },
+    { name: '10. Introspection Tools', fn: runIntrospectionExample },
   ];
 
   for (const example of examples) {
@@ -114,6 +126,11 @@ Summary of Features Demonstrated:
 ✓ Error recovery patterns
 ✓ Sequential vs parallel execution
 ✓ Fan-out / fan-in patterns
+✓ Agent.prompt() in loops with full observability
+✓ Custom tools, MCPs, hooks, skills integration
+✓ Multi-level reflection (workflow, agent, prompt)
+✓ Introspection tools for hierarchy navigation
+✓ Cache integration with metrics
 `);
 }
 
