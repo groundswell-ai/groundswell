@@ -5,12 +5,14 @@ Workflows are hierarchical task containers with built-in logging, state observat
 ## Table of Contents
 
 - [Basic Usage](#basic-usage)
+- [Functional Pattern](#functional-pattern)
 - [Decorators](#decorators)
 - [Parent-Child Workflows](#parent-child-workflows)
 - [Observers](#observers)
 - [Tree Debugger](#tree-debugger)
 - [Error Handling](#error-handling)
 - [Concurrent Execution](#concurrent-execution)
+- [API Reference](#api-reference)
 
 ## Basic Usage
 
@@ -47,6 +49,14 @@ idle -> running -> completed
                 -> cancelled
 ```
 
+| Status | Description |
+|--------|-------------|
+| `idle` | Created but not started |
+| `running` | Currently executing |
+| `completed` | Finished successfully |
+| `failed` | Terminated with error |
+| `cancelled` | Manually cancelled |
+
 ### Logger
 
 Every workflow has a built-in logger:
@@ -57,6 +67,47 @@ this.logger.info('Info message');
 this.logger.warn('Warning message');
 this.logger.error('Error message', { error });
 ```
+
+## Functional Pattern
+
+Create workflows without subclassing:
+
+```typescript
+import { createWorkflow } from 'groundswell';
+
+const workflow = createWorkflow(
+  { name: 'DataPipeline', enableReflection: true },
+  async (ctx) => {
+    const loaded = await ctx.step('load', async () => {
+      return fetchData();
+    });
+
+    const processed = await ctx.step('process', async () => {
+      return transform(loaded);
+    });
+
+    await ctx.step('save', async () => {
+      return persist(processed);
+    });
+
+    return processed;
+  }
+);
+
+const result = await workflow.run();
+console.log(result.data);      // The actual result
+console.log(result.duration);  // Execution time in ms
+```
+
+### WorkflowContext
+
+The context provides methods for composing workflows:
+
+| Method | Description |
+|--------|-------------|
+| `step(name, fn)` | Execute a named step with event tracking |
+| `spawnWorkflow(workflow)` | Spawn and attach a child workflow |
+| `replaceLastPromptResult(prompt, agent)` | Replace last prompt result without tree branching |
 
 ## Decorators
 
@@ -97,12 +148,18 @@ class MyWorkflow extends Workflow {
     logFinish: true,
   })
   async fullStep(): Promise<void> {}
-
-  async run(): Promise<void> {
-    await this.basicStep();
-  }
 }
 ```
+
+**Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `string` | Custom step name (defaults to method name) |
+| `snapshotState` | `boolean` | Capture state snapshot after step completion |
+| `trackTiming` | `boolean` | Track and emit step duration |
+| `logStart` | `boolean` | Log message when step starts |
+| `logFinish` | `boolean` | Log message when step completes |
 
 ### @Task
 
@@ -141,6 +198,13 @@ class ParentWorkflow extends Workflow {
 }
 ```
 
+**Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `name` | `string` | Custom task name |
+| `concurrent` | `boolean` | Run returned workflows in parallel |
+
 ### @ObservedState
 
 Marks fields for inclusion in state snapshots.
@@ -170,6 +234,13 @@ class MyWorkflow extends Workflow {
   }
 }
 ```
+
+**Options:**
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `hidden` | `boolean` | Exclude field from snapshots entirely |
+| `redact` | `boolean` | Show value as `'***'` in snapshots |
 
 ## Parent-Child Workflows
 
@@ -257,28 +328,28 @@ Visualize workflow execution:
 import { WorkflowTreeDebugger } from 'groundswell';
 
 const workflow = new ParentWorkflow('Root');
-const debugger = new WorkflowTreeDebugger(workflow);
+const debugger_ = new WorkflowTreeDebugger(workflow);
 
 await workflow.run();
 
 // ASCII tree
-console.log(debugger.toTreeString());
-// ✓ Root [completed]
-// ├── ✓ Child-1 [completed]
-// └── ✓ Child-2 [completed]
+console.log(debugger_.toTreeString());
+// Root [completed]
+//   Child-1 [completed]
+//   Child-2 [completed]
 
 // Formatted logs
-console.log(debugger.toLogString());
+console.log(debugger_.toLogString());
 
 // Statistics
-console.log(debugger.getStats());
+console.log(debugger_.getStats());
 // { totalNodes: 3, byStatus: { completed: 3 }, totalLogs: 10, totalEvents: 15 }
 
 // Find node by ID
-const node = debugger.getNode(workflow.id);
+const node = debugger_.getNode(workflow.id);
 
 // Subscribe to events
-debugger.events.subscribe({
+debugger_.events.subscribe({
   next: (event) => console.log(event.type),
 });
 ```
@@ -287,11 +358,11 @@ debugger.events.subscribe({
 
 | Symbol | Status |
 |--------|--------|
-| ○ | idle |
-| ◐ | running |
-| ✓ | completed |
-| ✗ | failed |
-| ⊘ | cancelled |
+| o | idle |
+| - | running |
+| + | completed |
+| x | failed |
+| / | cancelled |
 
 ## Error Handling
 
@@ -444,18 +515,19 @@ class Pipeline extends Workflow {
 
 ## API Reference
 
-### Workflow
+### Workflow Class
 
 ```typescript
-abstract class Workflow {
+class Workflow<T = unknown> {
   readonly id: string;
   parent: Workflow | null;
   children: Workflow[];
   status: WorkflowStatus;
 
   constructor(name?: string, parent?: Workflow);
+  constructor(config: WorkflowConfig, executor: WorkflowExecutor<T>);
 
-  abstract run(...args: unknown[]): Promise<unknown>;
+  run(...args: unknown[]): Promise<T | WorkflowResult<T>>;
 
   protected setStatus(status: WorkflowStatus): void;
   protected readonly logger: WorkflowLogger;
@@ -465,6 +537,7 @@ abstract class Workflow {
   attachChild(child: Workflow): void;
   snapshotState(): void;
   getNode(): WorkflowNode;
+  emitEvent(event: WorkflowEvent): void;
 }
 ```
 
@@ -474,6 +547,17 @@ abstract class Workflow {
 type WorkflowStatus = 'idle' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+interface WorkflowConfig {
+  name?: string;
+  enableReflection?: boolean;
+}
+
+interface WorkflowResult<T> {
+  data: T;
+  node: WorkflowNode;
+  duration: number;
+}
 
 interface LogEntry {
   id: string;
@@ -504,4 +588,13 @@ interface WorkflowNode {
   events: WorkflowEvent[];
   stateSnapshot: Record<string, unknown> | null;
 }
+
+interface WorkflowObserver {
+  onLog(entry: LogEntry): void;
+  onEvent(event: WorkflowEvent): void;
+  onStateUpdated(node: WorkflowNode): void;
+  onTreeChanged(root: WorkflowNode): void;
+}
 ```
+
+See [examples/07-agent-loops.ts](../examples/examples/07-agent-loops.ts) for workflow usage with agents.
