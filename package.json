@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.1",
+    "lru-cache": "^10.4.3",
     "zod": "^3.23.0"
   },
   "devDependencies": {

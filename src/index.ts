@@ -35,7 +35,20 @@ export type {
   EventTreeHandle,
   EventNode,
   EventMetrics,
+  AgentLike,
+  PromptLike,
+  // Reflection types
   ReflectionAPI,
+  ReflectionConfig,
+  ReflectionContext,
+  ReflectionResult,
+  ReflectionEntry,
+} from './types/index.js';
+
+// Re-export reflection utilities
+export {
+  DEFAULT_REFLECTION_CONFIG,
+  createReflectionConfig,
 } from './types/index.js';
 
 // Core classes
@@ -71,6 +84,56 @@ export { WorkflowTreeDebugger } from './debugger/tree-debugger.js';
 export { Observable } from './utils/observable.js';
 export type { Subscription, Observer } from './utils/observable.js';
 export { generateId } from './utils/id.js';
+
+// Factory functions
+export {
+  createWorkflow,
+  createAgent,
+  createPrompt,
+  quickWorkflow,
+  quickAgent,
+} from './core/factory.js';
+
+// Cache
+export { LLMCache, defaultCache } from './cache/cache.js';
+export { generateCacheKey, deterministicStringify, getSchemaHash } from './cache/cache-key.js';
+export type { CacheConfig, CacheMetrics } from './cache/cache.js';
+export type { CacheKeyInputs } from './cache/cache-key.js';
+
+// Reflection
+export { ReflectionManager, executeWithReflection } from './reflection/reflection.js';
+
+// Introspection Tools
+export {
+  INTROSPECTION_TOOLS,
+  INTROSPECTION_HANDLERS,
+  registerIntrospectionTools,
+  executeIntrospectionTool,
+  // Individual tools
+  inspectCurrentNodeTool,
+  readAncestorChainTool,
+  listSiblingsChildrenTool,
+  inspectPriorOutputsTool,
+  inspectCacheStatusTool,
+  requestSpawnWorkflowTool,
+  // Handlers
+  handleInspectCurrentNode,
+  handleReadAncestorChain,
+  handleListSiblingsChildren,
+  handleInspectPriorOutputs,
+  handleInspectCacheStatus,
+  handleRequestSpawnWorkflow,
+} from './tools/introspection.js';
+export type {
+  CurrentNodeInfo,
+  AncestorInfo,
+  AncestorChainResult,
+  NodeInfo,
+  SiblingsChildrenResult,
+  PriorOutputInfo,
+  CacheStatusResult,
+  SpawnWorkflowRequest,
+} from './tools/introspection.js';
 
 // Examples (for reference)
 export { TestCycleWorkflow } from './examples/test-cycle-workflow.js';

@@ -267,7 +267,7 @@ export class Workflow<T = unknown> {
     const ctx = createWorkflowContext(
       this as unknown as Parameters<typeof createWorkflowContext>[0],
       this.parent?.id,
-      this.config.enableReflection
+      this.config.enableReflection ? { enabled: true } : undefined
     );
 
     try {

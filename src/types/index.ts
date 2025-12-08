@@ -37,5 +37,19 @@ export type {
   EventTreeHandle,
   EventNode,
   EventMetrics,
-  ReflectionAPI,
+  AgentLike,
+  PromptLike,
 } from './workflow-context.js';
+
+// Reflection types
+export type {
+  ReflectionAPI,
+  ReflectionConfig,
+  ReflectionContext,
+  ReflectionResult,
+  ReflectionEntry,
+} from './reflection.js';
+export {
+  DEFAULT_REFLECTION_CONFIG,
+  createReflectionConfig,
+} from './reflection.js';

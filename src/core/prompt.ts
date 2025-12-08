@@ -131,4 +131,20 @@ export class Prompt<T> {
       enableReflection: this.enableReflection,
     });
   }
+
+  /**
+   * Get the prompt data (used for cache key generation)
+   * @returns The prompt data object
+   */
+  public getData(): Record<string, unknown> {
+    return this.data;
+  }
+
+  /**
+   * Get the response format schema (used for cache key generation)
+   * @returns The Zod response format schema
+   */
+  public getResponseFormat(): z.ZodType<T> {
+    return this.responseFormat;
+  }
 }
