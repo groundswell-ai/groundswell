@@ -12,11 +12,52 @@ export type {
   StepOptions,
   TaskOptions,
   ErrorMergeStrategy,
+  // SDK primitive types
+  Tool,
+  ToolResult,
+  MCPServer,
+  Skill,
+  HookHandler,
+  PreToolUseContext,
+  PostToolUseContext,
+  SessionStartContext,
+  SessionEndContext,
+  AgentHooks,
+  TokenUsage,
+  // Agent and Prompt types
+  AgentConfig,
+  PromptOverrides,
+  PromptConfig,
+  // WorkflowContext types
+  WorkflowContext,
+  WorkflowConfig,
+  WorkflowResult,
+  EventTreeHandle,
+  EventNode,
+  EventMetrics,
+  ReflectionAPI,
 } from './types/index.js';
 
 // Core classes
-export { Workflow } from './core/workflow.js';
+export { Workflow, type WorkflowExecutor } from './core/workflow.js';
 export { WorkflowLogger } from './core/logger.js';
+export { Agent, type PromptResult } from './core/agent.js';
+export { Prompt } from './core/prompt.js';
+export { MCPHandler, type ToolExecutor } from './core/mcp-handler.js';
+
+// Context and event tree
+export { EventTreeHandleImpl, createEventTreeHandle } from './core/event-tree.js';
+export { WorkflowContextImpl, createWorkflowContext } from './core/workflow-context.js';
+export {
+  getExecutionContext,
+  requireExecutionContext,
+  runInContext,
+  runInContextSync,
+  hasExecutionContext,
+  createChildContext,
+  agentExecutionStorage,
+  type AgentExecutionContext,
+} from './core/context.js';
 
 // Decorators
 export { Step } from './decorators/step.js';

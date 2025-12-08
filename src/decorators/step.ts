@@ -1,5 +1,7 @@
 import type { StepOptions, WorkflowError, WorkflowNode, LogEntry, WorkflowEvent } from '../types/index.js';
 import { getObservedState } from './observed-state.js';
+import { runInContext, type AgentExecutionContext } from '../core/context.js';
+import { generateId } from '../utils/id.js';
 
 // Type for workflow-like objects that @Step can decorate methods on
 interface WorkflowLike {
@@ -50,9 +52,37 @@ export function Step(opts: StepOptions = {}) {
         step: stepName,
       });
 
+      // Create step node for hierarchy tracking
+      const stepNode: WorkflowNode = {
+        id: generateId(),
+        name: stepName,
+        parent: wf.node,
+        children: [],
+        status: 'running',
+        logs: [],
+        events: [],
+        stateSnapshot: null,
+      };
+
+      // Create execution context for agent/prompt operations within this step
+      const executionContext: AgentExecutionContext = {
+        workflowNode: stepNode,
+        emitEvent: (event: WorkflowEvent) => {
+          stepNode.events.push(event);
+          wf.emitEvent(event);
+        },
+        workflowId: wf.id,
+      };
+
       try {
-        // Execute the original method
-        const result = await originalMethod.call(this, ...args);
+        // Execute the original method within the execution context
+        // This allows Agent.prompt() calls to automatically capture events
+        const result = await runInContext(executionContext, async () => {
+          return originalMethod.call(this, ...args);
+        });
+
+        // Update step node status
+        stepNode.status = 'completed';
 
         // Snapshot state if requested
         if (opts.snapshotState) {
@@ -77,6 +107,8 @@ export function Step(opts: StepOptions = {}) {
 
         return result;
       } catch (err: unknown) {
+        // Update step node status
+        stepNode.status = 'failed';
         // Create rich error with context
         const error = err as Error;
         const snap = getObservedState(this as object);
