@@ -111,4 +111,41 @@ describe('Tree Mirroring Integration', () => {
       }
     }
   });
+
+  it('should propagate treeUpdated events to root observers', () => {
+    // ARRANGE: Create parent-child workflow tree
+    const parent = new TDDOrchestrator('Parent');
+    const child = new TDDOrchestrator('Child', parent);
+
+    // ARRANGE: Set up observer with collection arrays
+    const events: WorkflowEvent[] = [];
+    const treeChangedCalls: any[] = [];
+
+    // ARRANGE: Create inline observer
+    const observer: WorkflowObserver = {
+      onLog: () => {}, // Empty - not testing logs
+      onEvent: (event) => events.push(event), // Capture events
+      onStateUpdated: () => {}, // Empty - not testing state updates
+      onTreeChanged: (root) => treeChangedCalls.push(root), // Capture tree changes
+    };
+
+    // ARRANGE: Attach observer to ROOT (parent, not child)
+    parent.addObserver(observer);
+
+    // ACT: Trigger status change on CHILD workflow
+    child.setStatus('completed');
+
+    // ASSERT: Verify treeUpdated event was received via onEvent
+    const treeUpdatedEvent = events.find((e) => e.type === 'treeUpdated');
+    expect(treeUpdatedEvent).toBeDefined();
+
+    // ASSERT: Type guard for discriminated union + verify root node
+    if (treeUpdatedEvent && treeUpdatedEvent.type === 'treeUpdated') {
+      expect(treeUpdatedEvent.root).toBe(parent.getNode());
+    }
+
+    // ASSERT: Verify onTreeChanged callback was invoked
+    expect(treeChangedCalls).toHaveLength(1);
+    expect(treeChangedCalls[0]).toBe(parent.getNode());
+  });
 });
