@@ -247,6 +247,7 @@ export class Workflow<T = unknown> {
   public setStatus(status: WorkflowStatus): void {
     this.status = status;
     this.node.status = status;
+    this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node });
   }
 
   /**

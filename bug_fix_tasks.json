@@ -187,7 +187,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "Emit treeUpdated event in setStatus() method",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md Issue #1 - setStatus() at lines 224-227 in src/core/workflow.ts currently doesn't emit treeUpdated. PRD Section 12.2 requires it.\n2. INPUT: new status parameter and this.getRoot().node.\n3. LOGIC: In setStatus() method (after line 226 where this.node.status = status is set), add: this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node });. This triggers observer.onTreeChanged() as specified in PRD.\n4. OUTPUT: Updated setStatus() that emits treeUpdated event, enabling tree debugger to rebuild on status changes."
