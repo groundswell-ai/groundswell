@@ -129,12 +129,23 @@ export class Workflow<T = unknown> {
 
   /**
    * Get the root workflow
+   * Uses cycle detection to prevent infinite loops from circular parent-child relationships
    */
   protected getRoot(): Workflow {
-    if (this.parent) {
-      return this.parent.getRoot();
+    const visited = new Set<Workflow>();
+    let root: Workflow = this;
+    let current: Workflow | null = this;
+
+    while (current) {
+      if (visited.has(current)) {
+        throw new Error('Circular parent-child relationship detected');
+      }
+      visited.add(current);
+      root = current;
+      current = current.parent;
     }
-    return this;
+
+    return root;
   }
 
   /**

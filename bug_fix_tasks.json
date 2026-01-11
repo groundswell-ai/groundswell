@@ -136,7 +136,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Implement cycle detection logic in getRoot() method",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/GAP_ANALYSIS_SUMMARY.md Issue #4 - getRoot() at lines 132-137 in src/core/workflow.ts currently has no cycle detection. Can infinite loop if circular reference created.\n2. INPUT: this.parent chain to traverse.\n3. LOGIC: Rewrite getRoot() method (lines 132-137) to use visited Set: 1) Create 'const visited = new Set<Workflow>()', 2) Loop with 'let current: Workflow | null = this', 3) Inside loop: if (visited.has(current)) throw new Error('Circular parent-child relationship detected'), 4) Add current to visited, 5) Move to parent. This prevents DoS from malicious cycles.\n4. OUTPUT: Updated getRoot() method that throws descriptive error when cycle detected, preventing infinite loops and potential DoS attacks."
