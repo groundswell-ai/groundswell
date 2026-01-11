@@ -1,470 +1,415 @@
-# Product Requirement Prompt (PRP): Add getObservedState Import to workflow-context.ts
-
-**Work Item**: P1.M1.T2.S1
-**Title**: Add getObservedState import to workflow-context.ts
-**Status**: Ready for Implementation
-**Confidence Score**: 10/10
+name: "P1.M1.T2.S1 - Verify getObservedState Import in workflow-context.ts"
+description: |
 
 ---
 
 ## Goal
 
-**Feature Goal**: Add the `getObservedState` import statement to `workflow-context.ts` to enable the subsequent subtasks (P1.M1.T2.S2 and P1.M1.T2.S3) to fix empty state objects in error handlers.
+**Feature Goal**: Verify that `getObservedState` is properly imported in `src/core/workflow-context.ts` and available for use in the `step()` and `replaceLastPromptResult()` error handlers.
 
-**Deliverable**: Modified `src/core/workflow-context.ts` with import statement `import { getObservedState } from '../decorators/observed-state.js';` added at the top of the file.
+**Deliverable**: Verified import statement at the top of `src/core/workflow-context.ts` enabling error state capture in WorkflowContext methods.
 
-**Success Definition**:
-- Import statement is added in the correct location (after existing imports, before class definition)
-- Import uses correct relative path (`../decorators/observed-state.js`)
-- File compiles without TypeScript errors
-- Subsequent subtasks (S2, S3) can successfully use `getObservedState(this.workflow)` in error handlers
+**Success Definition**: The `getObservedState` function is imported from `'../decorators/observed-state.js'` and available for use in error catch blocks to capture workflow state when errors occur in WorkflowContext operations.
 
----
+## User Persona (if applicable)
 
-## User Persona
+**Target User**: Developer maintaining the workflow system.
 
-**Target User**: Developer implementing bug fixes for workflow error handling (typically an AI agent or human developer following the PRP).
+**Use Case**: When a WorkflowContext operation (step execution or prompt result replacement) throws an error, the error handlers need to capture the actual observed state of the workflow for debugging and introspection.
 
-**Use Case**: This is the first step in a 4-step bug fix task. The import must be added before the error handlers can be modified to use `getObservedState()`.
+**User Journey**: The import statement is a prerequisite for the error handlers in `step()` and `replaceLastPromptResult()` to call `getObservedState(this.workflow)` and include the state snapshot in the error event payload.
 
-**User Journey**:
-1. Developer reads this PRP
-2. Developer adds the single import line to workflow-context.ts
-3. Developer validates with `npm run test` that nothing broke
-4. Developer proceeds to P1.M1.T2.S2 (fixing first error handler)
-
-**Pain Points Addressed**:
-- Without this import, the code in P1.M1.T2.S2/S3 would fail with "getObservedState is not defined"
-- Mirrors the pattern already established in P1.M1.T1.S1 for workflow.ts
-- Provides explicit guidance on exact placement to avoid import sorting issues
-
----
+**Pain Points Addressed**: Without this import, the error handlers cannot capture actual workflow state, breaking error introspection capabilities required by PRD #001 Section 5.1.
 
 ## Why
 
-- **Dependency Setup**: This import is required for P1.M1.T2.S2 and P1.M1.T2.S3, which will replace empty `state: {}` objects with `getObservedState(this.workflow)` calls
-- **Pattern Consistency**: Follows the same pattern established in P1.M1.T1.S1 where `getObservedState` was imported into `workflow.ts`
-- **Error Handler Fix**: The workflow-context.ts file has 2 error handlers (lines 155-162 and 319-326) with empty state objects that need to be fixed
-- **Type Safety**: The import provides the `getObservedState` function signature: `(obj: object): SerializedWorkflowState`
-
----
+- **Critical for Error Introspection**: PRD #001 Section 5.1 requires error events to include actual workflow state, not empty objects
+- **Enables Debugging**: Developers need to inspect workflow state at the point of failure to diagnose issues
+- **Consistent Pattern**: Follows the established `getObservedState(this.workflow)` pattern used in WorkflowContext
+- **Prerequisite for S2/S3**: This import is required before the state capture can be implemented in the error handlers
 
 ## What
 
-Add exactly one import statement to `src/core/workflow-context.ts`:
-
-```typescript
-import { getObservedState } from '../decorators/observed-state.js';
-```
-
-**Placement**: After line 28 (after `import { createReflectionConfig } from '../types/index.js';`), before line 30 (before the `interface WorkflowLike` declaration).
+Add or verify the import statement for `getObservedState` at the top of `src/core/workflow-context.ts`. This is a pure import addition task - no code logic changes required.
 
 ### Success Criteria
 
-- [ ] Import statement added to `src/core/workflow-context.ts`
-- [ ] Import placed after existing imports (lines 8-28)
-- [ ] Import uses correct relative path: `../decorators/observed-state.js`
-- [ ] File compiles: `npx tsc --noEmit` produces no errors
-- [ ] Tests still pass: `npm run test` succeeds
-- [ ] Import is ready for use in P1.M1.T2.S2 and P1.M1.T2.S3
-
----
+- [ ] Import statement exists in `src/core/workflow-context.ts` around line 30
+- [ ] Import follows the pattern: `import { getObservedState } from '../decorators/observed-state.js';`
+- [ ] Import is positioned after type imports and before other regular imports
+- [ ] Function is available for use in `step()` catch block (around line 155-162)
+- [ ] Function is available for use in `replaceLastPromptResult()` catch block (around line 319-326)
 
 ## All Needed Context
 
 ### Context Completeness Check
 
-**"No Prior Knowledge" Test**: If someone knew nothing about this codebase, would they have everything needed to implement this successfully?
-
-**Answer**: Yes. This PRP provides:
-- Exact file path and line number for the change
-- The complete import statement to add
-- The correct placement location with context
-- Reference to the same change already made in workflow.ts (P1.M1.T1.S1)
-- Validation commands to verify the change
-- Type information about what's being imported
-
----
+**"No Prior Knowledge" Test**: If someone knew nothing about this codebase, would they have everything needed to implement this successfully? YES - This PRP provides exact file location, import pattern, line context, and verification commands.
 
 ### Documentation & References
 
 ```yaml
-# MUST READ - Target file to modify
-- file: /home/dustin/projects/groundswell/src/core/workflow-context.ts
-  why: This is the file that needs the import statement added
-  lines: 1-29 (import section)
-  pattern: Imports are grouped by purpose: types, then implementations
-  critical: Add new import after line 28, before line 30
+# MUST READ - Include these in your context window
+- url: https://www.typescriptlang.org/docs/handbook/modules/theory.html
+  why: Understanding ES6 import syntax and module resolution
+  critical: Use named imports with `import { name } from 'path.js'` - always include .js extension
 
-# MUST READ - Source of the import
-- file: /home/dustin/projects/groundswell/src/decorators/observed-state.ts
-  why: This exports getObservedState function that we need to import
-  lines: 46-77
-  pattern: export function getObservedState(obj: object): SerializedWorkflowState
-  gotcha: The function returns empty object {} if no @ObservedState fields exist
+- url: https://www.typescriptlang.org/docs/handbook/decorators.html
+  why: Understanding decorator pattern context for getObservedState usage
+  critical: Decorators are runtime values, not types - use regular import not import type
 
-# REFERENCE - Same change already completed
-- file: /home/dustin/projects/groundswell/src/core/workflow.ts
-  why: Shows the exact import pattern that was added in P1.M1.T1.S1
-  lines: 11
-  pattern: import { getObservedState } from '../decorators/observed-state.js';
-  critical: Use this exact import statement - it's already been validated
+- file: src/core/workflow-context.ts
+  why: The target file requiring the import statement
+  pattern: Type imports (lines 8-21), then regular imports (lines 22-30)
+  gotcha: Always use .js extension in relative imports even in .ts files (ES2022 module system)
 
-# RESEARCH - Context on why this import is needed
-- file: /home/dustin/projects/groundswell/plan/docs/bugfix_QUICK_REFERENCE.md
-  why: Documents the common pitfall of forgetting imports
-  section: "Common Pitfalls #1: Forgetting imports"
-  critical: Reminds to add import before using getObservedState
+- file: src/core/workflow-context.ts:30
+  why: Exact line where getObservedState import should be placed
+  pattern: `import { getObservedState } from '../decorators/observed-state.js';`
+  gotcha: THIS IMPORT ALREADY EXISTS - this task is for verification only
 
-# TYPE DEFINITIONS - What getObservedState returns
-- file: /home/dustin/projects/groundswell/src/types/index.ts
-  why: Defines SerializedWorkflowState type that getObservedState returns
-  pattern: type SerializedWorkflowState = Record<string, unknown>
+- file: src/decorators/observed-state.ts
+  why: Source file defining getObservedState function
+  pattern: Named export `export function getObservedState(obj: object): SerializedWorkflowState`
+  gotcha: Returns empty object {} if no observed fields found (WeakMap-based storage)
+
+- file: src/decorators/step.ts:145-165
+  why: Reference pattern for getObservedState usage in error handling
+  pattern: `const snap = getObservedState(this as object);` then `state: snap` in error object
+  gotcha: The @Step decorator is the canonical example of error state capture
+
+- file: src/core/workflow-context.ts:155-162
+  why: First error handler location (step() method) that will use getObservedState
+  pattern: `state: getObservedState(this.workflow), logs: [...this.node.logs]`
+  gotcha: Must use `this.workflow` not `this` - WorkflowContext wraps a Workflow instance
+
+- file: src/core/workflow-context.ts:319-326
+  why: Second error handler location (replaceLastPromptResult() method) that will use getObservedState
+  pattern: Same pattern as first error handler
+  gotcha: Both error handlers need the same fix
+
+- file: src/core/workflow.ts:11
+  why: Parallel implementation showing getObservedState import pattern for workflow files
+  pattern: `import { getObservedState } from '../decorators/observed-state.js';`
+  gotcha: Follow this exact pattern for consistency
+
+- docfile: plan/bugfix/architecture/GAP_ANALYSIS_SUMMARY.md
+  why: Contains Issue #2 analysis describing empty state/logs bug
+  section: Issue #2: Empty Error State in Functional Workflows
+  gotcha: The GAP analysis indicates this is a "Real Gap" with "Low" fix effort
 ```
-
----
 
 ### Current Codebase Tree
 
 ```bash
-src/
-├── core/
-│   ├── workflow.ts                    # Already has getObservedState import (line 11) - COMPLETED in P1.M1.T1.S1
-│   ├── workflow-context.ts            # TARGET FILE - needs import added
-│   ├── context.ts
-│   ├── event-tree.ts
-│   └── logger.ts
-├── decorators/
-│   ├── observed-state.ts              # Exports getObservedState
-│   ├── step.ts
-│   └── task.ts
-└── types/
-    └── index.ts                       # Defines SerializedWorkflowState
+groundswell/
+├── src/
+│   ├── core/
+│   │   ├── workflow.ts          # Reference for similar import pattern (line 11)
+│   │   ├── workflow-context.ts  # TARGET FILE - import goes here (line 30)
+│   │   └── context.ts
+│   ├── decorators/
+│   │   ├── observed-state.ts    # SOURCE FILE - getObservedState defined here
+│   │   ├── step.ts              # Reference pattern for usage
+│   │   └── task.ts
+│   ├── types/
+│   │   ├── index.ts
+│   │   └── workflow-context.ts
+│   ├── utils/
+│   │   └── id.ts
+│   └── __tests__/
+│       ├── unit/
+│       │   └── context.test.ts  # Tests for WorkflowContext functionality
+│       └── integration/
+├── plan/
+│   └── bugfix/
+│       └── P1M1T2S1/
+│           └── PRP.md           # This file
+└── vitest.config.ts
 ```
 
----
-
-### Desired Codebase Tree
+### Desired Codebase Tree (No Changes - File Structure Unchanged)
 
 ```bash
-# No new files - modifying existing file:
-
-src/
-└── core/
-    └── workflow-context.ts            # MODIFY: Add import at line 29
-        # Add: import { getObservedState } from '../decorators/observed-state.js';
+# No structural changes - this is an import addition only
+# The file src/core/workflow-context.ts already exists and is being modified
 ```
-
----
 
 ### Known Gotchas of Our Codebase & Library Quirks
 
 ```typescript
-// CRITICAL: Use .js extension in imports
-// Even though we're importing from TypeScript files, use .js extension
-// This is because the project compiles to JavaScript modules
+// CRITICAL: TypeScript ES2022 module system requires .js extensions
+// Even in .ts files, relative imports must use .js extension
+// WRONG: import { getObservedState } from '../decorators/observed-state';
 // CORRECT: import { getObservedState } from '../decorators/observed-state.js';
-// WRONG:   import { getObservedState } from '../decorators/observed-state';
 
-// CRITICAL: Import placement matters
-// Add the import after line 28, before the interface declaration
-// The file groups imports: type imports first, then implementation imports
+// CRITICAL: Import organization pattern in this codebase
+// Type imports come first with "import type { ... }" (lines 8-21)
+// Regular imports follow, grouped by functionality (lines 22-30)
+// Decorator imports are mixed with other utility imports
 
-// CRITICAL: This is a named import, not a default export
-// CORRECT: import { getObservedState } from ...
-// WRONG:   import getObservedState from ...
+// CRITICAL: getObservedState is a named export, not a default export
+// Must use: import { getObservedState } from '...'
+// Cannot use: import getObservedState from '...'
 
-// CRITICAL: The function signature
-// getObservedState(obj: object): SerializedWorkflowState
-// Returns empty object {} if no @ObservedState fields on the object
+// IMPORTANT: This task is for VERIFICATION ONLY
+// The import already exists in the file at line 30
+// This PRP serves as validation documentation
 
-// CRITICAL: Subsequent usage pattern (for P1.M1.T2.S2/S3)
-// In WorkflowContext error handlers, use: getObservedState(this.workflow)
-// NOT: getObservedState(this) - this.workflow is the correct parameter
+// GOTCHA: getObservedState returns empty object {} if no @ObservedState decorators
+// This is expected behavior - not an error
+// Uses WeakMap-based storage keyed by class prototype
 
-// CRITICAL: This mirrors P1.M1.T1.S1
-// The same import was added to workflow.ts at line 11
-// Use that as the exact reference pattern
+// CRITICAL: WorkflowContext uses this.workflow not this
+// When calling getObservedState in WorkflowContext, use:
+// getObservedState(this.workflow) NOT getObservedState(this)
+// Because WorkflowContext wraps a Workflow instance
+
+// GOTCHA: The related subtask P1.M1.T2.S2 and S3 have ALREADY been completed
+// The step() error handler at line 155-162 already uses getObservedState(this.workflow)
+// The replaceLastPromptResult() error handler at line 319-326 also uses it
+// This means P1.M1.T2.S1 through S3 are all complete
 ```
 
----
-
 ## Implementation Blueprint
+
+### Data Models and Structure
+
+No data model changes required. This is an import statement addition only.
 
 ### Implementation Tasks (ordered by dependencies)
 
 ```yaml
-Task 1: READ workflow-context.ts import section
-  - READ: /home/dustin/projects/groundswell/src/core/workflow-context.ts lines 1-29
-  - UNDERSTAND: Import grouping pattern (types first, then implementations)
-  - VALIDATION: Confirm file does NOT already have getObservedState import
+Task 1: VERIFY EXISTING IMPORT IN src/core/workflow-context.ts
+  - CHECK: Lines 8-30 for import statements section
+  - VERIFY: Line 30 contains `import { getObservedState } from '../decorators/observed-state.js';`
+  - CONFIRM: Import is positioned after type imports (lines 8-21)
+  - CONFIRM: Import is after other regular imports (lines 22-29) as last import
+  - NAMING: Named import `{ getObservedState }` - matches source export
+  - PLACEMENT: Top of file, after type imports, before usage
 
-Task 2: ADD import statement
-  - ADD LINE: Line 29 (after existing imports, before interface declaration)
-  - CONTENT: import { getObservedState } from '../decorators/observed-state.js';
-  - PATTERN: Follow same pattern as workflow.ts line 11
+Task 2: VERIFY FUNCTION AVAILABILITY IN ERROR HANDLERS
+  - FIND: Usage of getObservedState in step() method (around line 155-162)
+  - VERIFY: Error handler contains `state: getObservedState(this.workflow),`
+  - VERIFY: Error handler contains `logs: [...this.node.logs] as LogEntry[],`
+  - FIND: Usage of getObservedState in replaceLastPromptResult() method (around line 319-326)
+  - VERIFY: Same pattern as step() error handler
+  - CONFIRM: No TypeScript errors related to undefined getObservedState
 
-Task 3: VALIDATE compilation
-  - RUN: npx tsc --noEmit
-  - EXPECTED: No TypeScript errors
-  - IF ERRORS: Check import path is correct (../decorators/observed-state.js)
+Task 3: RUN VALIDATION
+  - EXECUTE: Type checking with `npm run build` or `npx tsc --noEmit`
+  - VERIFY: No import errors for getObservedState
+  - EXECUTE: Linting with `npm run lint`
+  - VERIFY: No linting errors in workflow-context.ts
+  - EXECUTE: Tests with `npm test -- src/__tests__/unit/context.test.ts`
+  - VERIFY: All context tests pass
 
-Task 4: VALIDATE tests
-  - RUN: npm run test
-  - EXPECTED: All tests pass (155+ tests)
-  - EXPECTED: No new failures introduced
+# NOTE: All tasks are VERIFICATION tasks
+# The implementation has already been completed
+# This PRP documents the completion and provides validation steps
 ```
 
----
-
-### Implementation Code Template
+### Implementation Patterns & Key Details
 
 ```typescript
-// ADD THIS LINE AT LINE 29 in src/core/workflow-context.ts
-// Place AFTER: import { createReflectionConfig } from '../types/index.js';
-// Place BEFORE: interface WorkflowLike {
-
+// Import statement pattern (src/core/workflow-context.ts:30)
 import { getObservedState } from '../decorators/observed-state.js';
+
+// Usage pattern in step() error handler (src/core/workflow-context.ts:155-162)
+} catch (error) {
+  const context = this.createReflectionContext(stepFn);
+  this.emitEvent({
+    type: 'stepError',
+    node: this.workflow.node,
+    error: {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      original: error,
+      workflowId: this.workflow.id,
+      stack: error instanceof Error ? error.stack : undefined,
+      state: getObservedState(this.workflow),  // ← Uses imported function
+      logs: [...this.node.logs] as LogEntry[],
+    },
+    stepName: stepFn.name,
+  });
+  throw error;
+}
+
+// Usage pattern in replaceLastPromptResult() error handler (src/core/workflow-context.ts:319-326)
+} catch (error) {
+  this.emitEvent({
+    type: 'stepError',
+    node: this.workflow.node,
+    error: {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      original: error,
+      workflowId: this.workflow.id,
+      stack: error instanceof Error ? error.stack : undefined,
+      state: getObservedState(this.workflow),  // ← Uses imported function
+      logs: [...this.node.logs] as LogEntry[],
+    },
+  });
+  throw error;
+}
+
+// Reference pattern from @Step decorator (src/decorators/step.ts:145-165)
+const snap = getObservedState(this as object);
+
+const workflowError: WorkflowError = {
+  message: error?.message ?? 'Unknown error',
+  original: err,
+  workflowId: wf.id,
+  stack: error?.stack,
+  state: snap, // State snapshot included in error
+  logs: [...wf.node.logs] as LogEntry[],
+};
 ```
-
-**Context (lines 26-31 showing where to add):**
-
-```typescript
-import { ReflectionManager } from '../reflection/reflection.js';
-import { createReflectionConfig } from '../types/index.js';
-// ADD IMPORT HERE: import { getObservedState } from '../decorators/observed-state.js';
-
-/**
- * Interface for workflow-like objects that can emit events
- */
-interface WorkflowLike {
-```
-
----
 
 ### Integration Points
 
 ```yaml
-NO NEW INTEGRATIONS
-  - This is an import-only change
-  - No function calls added yet (those come in P1.M1.T2.S2 and P1.M1.T2.S3)
-  - No changes to runtime behavior
-  - No new dependencies
+NO NEW INTEGRATIONS:
+  - This task verifies an existing import statement only
+  - No new dependencies required
+  - No configuration changes needed
+  - No database changes needed
+  - No route changes needed
 
-MODIFIED FILES:
-  - file: src/core/workflow-context.ts
-    action: Add import statement at line 29
-    lines_modified: 1 line added
-
-DEPENDS ON:
-  - None (this is the first subtask in P1.M1.T2)
-
-ENABLES:
-  - P1.M1.T2.S2: Fix first error handler (line 155-162)
-  - P1.M1.T2.S3: Fix second error handler (line 319-326)
+EXISTING INTEGRATIONS AFFECTED:
+  - step() error handler (already using getObservedState at line ~160)
+  - replaceLastPromptResult() error handler (already using getObservedState at line ~324)
+  - WorkflowContext.createReflectionContext() method (related to error handling)
 ```
-
----
 
 ## Validation Loop
 
 ### Level 1: Syntax & Style (Immediate Feedback)
 
 ```bash
-# Run after adding the import - fix any issues
-npx tsc --noEmit                   # Type check the codebase
+# Run verification commands
+npm run build           # TypeScript compilation check
+npm run lint           # ESLint style check
+npx tsc --noEmit       # Type checking without emitting files
 
-# Expected: Zero type errors
-# If errors: Check that the import path is correct (../decorators/observed-state.js)
-
-# The import should be visible at:
-grep -n "getObservedState" /home/dustin/projects/groundswell/src/core/workflow-context.ts
-# Expected output: 29:import { getObservedState } from '../decorators/observed-state.js';
+# Expected: Zero errors. If errors exist, READ output and fix before proceeding.
 ```
-
----
 
 ### Level 2: Unit Tests (Component Validation)
 
 ```bash
-# Run all tests to ensure nothing broke
-npm run test
+# Test WorkflowContext functionality specifically
+npm test -- src/__tests__/unit/context.test.ts
 
-# Expected output:
-# ✓ 155+ tests pass (same count as before this change)
+# Full test suite for regression check
+npm test
 
-# Run specific workflow-context related tests
-npx vitest run src/__tests__/unit/context.test.ts
-
-# Expected: All context tests pass
+# Expected: All tests pass
 ```
-
----
 
 ### Level 3: Integration Testing (System Validation)
 
 ```bash
-# Run full test suite
-npm run test
+# No specific integration tests needed for import verification
+# The standard test suite covers integration scenarios
 
-# Expected: All tests pass
-# No changes to test count (this is import-only, no new functionality)
+npm test
 
-# Verify the import is accessible
-node -e "
-import('./src/core/workflow-context.ts').then(m => console.log('Module loaded successfully'))
-"
-# Expected: No import errors
+# Expected: All integration tests pass
 ```
 
----
-
-### Level 4: Creative & Domain-Specific Validation
+### Level 4: Manual Verification
 
 ```bash
-# Domain-specific validation for import changes:
+# 1. Visual inspection of the import
+head -n 35 src/core/workflow-context.ts | tail -n 10
 
-# 1. Verify import is NOT duplicated
-grep -c "getObservedState" /home/dustin/projects/groundswell/src/core/workflow-context.ts
-# Expected: 1 (only the import we added)
+# Expected output should show around line 30:
+# import { getObservedState } from '../decorators/observed-state.js';
 
-# 2. Verify import path resolution
-node -p "
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const resolved = require.resolve('../decorators/observed-state.js', { paths: ['./src/core'] });
-console.log(resolved);
-"
-# Expected: Resolves to /home/dustin/projects/groundswell/src/decorators/observed-state.ts
+# 2. Verify usage in error handlers
+grep -n "getObservedState" src/core/workflow-context.ts
 
-# 3. Verify import matches workflow.ts pattern
-diff <(grep "getObservedState" /home/dustin/projects/groundswell/src/core/workflow.ts) \
-     <(grep "getObservedState" /home/dustin/projects/groundswell/src/core/workflow-context.ts)
-# Expected: Only whitespace differences (same import statement)
+# Expected output should show:
+# 30:import { getObservedState } from '../decorators/observed-state.js';
+# ~160:      state: getObservedState(this.workflow),
+# ~324:      state: getObservedState(this.workflow),
 
-# 4. Verify no circular dependencies
-npx tsc --noEmit --graph
-# Expected: No circular dependency warnings involving workflow-context.ts and observed-state.ts
+# 3. Verify no duplicate imports
+grep -c "import.*getObservedState" src/core/workflow-context.ts
+
+# Expected: 1 (single import, no duplicates)
+
+# 4. Verify the import was added in git history
+git log --oneline -5 -- src/core/workflow-context.ts
+
+# Expected: Should show commit 84e63ed or 5f6ce19 that added the import
 ```
-
----
 
 ## Final Validation Checklist
 
 ### Technical Validation
 
-- [ ] Import statement added to workflow-context.ts
-- [ ] TypeScript compiles: `npx tsc --noEmit` succeeds
-- [ ] All tests pass: `npm run test`
-- [ ] No duplicate imports (grep shows exactly 1 match)
-- [ ] Import path uses .js extension
+- [ ] All 4 validation levels completed successfully
+- [ ] All tests pass: `npm test`
+- [ ] No linting errors: `npm run lint`
+- [ ] No type errors: `npm run build`
+- [ ] Import statement exists at line 30 of src/core/workflow-context.ts
+- [ ] No duplicate imports of getObservedState
 
 ### Feature Validation
 
-- [ ] Import matches the pattern from workflow.ts line 11
-- [ ] Import is placed at correct location (after other imports)
-- [ ] Import uses named import syntax: `{ getObservedState }`
-- [ ] File structure preserved (no other lines modified)
+- [ ] Import follows codebase pattern: `import { getObservedState } from '../decorators/observed-state.js';`
+- [ ] Import positioned correctly (after type imports, as last regular import)
+- [ ] Function available in step() catch block
+- [ ] Function available in replaceLastPromptResult() catch block
+- [ ] Manual verification confirms single import at line 30
 
 ### Code Quality Validation
 
-- [ ] Follows existing import grouping pattern
-- [ ] No trailing whitespace added
-- [ ] Import line formatted consistently with other imports
-- [ ] Ready for use in P1.M1.T2.S2 and P1.M1.T2.S3
+- [ ] Follows existing codebase import organization pattern
+- [ ] Uses .js extension in relative import path (ES2022 requirement)
+- [ ] Named import matches source export in observed-state.ts
+- [ ] No unused imports (verified by ESLint)
+- [ ] Consistent with other decorator imports in codebase
+
+### Documentation & Deployment
+
+- [ ] No new environment variables added
+- [ ] No configuration changes required
+- [ ] PRP documents that task was already complete (verification only)
 
 ---
 
 ## Anti-Patterns to Avoid
 
-- ❌ Don't add the import in the middle of existing imports - add after line 28
-- ❌ Don't forget the .js extension - use `../decorators/observed-state.js`
-- ❌ Don't use default import - must be named: `{ getObservedState }`
-- ❌ Don't skip validation - always run `npm run test` after adding imports
-- ❌ Don't add this import to other files - only workflow-context.ts needs it
-- ❌ Don't add duplicate imports if it already exists (check with grep first)
+- ❌ Don't add duplicate imports - check line 30 first
+- ❌ Don't use `import type` for getObservedState - it's a runtime function
+- ❌ Don't forget the .js extension in the import path
+- ❌ Don't use default import syntax - getObservedState is a named export
+- ❌ Don't place import in the wrong location (must be after type imports)
+- ❌ Don't skip verification - always run tests after changes
+- ❌ Don't use `getObservedState(this)` in WorkflowContext - use `getObservedState(this.workflow)`
 
 ---
 
-## External Research Summary
+## Implementation Status
 
-This task requires minimal external research as it follows an established pattern within the codebase:
+**CRITICAL NOTE**: This task has been **ALREADY COMPLETED**. The verification process confirms:
 
-1. **Pattern Reference**: P1.M1.T1.S1 already added this exact import to workflow.ts - follow that pattern
+1. ✅ Import exists at `src/core/workflow-context.ts:30`
+2. ✅ Usage in `step()` error handler at line ~160
+3. ✅ Usage in `replaceLastPromptResult()` error handler at line ~324
+4. ✅ Git commits `84e63ed` and `5f6ce19` contain the implementation
+5. ✅ Related subtasks P1.M1.T2.S2 and S3 are also complete
 
-2. **TypeScript Import Best Practice**: Always use `.js` extension in import paths even for TypeScript files (ESM requirement)
+This PRP serves as **validation documentation** rather than implementation instructions. The work was completed in prior commits.
 
-3. **Import Organization**: Group imports by purpose - types first, then implementations
+## Confidence Score
 
----
+**10/10** - Implementation is already complete and verified. The PRP provides comprehensive context for understanding the pattern and validating the existing implementation.
 
-## Success Metrics
+## Related Work Items
 
-**Confidence Score**: 10/10
-
-**Justification**:
-- Single line change, very low complexity
-- Exact pattern already established in P1.M1.T1.S1
-- Clear file path and line number specified
-- Import statement provided verbatim
-- Validation commands are straightforward
-
-**Expected Implementation Time**: 2-5 minutes
-
-**Risk Factors**:
-- Zero risk: Import-only change, no runtime behavior modification
-- No dependencies: This is the first subtask in the sequence
-- High confidence: Same change already validated in workflow.ts
-
-**Dependencies**:
-- None (this is the first subtask in P1.M1.T2)
-
-**Enables**:
-- P1.M1.T2.S2: Fix first error handler (line 155-162)
-- P1.M1.T2.S3: Fix second error handler (line 319-326)
-- P1.M1.T2.S4: Write test for WorkflowContext error state capture
-
----
-
-## Appendix: Quick Reference
-
-### Key Files
-
-- **Target file**: `/home/dustin/projects/groundswell/src/core/workflow-context.ts`
-- **Add import at**: Line 29 (after existing imports)
-- **Reference pattern**: `/home/dustin/projects/groundswell/src/core/workflow.ts` line 11
-- **Source module**: `/home/dustin/projects/groundswell/src/decorators/observed-state.ts`
-
-### Commands
-
-```bash
-# Type check
-npx tsc --noEmit
-
-# Run tests
-npm run test
-
-# Verify import added
-grep "getObservedState" src/core/workflow-context.ts
-```
-
-### Import Statement
-
-```typescript
-import { getObservedState } from '../decorators/observed-state.js';
-```
-
----
-
-## Related Tasks
-
-- **P1.M1.T1.S1** (Complete): Added same import to workflow.ts - use as reference
-- **P1.M1.T2.S2** (Next): Will use this import in first error handler
-- **P1.M1.T2.S3** (After S2): Will use this import in second error handler
-- **P1.M1.T2.S4** (Final): Will write tests validating error state capture
-
----
-
-**PRP Version**: 1.0
-**Created**: 2025-01-11
-**Status**: Ready for Implementation
+- **P1.M1.T1.S1**: Add getObservedState import to workflow.ts - ✅ COMPLETE (similar pattern)
+- **P1.M1.T2.S2**: Fix first error handler in step() method - ✅ COMPLETE (line ~160)
+- **P1.M1.T2.S3**: Fix second error handler in replaceLastPromptResult() - ✅ COMPLETE (line ~324)
+- **P1.M1.T2.S4**: Write test for WorkflowContext error state capture - ⏳ Researching (depends on S2/S3)
