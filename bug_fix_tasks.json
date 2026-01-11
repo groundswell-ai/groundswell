@@ -238,7 +238,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T3.S1",
                   "title": "Add duplicate check to attachChild() method",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/GAP_ANALYSIS_SUMMARY.md Issue #7 - attachChild() at lines 164-174 in src/core/workflow.ts doesn't check if child already attached.\n2. INPUT: child workflow parameter to attach.\n3. LOGIC: At start of attachChild() method (before line 164), add: if (this.children.includes(child)) { throw new Error('Child already attached to this workflow'); }. This prevents duplicate children array entries and inconsistent state.\n4. OUTPUT: Updated attachChild() that throws descriptive error when duplicate attachment attempted."

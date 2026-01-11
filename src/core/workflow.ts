@@ -185,6 +185,10 @@ export class Workflow<T = unknown> {
    * Called automatically in constructor when parent is provided
    */
   public attachChild(child: Workflow): void {
+    if (this.children.includes(child)) {
+      throw new Error('Child already attached to this workflow');
+    }
+
     this.children.push(child);
     this.node.children.push(child.node);
 

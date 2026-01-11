@@ -238,6 +238,17 @@ describe('Workflow', () => {
     );
   });
 
+  it('should throw error when duplicate attachment attempted', () => {
+    // Arrange: Create parent and child workflows with first attachment
+    const parent = new SimpleWorkflow('Parent');
+    const child = new SimpleWorkflow('Child', parent);
+
+    // Act & Assert: Second attachment attempt should throw error
+    expect(() => parent.attachChild(child)).toThrow(
+      'Child already attached to this workflow'
+    );
+  });
+
   it('should emit treeUpdated event when status changes', () => {
     // Arrange: Create workflow instance
     const wf = new SimpleWorkflow();
