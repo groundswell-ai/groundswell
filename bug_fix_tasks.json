@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Error Handling & State Capture Fixes",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Fix functional workflow error handlers to properly capture state and logs, ensuring error introspection works as specified in the PRD.",
           "tasks": [
             {
@@ -69,7 +69,7 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "Fix Empty State/Logs in WorkflowContext.step() Error Handler",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Update the WorkflowContext.step() error handlers in src/core/workflow-context.ts to capture actual state and logs.",
               "subtasks": [
                 {
@@ -107,7 +107,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S4",
                   "title": "Write test for WorkflowContext error state capture",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T2.S3"

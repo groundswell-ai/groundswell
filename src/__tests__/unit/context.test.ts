@@ -9,6 +9,7 @@ import {
   type AgentExecutionContext,
 } from '../../core/context.js';
 import type { WorkflowNode, WorkflowEvent } from '../../types/index.js';
+import { Workflow, WorkflowObserver, ObservedState } from '../../index.js';
 
 describe('AgentExecutionContext', () => {
   const createMockNode = (name: string): WorkflowNode => ({
@@ -134,5 +135,83 @@ describe('AgentExecutionContext', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0].type).toBe('stepStart');
+  });
+});
+
+describe('WorkflowContext', () => {
+  // Test workflow class with @ObservedState decorated fields
+  class StatefulTestWorkflow extends Workflow {
+    @ObservedState()
+    stepCount: number = 0;
+
+    @ObservedState({ redact: true })
+    apiKey: string = 'secret-key-123';
+
+    @ObservedState({ hidden: true })
+    internalCounter: number = 42;
+  }
+
+  it('should capture state and logs in step() error handler', async () => {
+    // Arrange: Create observer to capture error events
+    const events: WorkflowEvent[] = [];
+
+    const observer: WorkflowObserver = {
+      onLog: () => {},
+      onEvent: (event) => events.push(event),
+      onStateUpdated: () => {},
+      onTreeChanged: () => {},
+    };
+
+    // Arrange: Create workflow with @ObservedState fields using functional executor
+    const workflow = new StatefulTestWorkflow(
+      { name: 'StepErrorTest' },
+      async (ctx) => {
+        // Modify @ObservedState fields on the workflow instance
+        (workflow as any).stepCount = 5;
+        (workflow as any).apiKey = 'updated-key';
+        (workflow as any).internalCounter = 99;
+
+        // Execute a step that will fail - THIS TRIGGERS WorkflowContext.step() ERROR HANDLER
+        await ctx.step('failing-step', async () => {
+          throw new Error('Test error from step');
+        });
+      }
+    );
+
+    // Act: Attach observer and trigger error
+    workflow.addObserver(observer);
+    await expect(workflow.run()).rejects.toThrow('Test error from step');
+
+    // Assert: Verify error event was emitted
+    const errorEvents = events.filter((e) => e.type === 'error');
+    expect(errorEvents.length).toBeGreaterThanOrEqual(1);
+
+    // Assert: Verify error structure
+    const errorEvent = errorEvents[0];
+    expect(errorEvent.error).toBeDefined();
+    expect(errorEvent.error.message).toBe('Test error from step');
+
+    // Assert: Verify @ObservedState fields were captured in state
+    expect(errorEvent.error.state).toBeDefined();
+    expect(typeof errorEvent.error.state).toBe('object');
+
+    // Assert: Verify public field value is captured
+    expect(errorEvent.error.state.stepCount).toBe(5);
+
+    // Assert: Verify redacted field shows '***'
+    expect(errorEvent.error.state.apiKey).toBe('***');
+
+    // Assert: Verify hidden field is NOT in state
+    expect('internalCounter' in errorEvent.error.state).toBe(false);
+
+    // Assert: Verify logs array is present (may be empty)
+    expect(errorEvent.error.logs).toBeDefined();
+    expect(Array.isArray(errorEvent.error.logs)).toBe(true);
+
+    // Assert: Verify workflow status
+    expect(workflow.status).toBe('failed');
+
+    // Assert: Verify workflowId is captured
+    expect(errorEvent.error.workflowId).toBe(workflow.id);
   });
 });
