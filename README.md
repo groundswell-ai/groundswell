@@ -113,16 +113,59 @@ Immutable value objects defining what to send to an agent and how to validate th
 
 ## Decorators
 
-```typescript
-// Emit lifecycle events and track timing
-@Step({ trackTiming: true, snapshotState: true })
-async processData(): Promise<void> { }
+### @Step
 
-// Spawn and manage child workflows
+Emit lifecycle events and track step execution timing.
+
+**Default Behavior**: Without any options, `@Step()` automatically tracks timing information.
+
+```typescript
+@Step()  // Timing tracked by default
+async processData(): Promise<void> { }
+```
+
+**Configuration Options**:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | `string` | method name | Custom step name |
+| `trackTiming` | `boolean` | `true` | Include duration in `stepEnd` event. Set to `false` to eliminate timing overhead. |
+| `snapshotState` | `boolean` | `false` | Capture state snapshot after step completion |
+| `logStart` | `boolean` | `false` | Log message at step start |
+| `logFinish` | `boolean` | `false` | Log message at step end (includes duration) |
+
+**Examples**:
+
+```typescript
+// Default behavior - timing tracked automatically
+@Step()
+async basicStep(): Promise<void> { }
+
+// Disable timing for performance-critical code
+@Step({ trackTiming: false })
+async highFrequencyStep(): Promise<void> { }
+
+// Full configuration
+@Step({ trackTiming: true, snapshotState: true, logStart: true })
+async monitoredStep(): Promise<void> { }
+```
+
+**Performance Note**: Timing tracking has minimal overhead. Disable `trackTiming` only in performance-critical code paths with high-frequency execution.
+
+### @Task
+
+Spawn and manage child workflows.
+
+```typescript
 @Task({ concurrent: true })
 async createWorkers(): Promise<WorkerWorkflow[]> { }
+```
 
-// Mark fields for state snapshots
+### @ObservedState
+
+Mark fields for state snapshots.
+
+```typescript
 @ObservedState()
 progress: number = 0;
 

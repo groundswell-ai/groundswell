@@ -269,7 +269,7 @@
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Document trackTiming Default Behavior",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Add clear documentation explaining that trackTiming defaults to true in the @Step decorator.",
               "subtasks": [
                 {
@@ -285,7 +285,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S2",
                   "title": "Update README.md with @Step decorator timing documentation",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S1"
