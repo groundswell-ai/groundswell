@@ -1,669 +1,527 @@
-# PRP: Replace Empty State with getObservedState in runFunctional() Catch Block
+# PRP: Agent & Prompt Foundation + Hierarchy Integration
 
-**Task ID**: P1.M1.T1.S2
-**Status**: Ready for Implementation
-**Story Points**: 1
-**Dependencies**: P1.M1.T1.S1 (Complete)
+## Phases 1 & 2 Implementation Plan
 
 ---
 
 ## Goal
 
-**Feature Goal**: Fix the empty `state: {}` placeholder in the `runFunctional()` method's error handler to capture actual workflow state using `getObservedState(this)`.
+### Feature Goal
+Implement the foundational Agent and Prompt classes with full Anthropic SDK integration, and integrate them into the existing workflow hierarchy with automatic context propagation and event capture.
 
-**Deliverable**: Single-line modification to `src/core/workflow.ts` line 294, replacing `state: {}` with `state: getObservedState(this)`.
+### Deliverable
+A complete Agent/Prompt system where:
+1. `Agent` class wraps Anthropic SDK for prompt execution
+2. `Prompt<T>` class provides type-safe, immutable prompt definitions with Zod validation
+3. Agent calls within workflow steps automatically capture events in the workflow tree
+4. Zero-plumbing context propagation via `AsyncLocalStorage`
+5. Extended `WorkflowEvent` union captures all agent/prompt/tool activities
 
-**Success Definition**:
-- The error handler captures actual workflow state instead of empty object
-- State is properly typed as `SerializedWorkflowState` (Record<string, unknown>)
-- The captured state includes all fields decorated with `@ObservedState()`
-- Error events emitted from functional workflows contain introspectable state
-- Existing workflow functionality remains unchanged (no behavioral side effects)
-
----
-
-## User Persona
-
-**Target User**: Developer debugging functional workflow failures
-
-**Use Case**: When a functional workflow fails, the developer needs to inspect the workflow state at the time of error to understand what led to the failure and potentially restart the workflow from that state.
-
-**User Journey**:
-1. Developer creates a functional workflow using `new Workflow({ executor })`
-2. Workflow execution fails at some point
-3. Error event is emitted with error details
-4. Developer inspects `error.state` to see actual workflow state
-5. Developer can analyze state to diagnose root cause or enable restart logic
-
-**Pain Points Addressed**:
-- Currently: `error.state` is always `{}` - no useful information
-- After fix: `error.state` contains actual workflow state for debugging
-- Enables error introspection and workflow restart capabilities
+### Success Definition
+- [ ] `npm run build` passes with no TypeScript errors
+- [ ] `npm test` passes all new and existing tests
+- [ ] Agent can execute prompts and validate responses with Zod schemas
+- [ ] Events from agent.prompt() calls appear in WorkflowTreeDebugger output
+- [ ] Context propagates automatically without manual plumbing
 
 ---
 
-## Why
+## Context
 
-### Business Value and User Impact
-
-1. **Debugging Capability**: Developers can see what state led to errors in functional workflows
-2. **Restart Logic**: Captured state enables implementing workflow recovery/restart mechanisms
-3. **Consistency**: Functional workflows now behave consistently with class-based workflows (which already capture state via `@Step` decorator)
-4. **PRD Compliance**: Meets Section 5.1 requirements that `WorkflowError.state` must be populated with actual data
-
-### Integration with Existing Features
-
-- **P1.M1.T1.S1** (Complete): Already imported `getObservedState` at line 10 of workflow.ts
-- **P1.M1.T1.S3** (Next): Will fix empty `logs: []` in same error handler
-- **P1.M1.T1.S4** (Final): Will write tests for both state and logs capture
-- **@Step Decorator**: Uses the same pattern at `src/decorators/step.ts:114`
-
-### Problems Solved
-
-- **Gap Analysis Issue #2**: Empty state/logs in functional workflow error handlers (Lines 126-135 of PRD vs Implementation gap analysis)
-- **Inconsistency**: Class-based workflows capture state, functional workflows don't
-- **Lost Context**: Error events from functional workflows contain no debugging information
-
----
-
-## What
-
-### User-Visible Behavior
-
-**Before**: Error events from functional workflows have `state: {}`
-
-```typescript
-// Current error event output
-{
-  type: 'error',
-  error: {
-    message: 'Something failed',
-    state: {},  // Empty - no debugging information
-    logs: []
-  }
-}
-```
-
-**After**: Error events from functional workflows have `state: { /* actual workflow state */ }`
-
-```typescript
-// Fixed error event output
-{
-  type: 'error',
-  error: {
-    message: 'Something failed',
-    state: { userId: '123', retryCount: 3, lastResult: {...} },  // Actual state!
-    logs: [...]  // Will be fixed in P1.M1.T1.S3
-  }
-}
-```
-
-### Technical Requirements
-
-1. Modify line 294 of `src/core/workflow.ts`
-2. Replace `state: {}` with `state: getObservedState(this)`
-3. No other changes to error object structure
-4. No changes to error handling logic
-5. Type safety: `getObservedState(this)` returns `SerializedWorkflowState` which matches `WorkflowError.state` type
-
-### Success Criteria
-
-- [ ] Line 294 changed from `state: {}` to `state: getObservedState(this)`
-- [ ] No TypeScript compilation errors
-- [ ] All existing tests pass
-- [ ] Error events from functional workflows contain populated state object
-- [ ] State includes all `@ObservedState()` decorated fields from workflow instance
-
----
-
-## All Needed Context
-
-### Context Completeness Check
-
-_Before writing this PRP, validated: "If someone knew nothing about this codebase, would they have everything needed to implement this successfully?"_
-
-**YES** - This PRP includes:
-- Exact file path and line number to modify
-- Complete code context showing current implementation
-- Reference implementation from `@Step` decorator showing the exact pattern to follow
-- Complete `getObservedState` function signature and implementation
-- Type definitions for all involved interfaces
-- Test commands to validate the change
-- Gotchas and constraints specific to this codebase
-
-### Documentation & References
-
+### External Documentation
 ```yaml
-# MUST READ - Include these in your context window
+anthropic_sdk:
+  npm: "https://www.npmjs.com/package/@anthropic-ai/sdk"
+  github: "https://github.com/anthropics/anthropic-sdk-typescript"
+  api_reference: "https://github.com/anthropics/anthropic-sdk-typescript/blob/main/api.md"
+  tool_use: "https://platform.claude.com/docs/en/agents-and-tools/tool-use/implement-tool-use"
+  version: "^0.71.1"
 
-- url: https://blog.logrocket.com/async-await-typescript/
-  why: Error handling patterns in async/try-catch contexts
-  critical: State is preserved within try-catch scope in async functions
+zod:
+  npm: "https://www.npmjs.com/package/zod"
+  docs: "https://v3.zod.dev/"
+  api: "https://zod.dev/api"
+  version: "^3.23.0"
 
-- url: https://javascript.info/custom-errors
-  why: Error enrichment patterns - adding context to errors
-  critical: Use `cause` property and custom error fields for error enrichment
-
-- url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error
-  why: Custom error types and best practices
-  critical: Serialize errors properly, preserve stack traces
-
-- file: src/core/workflow.ts
-  why: Target file for modification - runFunctional() method error handler
-  pattern: Error event emission pattern in catch block (lines 286-297)
-  gotcha: getObservedState already imported at line 10 from P1.M1.T1.S1
-
-- file: src/decorators/step.ts
-  why: Reference implementation showing exact pattern to follow (line 114)
-  pattern: `const snap = getObservedState(this as object);` then `state: snap`
-  gotcha: Uses `this as object` cast for type safety
-
-- file: src/decorators/observed-state.ts
-  why: Implementation of getObservedState function (lines 50-77)
-  pattern: Returns `SerializedWorkflowState` (Record<string, unknown>)
-  gotcha: Uses WeakMap - only returns fields decorated with @ObservedState()
-
-- file: src/types/snapshot.ts
-  why: Type definitions for SerializedWorkflowState and StateFieldMetadata
-  pattern: `export type SerializedWorkflowState = Record<string, unknown>;`
-  gotcha: State structure is flexible key-value pairs
-
-- file: src/types/index.ts
-  why: Complete type definitions including WorkflowError interface
-  pattern: `interface WorkflowError { state: SerializedWorkflowState; logs: LogEntry[]; }`
-  gotcha: State and logs are both required fields
-
-- file: plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md
-  why: Context for this bug fix within the overall initiative
-  section: Issue #2 (Lines 126-135)
-  gotcha: This is part of P1.M1.T1 which has 4 sequential subtasks
-
-- file: plan_bugfix/P1M1T1S2/research/error_handling_patterns.md
-  why: External research on TypeScript error handling best practices
-  section: WeakMap-Based State Capture and 'this' in Catch Blocks
-  gotcha: Arrow functions preserve lexical this - runFunctional uses async method
-
-- file: src/__tests__/integration/agent-workflow.test.ts
-  why: Existing test patterns for error handling in workflows
-  pattern: Observer pattern for event collection, `rejects.toThrow()` for async errors
-  gotcha: Tests validate error events are emitted with proper structure
+async_local_storage:
+  node_docs: "https://nodejs.org/api/async_context.html"
 ```
 
-### Current Codebase Tree
-
-```bash
-groundswell/
-├── src/
-│   ├── core/
-│   │   ├── workflow.ts           # TARGET FILE - line 294
-│   │   ├── workflow-context.ts   # Related file (P1.M1.T2 will fix similar issue)
-│   │   └── index.ts
-│   ├── decorators/
-│   │   ├── step.ts               # Reference implementation (line 114)
-│   │   ├── observed-state.ts     # getObservedState implementation (lines 50-77)
-│   │   └── index.ts
-│   ├── types/
-│   │   ├── snapshot.ts           # SerializedWorkflowState type
-│   │   ├── index.ts              # WorkflowError interface
-│   │   └── ...
-│   └── __tests__/
-│       ├── integration/
-│       │   └── agent-workflow.test.ts  # Error handling test patterns
-│       └── unit/
-│           └── workflow.test.ts        # Workflow unit tests
-└── plan_bugfix/
-    ├── architecture/
-    │   └── ANALYSIS_PRD_VS_IMPLEMENTATION.md
-    └── P1M1T1S2/
-        ├── PRP.md                 # This file
-        └── research/
-            └── error_handling_patterns.md  # External research
-```
-
-### Desired Codebase Tree with Files to be Modified
-
-```bash
-# No new files - single line modification to existing file
-
-src/
-└── core/
-    └── workflow.ts  # MODIFY: Line 294 - change `state: {}` to `state: getObservedState(this)`
-```
-
-### Known Gotchas of This Codebase & Library Quirks
-
-```typescript
-// CRITICAL: getObservedState uses WeakMap-based metadata storage
-// Only returns fields decorated with @ObservedState() - returns {} if none
-// Location: src/decorators/observed-state.ts lines 50-77
-
-// CRITICAL: 'this' in catch block refers to Workflow class instance
-// runFunctional is an async method, so 'this' is properly bound
-// No arrow function gotcha - async methods preserve class instance context
-
-// CRITICAL: getObservedState already imported at line 10 (from P1.M1.T1.S1)
-// Import statement: import { getObservedState } from '../decorators/observed-state.js';
-// Do NOT add duplicate import - use existing import
-
-// PATTERN: Follow @Step decorator pattern (src/decorators/step.ts:114)
-// Reference code: const snap = getObservedState(this as object);
-// Note: Uses `this as object` cast for type safety
-
-// GOTCHA: this.node.stateSnapshot may be null if snapshotState() never called
-// getObservedState(this) reads from WeakMap metadata, not from stateSnapshot
-// These are two different mechanisms - use getObservedState, not stateSnapshot
-
-// GOTCHA: Functional workflows don't use @Step decorator
-// They use executor function pattern: new Workflow({ executor })
-// But they can still have @ObservedState() decorated fields in custom Workflow subclasses
-// The getObservedState function works regardless of executor pattern
-
-// TESTING: Use Vitest framework (not Jest)
-// Run tests with: npm test or vitest run
-// Test files use .test.ts extension in src/__tests__/ directories
-```
-
----
-
-## Implementation Blueprint
-
-### Data Models and Structure
-
-**No new data models** - using existing types:
-
-```typescript
-// From src/types/snapshot.ts
-export type SerializedWorkflowState = Record<string, unknown>;
-
-// From src/types/index.ts (WorkflowError interface)
-interface WorkflowError {
-  message: string;
-  original: unknown;
-  workflowId: string;
-  stack?: string;
-  state: SerializedWorkflowState;  // Type matches getObservedState return type
-  logs: LogEntry[];
-}
-```
-
-### Implementation Tasks (Ordered by Dependencies)
-
+### Codebase Patterns to Follow
 ```yaml
-Task 1: MODIFY src/core/workflow.ts line 294
-  - CHANGE: `state: {}` → `state: getObservedState(this)`
-  - LOCATION: Error handler catch block, lines 286-297, specifically line 294
-  - FOLLOW pattern: src/decorators/step.ts line 114
-  - REFERENCE: `const snap = getObservedState(this as object);` then `state: snap`
-  - NOTE: getObservedState already imported at line 10 from P1.M1.T1.S1
-  - CONTEXT: Async method catch block, 'this' refers to Workflow instance
+workflow_base_class:
+  file: "/src/core/workflow.ts"
+  pattern: "Abstract class with node representation, emitEvent(), observer propagation"
+  key_methods: "constructor(), attachChild(), emitEvent(), getNode(), setStatus()"
 
-Task 2: VALIDATE TypeScript compilation
-  - RUN: npm run build or tsc --noEmit
-  - VERIFY: No type errors related to getObservedState or WorkflowError.state
-  - EXPECTED: Zero compilation errors
+event_types:
+  file: "/src/types/events.ts"
+  pattern: "Discriminated union with type field"
+  existing: "childAttached, stateSnapshot, stepStart, stepEnd, error, taskStart, taskEnd, treeUpdated"
 
-Task 3: RUN existing test suite
-  - RUN: npm test or vitest run
-  - VERIFY: All existing tests still pass
-  - FOCUS: src/__tests__/unit/workflow.test.ts and integration/agent-workflow.test.ts
-  - EXPECTED: All tests pass (this change should not break any existing tests)
+observer_pattern:
+  file: "/src/types/observer.ts"
+  pattern: "WorkflowObserver interface with onLog, onEvent, onStateUpdated, onTreeChanged"
 
-Task 4: MANUAL VERIFICATION (optional but recommended)
-  - CREATE: Test functional workflow with @ObservedState() decorated field
-  - RUN: Workflow and trigger error
-  - VERIFY: Error event contains populated state object
-  - CONFIRM: State includes decorated field values
+step_decorator:
+  file: "/src/decorators/step.ts"
+  pattern: "Method decorator that emits stepStart/stepEnd events, captures timing"
+
+id_generation:
+  file: "/src/utils/id.ts"
+  pattern: "generateId() using crypto.randomUUID()"
+
+type_exports:
+  file: "/src/types/index.ts"
+  pattern: "Re-export all types from individual files"
+
+main_exports:
+  file: "/src/index.ts"
+  pattern: "Export classes from core/, decorators/, debugger/, utils/"
 ```
 
-### Implementation Patterns & Key Details
+### Architectural Decisions (from system_context.md)
+```yaml
+decision_1:
+  rule: "Agent is NOT a Workflow subclass"
+  reason: "Agents execute prompts; they don't have their own lifecycle"
 
-```typescript
-// Current implementation (WRONG):
-// File: src/core/workflow.ts, lines 286-297
+decision_2:
+  rule: "Prompts are immutable value objects"
+  reason: "Prompts define what to send; execution happens via Agent.prompt()"
 
-} catch (error) {
-  this.setStatus('failed');
+decision_3:
+  rule: "WorkflowContext provides step() and spawnWorkflow()"
+  reason: "PRD requires step() callable anywhere in JS control flow"
 
-  // Emit error event
-  this.emitEvent({
-    type: 'error',
-    node: this.node,
-    error: {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      original: error,
-      workflowId: this.id,
-      stack: error instanceof Error ? error.stack : undefined,
-      state: {},      // ← Line 294 - EMPTY OBJECT (WRONG)
-      logs: [],       // ← Line 295 - Will be fixed in P1.M1.T1.S3
-    },
+decision_4:
+  rule: "All SDK properties pass through unchanged"
+  reason: "tools, mcps, skills, hooks, env must map 1:1 to Anthropic SDK"
+```
+
+### Test Patterns
+```yaml
+test_framework: "vitest"
+test_location: "/src/__tests__/unit/*.test.ts and /src/__tests__/integration/*.test.ts"
+test_config: "/vitest.config.ts"
+test_pattern: |
+  import { describe, it, expect } from 'vitest';
+  describe('ClassName', () => {
+    it('should do something', () => {
+      expect(result).toBe(expected);
+    });
   });
-
-  throw error;
-}
-
-// Target implementation (CORRECT):
-// File: src/core/workflow.ts, line 294
-
-} catch (error) {
-  this.setStatus('failed');
-
-  // Emit error event
-  this.emitEvent({
-    type: 'error',
-    node: this.node,
-    error: {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      original: error,
-      workflowId: this.id,
-      stack: error instanceof Error ? error.stack : undefined,
-      state: getObservedState(this),  // ← Line 294 - CAPTURE ACTUAL STATE (CORRECT)
-      logs: [],                       // ← Line 295 - Will be fixed in P1.M1.T1.S3
-    },
-  });
-
-  throw error;
-}
-
-// Reference implementation from @Step decorator:
-// File: src/decorators/step.ts, lines 114-122
-
-} catch (err: unknown) {
-  stepNode.status = 'failed';
-  const error = err as Error;
-  const snap = getObservedState(this as object);  // ← Pattern to follow
-
-  const workflowError: WorkflowError = {
-    message: error?.message ?? 'Unknown error',
-    original: err,
-    workflowId: wf.id,
-    stack: error?.stack,
-    state: snap,                    // ← Use the captured snapshot
-    logs: [...wf.node.logs],
-  };
-  // ... error handling continues
-}
-
-// Key differences from @Step pattern:
-// 1. runFunctional doesn't use 'this as object' cast - 'this' is already Workflow instance
-// 2. runFunctional doesn't create intermediate 'snap' variable - can inline getObservedState(this)
-// 3. runFunctional uses 'error' variable name, not 'err' - match existing code style
-```
-
-### Integration Points
-
-```yaml
-NO NEW INTEGRATIONS - Single line modification to existing code
-
-DEPENDS ON:
-  - P1.M1.T1.S1: Added getObservedState import to workflow.ts (COMPLETE)
-    Import at line 10: import { getObservedState } from '../decorators/observed-state.js';
-
-ENABLES:
-  - P1.M1.T1.S3: Will fix empty logs: [] in same error handler
-  - P1.M1.T1.S4: Will write tests for both state and logs capture
-  - P1.M1.T2: Will apply same pattern to WorkflowContext error handlers
-
-RELATED CODE:
-  - src/decorators/step.ts:114 - Reference implementation
-  - src/decorators/observed-state.ts:50-77 - Function implementation
-  - src/types/snapshot.ts - Type definitions
 ```
 
 ---
 
-## Validation Loop
+## Implementation Tasks
 
-### Level 1: Syntax & Style (Immediate Feedback)
+### Phase 1: Foundation Layer - Agent & Prompt Core
 
+#### P1.M1: Project Setup & Dependencies
+
+**P1.M1.T1.S1: Update package.json with dependencies**
+```
+LOCATION: /package.json
+ACTION: Add dependencies block with @anthropic-ai/sdk@^0.71.1 and zod@^3.23.0
+VALIDATION: npm install succeeds, npm ls @anthropic-ai/sdk zod shows correct versions
+```
+
+**P1.M1.T2.S1: Create AgentConfig and PromptOverrides types**
+```
+LOCATION: /src/types/agent.ts (NEW FILE)
+PATTERN: Follow /src/types/workflow.ts structure
+EXPORTS: AgentConfig, PromptOverrides interfaces
+CONTENT:
+  - AgentConfig: name?, system?, tools?, mcps?, skills?, hooks?, env?, enableReflection?, enableCache?
+  - PromptOverrides: extends relevant AgentConfig fields + temperature?, maxTokens?, stop?, disableCache?
+VALIDATION: tsc --noEmit passes
+```
+
+**P1.M1.T2.S2: Create PromptConfig and Prompt types**
+```
+LOCATION: /src/types/prompt.ts (NEW FILE)
+IMPORTS: z from 'zod', AgentConfig from './agent.js'
+EXPORTS: PromptConfig<T> interface
+CONTENT:
+  - PromptConfig<T>: user (string), data? (Record<string,any>), responseFormat (z.ZodType<T>)
+  - Plus override fields: system?, tools?, mcps?, skills?, hooks?, enableReflection?
+VALIDATION: tsc --noEmit passes
+```
+
+**P1.M1.T2.S3: Create SDK primitive types**
+```
+LOCATION: /src/types/sdk-primitives.ts (NEW FILE)
+PATTERN: Mirror Anthropic SDK types for pass-through
+EXPORTS: Tool, MCPServer, Skill, AgentHooks, HookHandler interfaces
+CONTENT:
+  - Tool: name, description, input_schema (JSON Schema object)
+  - MCPServer: name, version?, transport ('stdio'|'inprocess'), command?, args?, tools?
+  - Skill: name, path (string to skill directory)
+  - AgentHooks: PreToolUse?, PostToolUse?, SessionStart?, SessionEnd? arrays
+VALIDATION: tsc --noEmit passes
+```
+
+**P1.M1.T2.S4: Update types/index.ts exports**
+```
+LOCATION: /src/types/index.ts
+ACTION: Add exports for new type files
+PATTERN: Follow existing re-export pattern
+```
+
+#### P1.M2: Agent & Prompt Class Implementation
+
+**P1.M2.T1.S1: Implement Agent constructor and config storage**
+```
+LOCATION: /src/core/agent.ts (NEW FILE)
+IMPORTS: Anthropic from '@anthropic-ai/sdk', types from '../types/index.js'
+PATTERN: Store config, instantiate private Anthropic client
+CLASS: Agent
+CONSTRUCTOR: (config: AgentConfig) => stores all config fields, creates client
+VALIDATION: Unit test creates Agent instance successfully
+```
+
+**P1.M2.T2.S1: Implement Prompt<T> class**
+```
+LOCATION: /src/core/prompt.ts (NEW FILE)
+IMPORTS: z from 'zod', types from '../types/index.js'
+CLASS: Prompt<T>
+CONSTRUCTOR: (config: PromptConfig<T>) => stores all fields as readonly
+METHODS: validateResponse(data: unknown): T using this.responseFormat.parse()
+PATTERN: Immutable value object - all fields readonly
+VALIDATION: Unit test creates Prompt, validates response successfully
+```
+
+**P1.M2.T1.S2: Implement Agent.prompt() method**
+```
+LOCATION: /src/core/agent.ts
+DEPENDENCIES: Agent constructor, Prompt class
+METHOD: prompt<T>(prompt: Prompt<T>, overrides?: PromptOverrides): Promise<T>
+LOGIC:
+  1. Merge config: Prompt overrides > PromptOverrides param > AgentConfig defaults
+  2. Build Anthropic messages.create() params
+  3. Execute API call
+  4. Extract text content from response
+  5. Parse JSON from text
+  6. Validate with prompt.responseFormat.parse()
+  7. Return typed result
+ERROR_HANDLING: Throw on validation failure, API errors
+VALIDATION: Integration test with mock API or real API call
+```
+
+**P1.M2.T1.S3: Implement Agent.reflect() method**
+```
+LOCATION: /src/core/agent.ts
+DEPENDENCIES: Agent.prompt()
+METHOD: reflect<T>(prompt: Prompt<T>, overrides?: PromptOverrides): Promise<T>
+LOGIC: Same as prompt() but with reflection system prefix when enableReflection is true
+VALIDATION: Unit test verifies reflection prefix added
+```
+
+**P1.M2.T3.S1: Implement tools array pass-through**
+```
+LOCATION: /src/core/agent.ts (within prompt() method)
+LOGIC:
+  1. Merge tools: prompt.toolsOverride ?? overrides?.tools ?? this.config.tools
+  2. Pass to messages.create({ tools: mergedTools })
+  3. Handle tool_use stop_reason with tool execution loop
+VALIDATION: Test with mock tool definition, verify passed to API
+```
+
+**P1.M2.T3.S2: Implement MCP server handler**
+```
+LOCATION: /src/core/mcp-handler.ts (NEW FILE)
+CLASS: MCPHandler
+METHODS:
+  - registerServer(server: MCPServer): void
+  - getTools(): Tool[] (converts MCP tools to Anthropic format)
+LOGIC: For inprocess transport: direct tool registration. For stdio: document as future.
+VALIDATION: Unit test with inprocess MCP server
+```
+
+**P1.M2.T3.S3: Implement hooks pass-through**
+```
+LOCATION: /src/core/agent.ts (within prompt() method)
+LOGIC:
+  1. Merge hooks from config/overrides
+  2. Call PreToolUse hooks before tool execution
+  3. Call PostToolUse hooks after tool execution
+VALIDATION: Unit test verifies hooks called at correct times
+```
+
+**P1.M2.T3.S4: Implement skills and env pass-through**
+```
+LOCATION: /src/core/agent.ts
+LOGIC:
+  - Skills: Load SKILL.md from skill.path, inject into system prompt
+  - Env: Temporarily set process.env during prompt execution
+VALIDATION: Test skill content appears in system prompt
+```
+
+**P1.M2.T4: Update core/index.ts and main exports**
+```
+LOCATION: /src/core/index.ts, /src/index.ts
+ACTION: Export Agent, Prompt classes
+VALIDATION: Import from 'groundswell' works
+```
+
+---
+
+### Phase 2: Hierarchy & Event System Integration
+
+#### P2.M1: Event Tree Extension
+
+**P2.M1.T1.S1: Add agent event types to WorkflowEvent union**
+```
+LOCATION: /src/types/events.ts
+ACTION: Extend WorkflowEvent union with new types
+NEW_TYPES:
+  - { type: 'agentPromptStart'; agentId: string; promptId: string; node: WorkflowNode }
+  - { type: 'agentPromptEnd'; agentId: string; promptId: string; node: WorkflowNode; duration: number; tokenUsage?: { input: number; output: number } }
+  - { type: 'toolInvocation'; toolName: string; input: unknown; output: unknown; duration: number; node: WorkflowNode }
+  - { type: 'mcpEvent'; serverName: string; event: string; node: WorkflowNode }
+  - { type: 'reflectionStart'; level: string; node: WorkflowNode }
+  - { type: 'reflectionEnd'; level: string; success: boolean; node: WorkflowNode }
+VALIDATION: tsc --noEmit passes
+```
+
+**P2.M1.T2.S1: Create AgentExecutionContext for hierarchy tracking**
+```
+LOCATION: /src/core/context.ts (NEW FILE)
+IMPORTS: AsyncLocalStorage from 'node:async_hooks'
+EXPORTS: AgentExecutionContext, agentExecutionContext (singleton)
+INTERFACE:
+  - workflowNode: WorkflowNode | null
+  - emitEvent: (event: WorkflowEvent) => void
+PATTERN: Use AsyncLocalStorage<AgentExecutionContext>
+METHODS:
+  - getContext(): AgentExecutionContext | undefined
+  - runInContext<T>(ctx: AgentExecutionContext, fn: () => Promise<T>): Promise<T>
+VALIDATION: Unit test context propagation through async calls
+```
+
+**P2.M1.T1.S2: Emit agentPromptStart/End events from Agent.prompt()**
+```
+LOCATION: /src/core/agent.ts
+DEPENDENCIES: AgentExecutionContext
+LOGIC:
+  1. Check agentExecutionContext.getContext()
+  2. If context exists, emit agentPromptStart before API call
+  3. Track duration
+  4. Emit agentPromptEnd after response with tokenUsage
+  5. If no context, events are standalone (not in tree)
+VALIDATION: Integration test shows events in tree when called from step
+```
+
+**P2.M1.T1.S3: Emit toolInvocation and mcpEvent events**
+```
+LOCATION: /src/core/agent.ts, /src/core/mcp-handler.ts
+DEPENDENCIES: AgentExecutionContext
+LOGIC:
+  - In tool execution loop: emit toolInvocation for each tool call
+  - In MCP handler: emit mcpEvent for MCP interactions
+VALIDATION: Test tool events appear nested under agentPrompt node
+```
+
+**P2.M1.T2.S2: Integrate context into @Step decorator**
+```
+LOCATION: /src/decorators/step.ts
+DEPENDENCIES: AgentExecutionContext
+LOGIC:
+  1. Before executing step function, get/create WorkflowNode
+  2. Create AgentExecutionContext with node and emitEvent
+  3. Use runInContext() to wrap step execution
+  4. Any agent.prompt() inside step automatically inherits context
+VALIDATION: Agent calls inside @Step decorated methods emit events in tree
+```
+
+#### P2.M2: WorkflowContext Implementation
+
+**P2.M2.T1.S1: Define WorkflowContext interface**
+```
+LOCATION: /src/types/workflow-context.ts (NEW FILE)
+EXPORTS: WorkflowContext interface
+CONTENT:
+  - workflowId: string
+  - parentWorkflowId?: string
+  - step(name: string, fn: () => Promise<any>): Promise<any>
+  - spawnWorkflow(wf: Workflow): Promise<any>
+  - eventTree: EventTreeHandle
+  - reflection: ReflectionAPI (placeholder for Phase 3)
+VALIDATION: tsc --noEmit passes
+```
+
+**P2.M2.T1.S2: Implement WorkflowContext class**
+```
+LOCATION: /src/core/workflow-context.ts (NEW FILE)
+CLASS: WorkflowContextImpl implements WorkflowContext
+CONSTRUCTOR: (workflow: Workflow)
+METHODS:
+  - step(name, fn): Creates step node, sets AgentExecutionContext, executes fn, captures result/error, emits stepStart/stepEnd
+  - spawnWorkflow(wf): Attaches child workflow, runs it, returns result
+  - eventTree getter: Returns EventTreeHandle for current workflow
+PATTERN: Use AgentExecutionContext.runInContext() in step()
+VALIDATION: Test step() creates events, test spawnWorkflow() attaches children
+```
+
+**P2.M2.T1.S3: Update Workflow class for executor pattern**
+```
+LOCATION: /src/core/workflow.ts
+ACTION: Add optional executor function to constructor
+SIGNATURE: constructor(config?: WorkflowConfig | string, executor?: (ctx: WorkflowContext) => Promise<any>)
+LOGIC:
+  - If executor provided: In run(), create WorkflowContext, call executor(ctx)
+  - Keep abstract run() support for class-based workflows (backward compat)
+NEW_INTERFACE:
+  WorkflowConfig { name?: string; enableReflection?: boolean }
+VALIDATION: Both patterns work - class-based and functional
+```
+
+**P2.M2.T2.S1: Implement EventTreeHandle**
+```
+LOCATION: /src/core/event-tree.ts (NEW FILE)
+CLASS: EventTreeHandle
+CONSTRUCTOR: (root: WorkflowNode)
+METHODS:
+  - get root(): EventNode
+  - getNode(id: string): EventNode | undefined
+  - getChildren(id: string): EventNode[]
+  - getAncestors(id: string): EventNode[]
+  - toJSON(): EventNode
+PATTERN: Use existing WorkflowNode traversal from WorkflowTreeDebugger
+VALIDATION: Unit test all traversal methods
+```
+
+**P2.M2.T3: Update exports**
+```
+LOCATION: /src/types/index.ts, /src/core/index.ts, /src/index.ts
+ACTION: Export all new types and classes
+EXPORTS:
+  - WorkflowContext, WorkflowContextImpl
+  - EventTreeHandle
+  - AgentExecutionContext helpers
+VALIDATION: All exports accessible from main package
+```
+
+---
+
+## Validation Gates
+
+### After Phase 1:
 ```bash
-# After modifying line 294, run these commands to verify syntax
-
-# Type checking (catches type errors early)
-npm run build
-# OR if using tsc directly:
-npx tsc --noEmit
-
-# Expected: Zero compilation errors
-# If errors occur, check:
-# - getObservedState import exists (should already be at line 10)
-# - Type mismatch between SerializedWorkflowState and WorkflowError.state (should match)
-# - 'this' context is correct in async method
-
-# Linting (if using ESLint or similar)
+# Type check
 npm run lint
-# OR if using eslint directly:
-npx eslint src/core/workflow.ts
 
-# Expected: Zero linting errors
+# Build
+npm run build
+
+# Unit tests for Agent and Prompt
+npm test -- --grep "Agent|Prompt"
+
+# Manual validation
+node -e "const { Agent, Prompt } = require('./dist'); console.log('Imports work');"
 ```
 
-### Level 2: Unit Tests (Component Validation)
-
+### After Phase 2:
 ```bash
-# Run all workflow tests
-npm test -- src/__tests__/unit/workflow.test.ts
-
-# Run integration tests for workflow error handling
-npm test -- src/__tests__/integration/agent-workflow.test.ts
-
-# Run full test suite to ensure no regressions
+# Full test suite
 npm test
-# OR using vitest directly:
-npx vitest run
 
-# Expected: All tests pass
-# This change should not break any existing tests
-# Test validation will be added in P1.M1.T1.S4
+# Integration test - events in tree
+npm test -- --grep "tree-mirroring"
 
-# Coverage check (if available)
-npm run test:coverage
-# Expected: Coverage for workflow.ts remains consistent
-```
+# Manual validation - create workflow with agent
+cat << 'EOF' > /tmp/test-agent.ts
+import { Workflow, Agent, Prompt, WorkflowTreeDebugger } from './dist';
+import { z } from 'zod';
 
-### Level 3: Integration Testing (System Validation)
-
-```bash
-# Manual verification (optional but recommended)
-
-# 1. Create a test workflow file
-cat > test-state-capture.ts << 'EOF'
-import { Workflow, ObservedState } from './src/index.js';
+const agent = new Agent({ name: 'TestAgent' });
+const prompt = new Prompt({
+  user: 'Say hello',
+  responseFormat: z.object({ message: z.string() })
+});
 
 class TestWorkflow extends Workflow {
-  @ObservedState()
-  public testField: string = 'test-value';
-
-  @ObservedState()
-  public counter: number = 42;
+  async run() {
+    this.setStatus('running');
+    // This should emit events
+    const result = await agent.prompt(prompt);
+    console.log(result);
+    this.setStatus('completed');
+  }
 }
 
-const workflow = new TestWorkflow({ name: 'StateTest' }, async (ctx) => {
-  await ctx.step('failing-step', async () => {
-    throw new Error('Test error with state');
-  });
-});
-
-// Add observer to capture error event
-const observer = {
-  onLog: () => {},
-  onEvent: (event: any) => {
-    if (event.type === 'error') {
-      console.log('Error state:', JSON.stringify(event.error.state, null, 2));
-      console.log('Expected: { testField: "test-value", counter: 42 }');
-    }
-  },
-  onStateUpdated: () => {},
-  onTreeChanged: () => {}
-};
-
-workflow.addObserver(observer);
-
-workflow.run().catch(() => {
-  console.log('Workflow failed as expected');
-});
+const wf = new TestWorkflow('Test');
+const debugger_ = new WorkflowTreeDebugger(wf);
+debugger_.events.subscribe({ next: e => console.log('Event:', e.type) });
+wf.run();
 EOF
-
-# 2. Run the test workflow
-npx tsx test-state-capture.ts
-
-# Expected output:
-# Error state: {
-#   "testField": "test-value",
-#   "counter": 42
-# }
-# Expected: { testField: "test-value", counter: 42 }
-# Workflow failed as expected
-
-# 3. Clean up test file
-rm test-state-capture.ts
-```
-
-### Level 4: Creative & Domain-Specific Validation
-
-```bash
-# Domain-specific validation for workflow state capture
-
-# Test 1: Verify state capture with different field types
-# Test 2: Verify state capture with nested objects
-# Test 3: Verify state capture with @ObservedState({ redact: true }) fields
-# Test 4: Verify state capture with @ObservedState({ hidden: true }) fields (should be excluded)
-
-# These tests will be implemented in P1.M1.T1.S4
-# For now, manual verification is sufficient
-
-# Performance validation (state capture should be fast)
-# The getObservedState function uses WeakMap which is O(n) where n = number of observed fields
-# Typical workflow has < 10 observed fields, so performance impact is negligible
-
-# Memory leak validation
-# WeakMap-based metadata doesn't prevent garbage collection
-# No memory leaks expected from this change
+npx tsx /tmp/test-agent.ts
 ```
 
 ---
 
 ## Final Validation Checklist
 
-### Technical Validation
-
-- [ ] Line 294 modified: `state: {}` → `state: getObservedState(this)`
-- [ ] No TypeScript compilation errors: `npm run build` passes
-- [ ] All existing tests pass: `npm test` passes
-- [ ] No linting errors (if applicable): `npm run lint` passes
-- [ ] Import verification: getObservedState imported at line 10 (from P1.M1.T1.S1)
-
-### Feature Validation
-
-- [ ] Error events from functional workflows contain populated state object
-- [ ] State includes fields decorated with @ObservedState()
-- [ ] State type matches SerializedWorkflowState (Record<string, unknown>)
-- [ ] Manual testing successful: error.state shows actual values, not empty object
-- [ ] No behavioral side effects: existing workflow functionality unchanged
-
-### Code Quality Validation
-
-- [ ] Follows @Step decorator pattern (src/decorators/step.ts:114)
-- [ ] Type-safe: getObservedState(this) returns correct type for WorkflowError.state
-- [ ] No duplicate imports: uses existing getObservedState import from line 10
-- [ ] Maintains existing code style: matches error object structure
-- [ ] Single responsibility: only changes state capture, doesn't touch logs (P1.M1.T1.S3)
-
-### Documentation & Deployment
-
-- [ ] Change is self-documenting: getObservedState(this) clearly indicates intent
-- [ ] No new environment variables or configuration required
-- [ ] No migration needed: backward compatible change
-- [ ] Ready for P1.M1.T1.S3: logs fix in same error handler
-- [ ] Ready for P1.M1.T1.S4: comprehensive test coverage for both state and logs
+- [ ] package.json has @anthropic-ai/sdk@^0.71.1 and zod@^3.23.0
+- [ ] All new files created in correct locations
+- [ ] Types exported from /src/types/index.ts
+- [ ] Classes exported from /src/index.ts
+- [ ] Agent.prompt() executes API calls and validates responses
+- [ ] Prompt<T> provides type-safe response validation
+- [ ] AgentExecutionContext propagates through AsyncLocalStorage
+- [ ] Events emitted when agent.prompt() called within workflow step
+- [ ] WorkflowTreeDebugger shows agent events in tree visualization
+- [ ] @Step decorator integrates context automatically
+- [ ] WorkflowContext.step() works for functional workflow pattern
+- [ ] All existing tests still pass
+- [ ] npm run build produces valid dist/
 
 ---
 
-## Anti-Patterns to Avoid
+## File Creation Summary
 
-- ❌ **Don't add duplicate import**: getObservedState already imported at line 10 from P1.M1.T1.S1
-- ❌ **Don't use `this as object` cast**: Not needed in runFunctional context (unlike @Step decorator)
-- ❌ **Don't create intermediate variable**: Direct inline `getObservedState(this)` is cleaner
-- ❌ **Don't modify logs line 295**: That's P1.M1.T1.S3's responsibility
-- ❌ **Don't change error handling logic**: Only change state capture, preserve all other behavior
-- ❌ **Don't use `this.node.stateSnapshot`**: Wrong mechanism - use getObservedState(this) instead
-- ❌ **Don't add null check**: getObservedState already handles empty case (returns {})
-- ❌ **Don't write tests yet**: P1.M1.T1.S4 will write comprehensive tests for both state and logs
-- ❌ **Don't modify other error handlers**: P1.M1.T2 will fix WorkflowContext error handlers
-
----
-
-## PRP Metadata
-
-**Confidence Score**: 10/10 for one-pass implementation success
-
-**Reasons for High Confidence**:
-1. Single-line modification with exact line number specified
-2. Reference implementation available in same codebase (@Step decorator)
-3. All dependencies already satisfied (import added in P1.M1.T1.S1)
-4. Type-safe change with matching return types
-5. No behavioral changes - pure data capture improvement
-6. Comprehensive validation commands provided
-7. All gotchas and constraints documented
-8. External research included for context
-
-**Estimated Implementation Time**: 2 minutes for core change, 5 minutes with validation
-
-**Risk Level**: Very Low
-- Single line change
-- No behavioral modifications
-- No new dependencies
-- Type-safe
-- Follows existing pattern
-
-**Next Tasks After Completion**:
-1. P1.M1.T1.S3: Replace empty `logs: []` with `logs: [...this.node.logs] as LogEntry[]`
-2. P1.M1.T1.S4: Write tests for both state and logs capture in runFunctional() error handler
-3. P1.M1.T2: Apply same pattern to WorkflowContext error handlers
-
----
-
-## Appendix: Quick Reference
-
-### Files to Modify
-
+### New Files:
 ```
-src/core/workflow.ts - Line 294 only
+/src/types/agent.ts           - AgentConfig, PromptOverrides types
+/src/types/prompt.ts          - PromptConfig<T> type
+/src/types/sdk-primitives.ts  - Tool, MCPServer, Skill, AgentHooks types
+/src/types/workflow-context.ts - WorkflowContext interface
+/src/core/agent.ts            - Agent class
+/src/core/prompt.ts           - Prompt<T> class
+/src/core/context.ts          - AgentExecutionContext with AsyncLocalStorage
+/src/core/mcp-handler.ts      - MCPHandler class
+/src/core/workflow-context.ts - WorkflowContextImpl class
+/src/core/event-tree.ts       - EventTreeHandle class
+/src/__tests__/unit/agent.test.ts
+/src/__tests__/unit/prompt.test.ts
+/src/__tests__/unit/context.test.ts
+/src/__tests__/integration/agent-workflow.test.ts
 ```
 
-### Change Summary
-
-```diff
-  state: {},      // ← Line 294 - BEFORE
-- state: {},
-+ state: getObservedState(this),
-  logs: [],       // ← Line 295 - Will be fixed in P1.M1.T1.S3
+### Modified Files:
 ```
-
-### Validation Commands
-
-```bash
-# Build/type check
-npm run build
-
-# Run tests
-npm test
-
-# Manual verification (optional)
-# See Level 3: Integration Testing section above
-```
-
-### Reference Implementation
-
-```typescript
-// File: src/decorators/step.ts, Line 114
-const snap = getObservedState(this as object);
-// ...
-state: snap,
+/package.json                 - Add dependencies
+/src/types/index.ts           - Export new types
+/src/types/events.ts          - Extend WorkflowEvent union
+/src/core/workflow.ts         - Add executor pattern support
+/src/core/index.ts            - Export new classes
+/src/decorators/step.ts       - Integrate AgentExecutionContext
+/src/index.ts                 - Export all new public API
 ```
 
 ---
 
-**PRP Version**: 1.0
-**Last Updated**: 2025-01-10
-**Author**: PRP Generation System
-**Status**: Ready for Implementation
+## Confidence Score: 8/10
+
+**Strengths:**
+- Clear existing codebase patterns to follow
+- Well-documented external dependencies
+- Specific file locations and method signatures
+- Comprehensive validation steps
+
+**Risks:**
+- AsyncLocalStorage integration with existing decorator may need iteration
+- Tool execution loop complexity depends on actual Anthropic SDK behavior
+- MCP handler may need refinement based on actual MCP protocol details
