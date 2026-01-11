@@ -240,6 +240,7 @@ export class Workflow<T = unknown> {
     // Update child's parent if it's currently null
     if (child.parent === null) {
       child.parent = this;
+      child.node.parent = this.node; // Maintain 1:1 mirror between workflow tree and node tree
     }
 
     this.children.push(child);
@@ -294,8 +295,9 @@ export class Workflow<T = unknown> {
       this.node.children.splice(nodeIndex, 1);
     }
 
-    // Clear child's parent reference
+    // Clear child's parent reference (both workflow tree and node tree)
     child.parent = null;
+    child.node.parent = null; // Maintain 1:1 mirror between workflow tree and node tree
 
     // Emit childDetached event
     this.emitEvent({

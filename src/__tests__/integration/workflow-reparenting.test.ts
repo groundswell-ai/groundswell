@@ -14,6 +14,7 @@ import {
   Workflow,
   WorkflowObserver,
   WorkflowEvent,
+  WorkflowTreeDebugger,
 } from '../../index.js';
 
 /**
@@ -182,5 +183,121 @@ describe('Integration: Reparenting Observer Propagation', () => {
     child.setStatus('completed');
     expect(eventsA.some((e) => e.type === 'treeUpdated')).toBe(true);
     expect(eventsC.some((e) => e.type === 'treeUpdated')).toBe(false);
+  });
+
+  it('should verify tree consistency after reparenting using debugger', () => {
+    // ============================================================
+    // PHASE 1: Setup - Create parent1, parent2, and child
+    // ============================================================
+    // ARRANGE: Create two root workflows
+    const parent1 = new SimpleWorkflow('Parent1');
+    const parent2 = new SimpleWorkflow('Parent2');
+
+    // ARRANGE: Create child attached to parent1 (via constructor)
+    const child = new SimpleWorkflow('Child', parent1);
+
+    // ARRANGE: Create debugger attached to parent1
+    const parent1Debugger = new WorkflowTreeDebugger(parent1);
+
+    // ASSERT: Verify initial tree structure
+    expect(child.parent).toBe(parent1);
+    expect(parent1.children).toContain(child);
+    expect(parent2.children).not.toContain(child);
+
+    // ASSERT: Verify debugger sees initial structure
+    const initialTree = parent1Debugger.getTree();
+    expect(initialTree.name).toBe('Parent1');
+    expect(initialTree.children.length).toBe(1);
+    expect(initialTree.children[0].name).toBe('Child');
+
+    // ============================================================
+    // PHASE 2: Reparenting operation
+    // ============================================================
+    // ACT: Reparent child from parent1 to parent2
+    parent1.detachChild(child);
+    parent2.attachChild(child);
+
+    // ASSERT: Verify basic reparenting succeeded
+    expect(child.parent).toBe(parent2);
+    expect(parent2.children).toContain(child);
+    expect(parent1.children).not.toContain(child);
+
+    // ============================================================
+    // PHASE 3: Verify workflow tree structure
+    // ============================================================
+    // ASSERT: Verify child.parent points to new parent
+    expect(child.parent).toBe(parent2);
+
+    // ASSERT: Verify new parent.children includes child
+    expect(parent2.children).toContain(child);
+
+    // ASSERT: Verify old parent.children does NOT include child
+    expect(parent1.children).not.toContain(child);
+
+    // ============================================================
+    // PHASE 4: Verify node tree structure using debugger
+    // ============================================================
+    // NOTE: parent1Debugger is still attached to parent1, so it shows parent1's tree
+    // Create debugger for parent2 to see the new tree structure
+    const parent2Debugger = new WorkflowTreeDebugger(parent2);
+
+    // ASSERT: Verify debugger can find child node
+    const childNode = parent2Debugger.getNode(child.id);
+    expect(childNode).toBeDefined();
+    expect(childNode?.name).toBe('Child');
+
+    // ASSERT: Verify child's node parent is parent2's node (node tree mirrors workflow tree)
+    const parent2NodeDirect = parent2.getNode();
+    expect(childNode?.parent).toBe(parent2NodeDirect);
+
+    // ASSERT: Verify parent2's node children includes child's node
+    const parent2Node = parent2Debugger.getNode(parent2.id);
+    const childNodeDirect = child.getNode();
+    expect(parent2Node?.children).toContain(childNodeDirect);
+
+    // ASSERT: Verify parent1's node children does NOT include child's node
+    const parent1Node = parent1Debugger.getNode(parent1.id);
+    expect(parent1Node?.children).not.toContain(childNodeDirect);
+
+    // ============================================================
+    // PHASE 5: Visual validation using toTreeString()
+    // ============================================================
+    // ACT: Get tree string for visual debugging
+    const parent2TreeString = parent2Debugger.toTreeString();
+
+    // ASSERT: Verify tree structure in ASCII representation
+    expect(parent2TreeString).toContain('Parent2');
+    expect(parent2TreeString).toContain('Child');
+    expect(parent2TreeString).toContain('└──'); // Tree connector symbol
+
+    // ============================================================
+    // PHASE 6: Statistical validation
+    // ============================================================
+    const parent2Stats = parent2Debugger.getStats();
+    expect(parent2Stats.totalNodes).toBe(2); // parent2 + child = 2
+
+    // ============================================================
+    // CRITICAL VALIDATION: 1:1 Tree Mirror Invariant
+    // ============================================================
+    // Verify workflow tree and node tree are perfectly synchronized
+    // This is the core invariant that must be maintained
+
+    // Workflow tree state:
+    expect(child.parent).toBe(parent2);
+    expect(parent2.children).toEqual([child]);
+    expect(parent1.children).toEqual([]);
+
+    // Node tree state (via getNode() method):
+    const childNodeFinal = child.getNode();
+    const parent2NodeFinal = parent2.getNode();
+    const parent1NodeFinal = parent1.getNode();
+
+    expect(childNodeFinal.parent).toBe(parent2NodeFinal);
+    expect(parent2NodeFinal.children).toEqual([childNodeFinal]);
+    expect(parent1NodeFinal.children).toEqual([]);
+
+    // Cross-verification: debugger lookup matches direct access
+    expect(parent2Debugger.getNode(child.id)).toBe(childNodeFinal);
+    expect(parent2Debugger.getNode(parent2.id)).toBe(parent2NodeFinal);
   });
 });

@@ -111,7 +111,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Reparenting Support",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Implement detachChild() method to enable proper reparenting workflow, allowing users to move a child from one parent to another without creating inconsistent state.",
           "tasks": [
             {
@@ -169,7 +169,7 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Test Reparenting Workflow",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Write comprehensive tests for the reparenting workflow (detach from old parent, attach to new parent) to ensure observer propagation updates correctly.",
               "subtasks": [
                 {
@@ -187,7 +187,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S2",
                   "title": "Verify tree consistency after reparenting",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T2.S1"
