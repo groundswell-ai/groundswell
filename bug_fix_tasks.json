@@ -276,7 +276,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Add JSDoc comment to @Step decorator trackTiming option",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/GAP_ANALYSIS_SUMMARY.md Issue #6 - trackTiming option defaults to true but this is not documented. Implementation is in src/decorators/step.ts line 94.\n2. INPUT: No external inputs. Documentation change only.\n3. LOGIC: Add JSDoc comment to StepOptions interface in src/types/decorators.ts (or in step.ts if interface defined there). Document: 'trackTiming?: boolean; // Default: true. Set to false to disable step duration tracking.'. Clarify default is true.\n4. OUTPUT: Updated JSDoc documentation that explicitly states trackTiming defaults to true."
