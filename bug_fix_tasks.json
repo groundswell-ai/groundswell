@@ -96,7 +96,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S3",
                   "title": "Fix second error handler in replaceLastPromptResult() method (line 319-326)",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T2.S2"

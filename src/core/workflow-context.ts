@@ -323,8 +323,8 @@ export class WorkflowContextImpl implements WorkflowContext {
           original: error,
           workflowId: this.workflowId,
           stack: error instanceof Error ? error.stack : undefined,
-          state: {},
-          logs: [],
+          state: getObservedState(this.workflow),
+          logs: [...this.workflow.node.logs] as LogEntry[],
         },
       });
 
