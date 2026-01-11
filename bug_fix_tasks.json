@@ -76,7 +76,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "Add getObservedState import to workflow-context.ts",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md - WorkflowContext.ts has 3 error handlers with empty state/logs: lines 155-162, 319-326.\n2. INPUT: No external inputs. Import addition only.\n3. LOGIC: Add import statement: import { getObservedState } from '../decorators/observed-state'; at top of src/core/workflow-context.ts (around line 10).\n4. OUTPUT: Updated workflow-context.ts with getObservedState imported."

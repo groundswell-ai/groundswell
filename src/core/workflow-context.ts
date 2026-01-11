@@ -26,6 +26,7 @@ import {
 import { generateId } from '../utils/id.js';
 import { ReflectionManager } from '../reflection/reflection.js';
 import { createReflectionConfig } from '../types/index.js';
+import { getObservedState } from '../decorators/observed-state.js';
 
 /**
  * Interface for workflow-like objects that can emit events
