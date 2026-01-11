@@ -125,7 +125,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Add childDetached event type to events.ts",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md - Event types are in src/types/events.ts as discriminated union. Need to add childDetached type.\n2. INPUT: Access existing WorkflowEvent type definition from src/types/events.ts. Follow pattern of childAttached event.\n3. LOGIC: Add new case to WorkflowEvent discriminated union: { type: 'childDetached'; parentId: string; childId: string }. Use childId (string) instead of child (WorkflowNode) because child is no longer in tree. Follow existing pattern exactly.\n4. OUTPUT: Updated WorkflowEvent type in src/types/events.ts with childDetached case. TypeScript must compile without errors."

@@ -8,6 +8,7 @@ import type { TokenUsage } from './sdk-primitives.js';
 export type WorkflowEvent =
   // Core workflow events
   | { type: 'childAttached'; parentId: string; child: WorkflowNode }
+  | { type: 'childDetached'; parentId: string; childId: string }
   | { type: 'stateSnapshot'; node: WorkflowNode }
   | { type: 'stepStart'; node: WorkflowNode; step: string }
   | { type: 'stepEnd'; node: WorkflowNode; step: string; duration: number }
