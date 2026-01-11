@@ -3,6 +3,7 @@ import type {
   WorkflowStatus,
   WorkflowEvent,
   WorkflowObserver,
+  LogEntry,
 } from '../types/index.js';
 import type { WorkflowContext, WorkflowConfig, WorkflowResult } from '../types/workflow-context.js';
 import { generateId } from '../utils/id.js';
@@ -292,7 +293,7 @@ export class Workflow<T = unknown> {
           workflowId: this.id,
           stack: error instanceof Error ? error.stack : undefined,
           state: getObservedState(this),
-          logs: [],
+          logs: [...this.node.logs] as LogEntry[],
         },
       });
 
