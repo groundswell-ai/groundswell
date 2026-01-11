@@ -189,6 +189,21 @@ export class Workflow<T = unknown> {
       throw new Error('Child already attached to this workflow');
     }
 
+    // Check if child already has a different parent
+    if (child.parent !== null && child.parent !== this) {
+      const errorMessage =
+        `Child '${child.node.name}' already has a parent '${child.parent.node.name}'. ` +
+        `A workflow can only have one parent. ` +
+        `Use detachChild() on '${child.parent.node.name}' first if you need to reparent.`;
+      console.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
+    // Update child's parent if it's currently null
+    if (child.parent === null) {
+      child.parent = this;
+    }
+
     this.children.push(child);
     this.node.children.push(child.node);
 
