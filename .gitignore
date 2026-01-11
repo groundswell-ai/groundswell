@@ -142,6 +142,9 @@ dist
 ehthumbs.db
 Thumbs.db
 
+# Generated documentation
+llms_full.txt
+
 # Build artifacts
 dist/
 build/

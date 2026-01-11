@@ -1,0 +1,331 @@
+{
+  "backlog": [
+    {
+      "type": "Phase",
+      "id": "P1",
+      "title": "Bug Fix Phase - Critical Issues",
+      "status": "Planned",
+      "description": "Fix critical and major issues identified in the Hierarchical Workflow Engine bug report. This phase addresses functional gaps, security vulnerabilities, and PRD compliance issues to ensure production-readiness.",
+      "milestones": [
+        {
+          "type": "Milestone",
+          "id": "P1.M1",
+          "title": "Error Handling & State Capture Fixes",
+          "status": "Planned",
+          "description": "Fix functional workflow error handlers to properly capture state and logs, ensuring error introspection works as specified in the PRD.",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M1.T1",
+              "title": "Fix Empty State/Logs in Workflow.runFunctional() Error Handler",
+              "status": "Planned",
+              "description": "Update the functional workflow error handler in src/core/workflow.ts to capture actual state and logs instead of empty objects/arrays.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S1",
+                  "title": "Add getObservedState import to workflow.ts",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/GAP_ANALYSIS_SUMMARY.md Issue #2 - The @Step decorator correctly implements state capture using getObservedState(this). This is the reference pattern to follow.\n2. INPUT: No external inputs. This is an import addition only.\n3. LOGIC: Add import statement: import { getObservedState } from '../decorators/observed-state'; at the top of src/core/workflow.ts (around line 12, after other decorator imports).\n4. OUTPUT: Updated workflow.ts with getObservedState imported and ready for use in error handler."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S2",
+                  "title": "Replace empty state object with getObservedState(this) in runFunctional() catch block",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md - The runFunctional() method is at lines 258-301 in src/core/workflow.ts. The error handler at lines 286-297 currently has state: {} and logs: [].\n2. INPUT: getObservedState function from dependency P1.M1.T1.S1.\n3. LOGIC: In the catch block of runFunctional() (around line 286), replace 'state: {}' with 'state: getObservedState(this)'. This follows the same pattern as @Step decorator in src/decorators/step.ts line 114.\n4. OUTPUT: Updated error object with actual captured state instead of empty object. This enables error introspection and workflow restart from captured state."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S3",
+                  "title": "Replace empty logs array with actual logs from this.node.logs in runFunctional() catch block",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M1.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md, the node structure includes 'logs: LogEntry[]' field. The @Step decorator correctly captures logs via spread operator: [...wf.node.logs].\n2. INPUT: this.node.logs array from current workflow instance.\n3. LOGIC: In the same catch block (around line 287), replace 'logs: []' with 'logs: [...this.node.logs] as LogEntry[]'. Use spread operator to create a copy and prevent mutation. Add type assertion for LogEntry[].\n4. OUTPUT: Updated error object with actual captured logs instead of empty array. This enables debugging context when functional workflows fail."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S4",
+                  "title": "Write test for functional workflow error state capture",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M1.T1.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md, test files are in src/__tests__/unit/. Add test to src/__tests__/unit/workflow.test.ts.\n2. INPUT: Completed implementation from P1.M1.T1.S3 with state/logs capture.\n3. LOGIC: Create test 'should capture state and logs in functional workflow error' that: 1) Creates a functional workflow with @ObservedState fields, 2) Triggers an error, 3) Asserts error.state has captured properties, 4) Asserts error.logs contains log entries. Follow existing test patterns in workflow.test.ts.\n4. OUTPUT: Passing test that validates state/logs capture in functional workflow error handler. Test should be added to existing test suite."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M1.T2",
+              "title": "Fix Empty State/Logs in WorkflowContext.step() Error Handler",
+              "status": "Planned",
+              "description": "Update the WorkflowContext.step() error handlers in src/core/workflow-context.ts to capture actual state and logs.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T2.S1",
+                  "title": "Add getObservedState import to workflow-context.ts",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md - WorkflowContext.ts has 3 error handlers with empty state/logs: lines 155-162, 319-326.\n2. INPUT: No external inputs. Import addition only.\n3. LOGIC: Add import statement: import { getObservedState } from '../decorators/observed-state'; at top of src/core/workflow-context.ts (around line 10).\n4. OUTPUT: Updated workflow-context.ts with getObservedState imported."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T2.S2",
+                  "title": "Fix first error handler in step() method (line 155-162)",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M1.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This error handler is in the step() method at lines 155-162. It wraps execution of step functions.\n2. INPUT: getObservedState from dependency P1.M1.T2.S1, and this.node (the workflow node).\n3. LOGIC: Replace 'state: {}' with 'state: getObservedState(this.workflow)' and 'logs: []' with 'logs: [...this.node.logs] as LogEntry[]'. Note: WorkflowContext uses this.workflow not this.\n4. OUTPUT: First error handler updated with actual state/logs capture."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T2.S3",
+                  "title": "Fix second error handler in replaceLastPromptResult() method (line 319-326)",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M1.T2.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This error handler is in replaceLastPromptResult() method at lines 319-326. Same pattern as first handler.\n2. INPUT: getObservedState from dependency P1.M1.T2.S1, and this.node.\n3. LOGIC: Replace 'state: {}' with 'state: getObservedState(this.workflow)' and 'logs: []' with 'logs: [...this.node.logs] as LogEntry[]'.\n4. OUTPUT: Second error handler updated with actual state/logs capture."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T2.S4",
+                  "title": "Write test for WorkflowContext error state capture",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M1.T2.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Test file src/__tests__/unit/context.test.ts exists (4,081 bytes). Add tests there.\n2. INPUT: Completed implementation from P1.M1.T2.S3.\n3. LOGIC: Create test 'should capture state and logs in step() error handler' that: 1) Creates WorkflowContext with observable state, 2) Calls step() with function that throws, 3) Asserts error.state is captured, 4) Asserts error.logs contains entries. Follow existing context.test.ts patterns.\n4. OUTPUT: Passing test validating WorkflowContext error state capture."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P1.M2",
+          "title": "Tree Structure & Event System Fixes",
+          "status": "Planned",
+          "description": "Fix missing treeUpdated event emission and add cycle detection to prevent infinite loops and DoS vulnerabilities.",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M2.T1",
+              "title": "Add Cycle Detection to getRoot() Method",
+              "status": "Planned",
+              "description": "Implement cycle detection in the getRoot() method to prevent infinite loops when circular parent-child relationships exist.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S1",
+                  "title": "Implement cycle detection logic in getRoot() method",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/GAP_ANALYSIS_SUMMARY.md Issue #4 - getRoot() at lines 132-137 in src/core/workflow.ts currently has no cycle detection. Can infinite loop if circular reference created.\n2. INPUT: this.parent chain to traverse.\n3. LOGIC: Rewrite getRoot() method (lines 132-137) to use visited Set: 1) Create 'const visited = new Set<Workflow>()', 2) Loop with 'let current: Workflow | null = this', 3) Inside loop: if (visited.has(current)) throw new Error('Circular parent-child relationship detected'), 4) Add current to visited, 5) Move to parent. This prevents DoS from malicious cycles.\n4. OUTPUT: Updated getRoot() method that throws descriptive error when cycle detected, preventing infinite loops and potential DoS attacks."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S2",
+                  "title": "Write test for cycle detection in getRoot()",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Add test to src/__tests__/unit/workflow.test.ts.\n2. INPUT: Completed cycle detection from P1.M2.T1.S1.\n3. LOGIC: Create test 'should detect circular parent relationship' that: 1) Creates parent and child workflows, 2) Manually sets parent.parent = child (creating cycle), 3) Calls parent.getRoot(), 4) Expects error to be thrown with message 'Circular parent-child relationship detected'. Follow existing test patterns.\n4. OUTPUT: Passing test that validates cycle detection prevents infinite loops."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S3",
+                  "title": "Add cycle detection to getRootObservers() method",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md, getRootObservers() at lines 122-127 in src/core/workflow.ts also traverses parent chain and has same vulnerability.\n2. INPUT: this.parent chain to traverse.\n3. LOGIC: Apply same visited Set pattern from P1.M2.T1.S1 to getRootObservers() method. Ensure the cycle detection check happens before recursing to parent.\n4. OUTPUT: Updated getRootObservers() with cycle detection, consistent with getRoot() implementation."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S4",
+                  "title": "Write test for cycle detection in getRootObservers()",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T1.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Add to same test file as P1.M2.T1.S2.\n2. INPUT: Completed cycle detection from P1.M2.T1.S3.\n3. LOGIC: Create test 'should detect circular relationship in getRootObservers' that: 1) Creates workflows with cycle, 2) Calls getRootObservers(), 3) Expects error to be thrown.\n4. OUTPUT: Passing test validating observer method cycle detection."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M2.T2",
+              "title": "Emit treeUpdated Events on Status Changes",
+              "status": "Planned",
+              "description": "Add treeUpdated event emission in setStatus() method and other appropriate locations to notify observers of tree structural changes.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S1",
+                  "title": "Emit treeUpdated event in setStatus() method",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md Issue #1 - setStatus() at lines 224-227 in src/core/workflow.ts currently doesn't emit treeUpdated. PRD Section 12.2 requires it.\n2. INPUT: new status parameter and this.getRoot().node.\n3. LOGIC: In setStatus() method (after line 226 where this.node.status = status is set), add: this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node });. This triggers observer.onTreeChanged() as specified in PRD.\n4. OUTPUT: Updated setStatus() that emits treeUpdated event, enabling tree debugger to rebuild on status changes."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S2",
+                  "title": "Write test for treeUpdated event emission on setStatus",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M2.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md, tree debugger rebuild() method is called when onTreeChanged() is invoked.\n2. INPUT: Completed setStatus() from P1.M2.T2.S1.\n3. LOGIC: Create test 'should emit treeUpdated event when status changes' that: 1) Creates workflow with observer, 2) Mocks observer.onTreeChanged, 3) Calls workflow.setStatus('running'), 4) Asserts observer.onTreeChanged was called with root node. Follow existing observer test patterns.\n4. OUTPUT: Passing test validating treeUpdated emission triggers observer callbacks."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S3",
+                  "title": "Emit treeUpdated event after snapshotState() completes",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T2.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: snapshotState() is called after state changes and should trigger tree updates.\n2. INPUT: this.getRoot().node after state snapshot.\n3. LOGIC: Find snapshotState() method in src/core/workflow.ts, add this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node }); at the end of method. This ensures observers are notified when workflow state is captured.\n4. OUTPUT: Updated snapshotState() that emits treeUpdated event."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S4",
+                  "title": "Write integration test for treeUpdated event propagation",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M2.T2.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Add to src/__tests__/integration/tree-mirroring.test.ts.\n2. INPUT: Completed treeUpdated emissions from P1.M2.T2.S3.\n3. LOGIC: Create integration test 'should propagate treeUpdated events to root observers' that: 1) Creates parent-child workflow tree, 2) Attaches observer to root, 3) Calls child.setStatus('completed'), 4) Verifies root observer receives treeUpdated event. Tests tree-wide event propagation.\n4. OUTPUT: Passing integration test validating treeUpdated events propagate correctly through hierarchy."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M2.T3",
+              "title": "Add Duplicate Attachment Prevention",
+              "status": "Planned",
+              "description": "Prevent the same workflow from being attached to a parent multiple times by adding validation in attachChild().",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T3.S1",
+                  "title": "Add duplicate check to attachChild() method",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/GAP_ANALYSIS_SUMMARY.md Issue #7 - attachChild() at lines 164-174 in src/core/workflow.ts doesn't check if child already attached.\n2. INPUT: child workflow parameter to attach.\n3. LOGIC: At start of attachChild() method (before line 164), add: if (this.children.includes(child)) { throw new Error('Child already attached to this workflow'); }. This prevents duplicate children array entries and inconsistent state.\n4. OUTPUT: Updated attachChild() that throws descriptive error when duplicate attachment attempted."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T3.S2",
+                  "title": "Write test for duplicate attachment prevention",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Add to src/__tests__/unit/workflow.test.ts.\n2. INPUT: Completed attachChild() validation from P1.M2.T3.S1.\n3. LOGIC: Create test 'should prevent duplicate child attachment' that: 1) Creates parent and child workflows, 2) Calls attachChild(child) twice, 3) Expects second call to throw error with message 'Child already attached to this workflow'.\n4. OUTPUT: Passing test that validates duplicate attachment is prevented."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P1.M3",
+          "title": "Documentation & Minor Improvements",
+          "status": "Planned",
+          "description": "Document default behaviors and validate optional features to improve developer experience and code clarity.",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M3.T1",
+              "title": "Document trackTiming Default Behavior",
+              "status": "Planned",
+              "description": "Add clear documentation explaining that trackTiming defaults to true in the @Step decorator.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T1.S1",
+                  "title": "Add JSDoc comment to @Step decorator trackTiming option",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/GAP_ANALYSIS_SUMMARY.md Issue #6 - trackTiming option defaults to true but this is not documented. Implementation is in src/decorators/step.ts line 94.\n2. INPUT: No external inputs. Documentation change only.\n3. LOGIC: Add JSDoc comment to StepOptions interface in src/types/decorators.ts (or in step.ts if interface defined there). Document: 'trackTiming?: boolean; // Default: true. Set to false to disable step duration tracking.'. Clarify default is true.\n4. OUTPUT: Updated JSDoc documentation that explicitly states trackTiming defaults to true."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T1.S2",
+                  "title": "Update README.md with @Step decorator timing documentation",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M3.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: README.md at /home/dustin/projects/groundswell/README.md contains usage examples.\n2. INPUT: Completed JSDoc from P1.M3.T1.S1.\n3. LOGIC: In README.md, add section or update existing @Step documentation to explain trackTiming option. Include example: '@Step({ trackTiming: false }) async myStep() { ... } // Disable timing'. Note that timing is on by default.\n4. OUTPUT: Updated README.md with clear documentation of trackTiming default behavior and usage."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M3.T2",
+              "title": "Document @Task Decorator Lenient Validation Behavior",
+              "status": "Planned",
+              "description": "Add documentation explaining that @Task silently skips non-Workflow returns instead of throwing errors.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T2.S1",
+                  "title": "Add JSDoc comment to @Task decorator explaining validation behavior",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md Issue #5 - @Task silently skips non-Workflow returns (lines 59-70 in src/decorators/task.ts). PRD specifies throwing error but implementation is intentionally lenient.\n2. INPUT: No external inputs. Documentation change only.\n3. LOGIC: Add JSDoc comment to @Task decorator function or TaskOptions interface. Document: 'Validation: Non-Workflow return values are silently skipped (not attached). This allows flexible method signatures. If you need strict validation, check return types manually.'\n4. OUTPUT: JSDoc documentation explaining lenient validation behavior and rationale."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T2.S2",
+                  "title": "Update README.md with @Task validation behavior documentation",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M3.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: README.md has @Task examples.\n2. INPUT: Completed JSDoc from P1.M3.T2.S1.\n3. LOGIC: In README.md @Task section, add note: 'The @Task decorator performs lenient validation - methods returning non-Workflow objects are silently skipped rather than throwing errors. This enables flexible method designs.' Provide example of valid and invalid returns.\n4. OUTPUT: Updated README.md explaining @Task validation behavior."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+# Bug Fix Planning - Project Files
+# Generated: 2026-01-10
+
+## Root Level
+./bug_fix_tasks.json                    # Main backlog - 22 subtasks, 26 SP
+
+## Documentation Directory
+plan_bugfix/
+├── README.md                           # Planning summary & overview
+├── VALIDATION_SUMMARY.md               # QA checklist & validation
+├── QUICK_REFERENCE.md                  # Implementation quick start
+└── architecture/
+    ├── system_context.md               # Architecture documentation (12KB)
+    ├── GAP_ANALYSIS_SUMMARY.md         # Prioritized issues & fixes (5.4KB)
+    └── ANALYSIS_PRD_VS_IMPLEMENTATION.md  # Detailed gap analysis (35KB)
+
+## File Sizes
+- bug_fix_tasks.json:           24 KB
+- plan_bugfix/README.md:         9.6 KB
+- plan_bugfix/VALIDATION_SUMMARY.md:   8.2 KB
+- plan_bugfix/QUICK_REFERENCE.md:      4.8 KB
+- plan_bugfix/architecture/system_context.md:          12 KB
+- plan_bugfix/architecture/GAP_ANALYSIS_SUMMARY.md:    5.4 KB
+- plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md:  35 KB
+Total: 99 KB of documentation
+
+## Quick Access
+- View backlog: cat bug_fix_tasks.json | jq '.backlog[0].milestones[] | {id, title}'
+- Start here: plan_bugfix/QUICK_REFERENCE.md
+- Full details: plan_bugfix/README.md
+- Architecture: plan_bugfix/architecture/system_context.md
