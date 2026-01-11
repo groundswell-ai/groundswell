@@ -205,4 +205,20 @@ describe('Workflow', () => {
     // Assert: Verify workflowId is captured
     expect(errorEvent.error.workflowId).toBe(workflow.id);
   });
+
+  it('should detect circular parent relationship', () => {
+    // Arrange: Create parent and child workflows
+    const parent = new SimpleWorkflow('Parent');
+    const child = new SimpleWorkflow('Child', parent);
+
+    // Act: Create circular reference manually
+    // This simulates a bug or malicious input that creates a cycle
+    parent.parent = child;
+
+    // Assert: getRoot() should throw error for circular reference
+    // Note: getRoot() is protected, so we cast to any to access it
+    expect(() => (parent as any).getRoot()).toThrow(
+      'Circular parent-child relationship detected'
+    );
+  });
 });

@@ -145,7 +145,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S2",
                   "title": "Write test for cycle detection in getRoot()",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T1.S1"
