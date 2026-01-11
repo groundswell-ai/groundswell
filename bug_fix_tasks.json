@@ -65,7 +65,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "Write failing test for circular reference detection",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 2 - Circular references occur when attaching an ancestor as a child. Example: root -> child1 -> child2, then child2.attachChild(root).\n2. INPUT: Use Workflow class. Create 3-level hierarchy: root, child1 (child of root), child2 (child of child1).\n3. LOGIC: Write test that attempts child2.attachChild(root). Should throw Error with message containing 'circular' or 'cycle' or 'ancestor'. Also test that immediate cycle (child.attachChild(parent)) throws.\n4. OUTPUT: Export test functions for both scenarios. Tests must fail initially (red), then pass after S2 implementation."
