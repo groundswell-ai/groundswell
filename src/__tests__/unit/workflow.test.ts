@@ -221,4 +221,20 @@ describe('Workflow', () => {
       'Circular parent-child relationship detected'
     );
   });
+
+  it('should detect circular relationship in getRootObservers', () => {
+    // Arrange: Create parent and child workflows
+    const parent = new SimpleWorkflow('Parent');
+    const child = new SimpleWorkflow('Child', parent);
+
+    // Act: Create circular reference manually
+    // This simulates a bug or malicious input that creates a cycle
+    parent.parent = child;
+
+    // Assert: getRootObservers() should throw error for circular reference
+    // Note: getRootObservers() is private, so we cast to any to access it
+    expect(() => (parent as any).getRootObservers()).toThrow(
+      'Circular parent-child relationship detected'
+    );
+  });
 });
