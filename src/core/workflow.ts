@@ -254,6 +254,58 @@ export class Workflow<T = unknown> {
   }
 
   /**
+   * Detach a child workflow from this parent workflow.
+   *
+   * Removes the child from both the workflow tree (this.children) and
+   * the node tree (this.node.children), clears the child's parent reference,
+   * and emits a childDetached event to notify observers.
+   *
+   * This enables reparenting workflows: oldParent.detachChild(child); newParent.attachChild(child);
+   *
+   * @param child - The child workflow to detach
+   * @throws {Error} If the child is not attached to this parent workflow
+   *
+   * @example
+   * ```ts
+   * const parent = new Workflow('Parent');
+   * const child = new Workflow('Child', parent);
+   *
+   * // Later, reparent to a different parent
+   * parent.detachChild(child);
+   * newParent.attachChild(child);
+   * ```
+   */
+  public detachChild(child: Workflow): void {
+    // Validate child is actually attached
+    const index = this.children.indexOf(child);
+
+    if (index === -1) {
+      throw new Error(
+        `Child '${child.node.name}' is not attached to workflow '${this.node.name}'`
+      );
+    }
+
+    // Remove from workflow tree (this.children array)
+    this.children.splice(index, 1);
+
+    // Remove from node tree (this.node.children array)
+    const nodeIndex = this.node.children.indexOf(child.node);
+    if (nodeIndex !== -1) {
+      this.node.children.splice(nodeIndex, 1);
+    }
+
+    // Clear child's parent reference
+    child.parent = null;
+
+    // Emit childDetached event
+    this.emitEvent({
+      type: 'childDetached',
+      parentId: this.id,
+      childId: child.id,
+    });
+  }
+
+  /**
    * Emit an event to all root observers
    */
   public emitEvent(event: WorkflowEvent): void {
@@ -265,7 +317,7 @@ export class Workflow<T = unknown> {
         obs.onEvent(event);
 
         // Also notify tree changed for tree update events
-        if (event.type === 'treeUpdated' || event.type === 'childAttached') {
+        if (event.type === 'treeUpdated' || event.type === 'childAttached' || event.type === 'childDetached') {
           obs.onTreeChanged(this.getRoot().node);
         }
       } catch (err) {
