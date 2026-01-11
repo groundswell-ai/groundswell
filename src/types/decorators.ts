@@ -16,6 +16,9 @@ export interface StepOptions {
 
 /**
  * Configuration options for @Task decorator
+ *
+ * @note The decorator uses lenient validation - non-Workflow returns are
+ *       silently skipped. See the @Task decorator JSDoc for details.
  */
 export interface TaskOptions {
   /** Custom task name (defaults to method name) */

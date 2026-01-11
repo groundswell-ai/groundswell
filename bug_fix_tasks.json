@@ -305,7 +305,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T2.S1",
                   "title": "Add JSDoc comment to @Task decorator explaining validation behavior",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan_bugfix/architecture/ANALYSIS_PRD_VS_IMPLEMENTATION.md Issue #5 - @Task silently skips non-Workflow returns (lines 59-70 in src/decorators/task.ts). PRD specifies throwing error but implementation is intentionally lenient.\n2. INPUT: No external inputs. Documentation change only.\n3. LOGIC: Add JSDoc comment to @Task decorator function or TaskOptions interface. Document: 'Validation: Non-Workflow return values are silently skipped (not attached). This allows flexible method signatures. If you need strict validation, check return types manually.'\n4. OUTPUT: JSDoc documentation explaining lenient validation behavior and rationale."

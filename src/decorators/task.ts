@@ -29,6 +29,38 @@ interface WorkflowClass {
  *     ];
  *   }
  * }
+ *
+ * @example Non-workflow return (silently skipped)
+ * class MyWorkflow extends Workflow {
+ *   @Task()
+ *   async returnsString(): Promise<string> {
+ *     return 'not a workflow';  // Returned as-is, not attached
+ *   }
+ * }
+ *
+ * @example Mixed return (only workflows attached)
+ * class MyWorkflow extends Workflow {
+ *   @Task()
+ *   async mixedReturn(): Promise<(Workflow | string)[]> {
+ *     return [
+ *       new ChildWorkflow('child1', this),  // Attached
+ *       'some string',                       // Skipped
+ *       new ChildWorkflow('child2', this),  // Attached
+ *     ];
+ *   }
+ * }
+ *
+ * Validation Behavior
+ *
+ * The decorator uses lenient validation for return values:
+ * - Workflow objects (with 'id' property) are automatically attached
+ * - Non-workflow objects are silently skipped (not attached)
+ * - The original return value is always preserved
+ *
+ * This lenient approach enables:
+ * - Duck-typing: Works with workflow-like objects, not just Workflow instances
+ * - Flexible signatures: Methods can return any type without breaking
+ * - Graceful handling: Edge cases (null, undefined, primitives) don't throw errors
  */
 export function Task(opts: TaskOptions = {}) {
   return function <This, Args extends unknown[], Return>(
