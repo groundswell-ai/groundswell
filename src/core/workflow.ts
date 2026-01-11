@@ -291,7 +291,7 @@ export class Workflow<T = unknown> {
           original: error,
           workflowId: this.id,
           stack: error instanceof Error ? error.stack : undefined,
-          state: {},
+          state: getObservedState(this),
           logs: [],
         },
       });
