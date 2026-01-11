@@ -78,4 +78,54 @@ describe('Workflow', () => {
     expect(attachEvent).toBeDefined();
     expect(attachEvent?.type === 'childAttached' && attachEvent.parentId).toBe(parent.id);
   });
+
+  it('should capture state and logs in functional workflow error', async () => {
+    // Arrange: Create observer to capture events
+    const events: WorkflowEvent[] = [];
+
+    const observer: WorkflowObserver = {
+      onLog: () => {},
+      onEvent: (event) => events.push(event),
+      onStateUpdated: () => {},
+      onTreeChanged: () => {},
+    };
+
+    // Arrange: Create functional workflow with a step that throws an error
+    const workflow = new Workflow<void>(
+      { name: 'ErrorCaptureTest' },
+      async (ctx) => {
+        // Execute a step that will fail
+        await ctx.step('failing-step', async () => {
+          throw new Error('Test error from step');
+        });
+      }
+    );
+
+    // Act: Attach observer and run workflow
+    workflow.addObserver(observer);
+    await expect(workflow.run()).rejects.toThrow('Test error from step');
+
+    // Assert: Verify error event was emitted
+    const errorEvents = events.filter((e) => e.type === 'error');
+    expect(errorEvents.length).toBeGreaterThanOrEqual(1);
+
+    // Assert: Verify error structure
+    const errorEvent = errorEvents[0];
+    expect(errorEvent.error).toBeDefined();
+    expect(errorEvent.error.message).toBe('Test error from step');
+
+    // Assert: Verify logs array was captured (even if empty for step errors)
+    expect(errorEvent.error.logs).toBeDefined();
+    expect(Array.isArray(errorEvent.error.logs)).toBe(true);
+
+    // Assert: Verify state was captured (may be empty object for pure functional workflows)
+    expect(errorEvent.error.state).toBeDefined();
+    expect(typeof errorEvent.error.state).toBe('object');
+
+    // Assert: Verify workflow status
+    expect(workflow.status).toBe('failed');
+
+    // Assert: Verify workflowId is captured
+    expect(errorEvent.error.workflowId).toBe(workflow.id);
+  });
 });

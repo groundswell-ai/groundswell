@@ -18,7 +18,7 @@
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "Fix Empty State/Logs in Workflow.runFunctional() Error Handler",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Update the functional workflow error handler in src/core/workflow.ts to capture actual state and logs instead of empty objects/arrays.",
               "subtasks": [
                 {
@@ -56,7 +56,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S4",
                   "title": "Write test for functional workflow error state capture",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S3"
