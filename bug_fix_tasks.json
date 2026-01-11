@@ -122,7 +122,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Tree Structure & Event System Fixes",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Fix missing treeUpdated event emission and add cycle detection to prevent infinite loops and DoS vulnerabilities.",
           "tasks": [
             {
@@ -231,7 +231,7 @@
               "type": "Task",
               "id": "P1.M2.T3",
               "title": "Add Duplicate Attachment Prevention",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Prevent the same workflow from being attached to a parent multiple times by adding validation in attachChild().",
               "subtasks": [
                 {
@@ -247,7 +247,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T3.S2",
                   "title": "Write test for duplicate attachment prevention",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T3.S1"
