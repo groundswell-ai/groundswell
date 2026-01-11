@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Core Validation Implementation",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Implement the primary fix for attachChild() by adding parent state validation and circular reference detection to prevent inconsistent tree state.",
           "tasks": [
             {
@@ -58,7 +58,7 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "Add Circular Reference Detection",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Implement isDescendantOf() helper method and add circular reference validation to attachChild() to prevent attaching an ancestor as a child, which would create cycles in the tree.",
               "subtasks": [
                 {
@@ -96,7 +96,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S4",
                   "title": "Verify no regressions in full test suite",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T2.S3"
