@@ -156,10 +156,61 @@ async monitoredStep(): Promise<void> { }
 
 Spawn and manage child workflows.
 
+**Validation Behavior**: The decorator performs lenient validation - methods returning non-Workflow objects are silently skipped rather than throwing errors. This enables flexible method designs and duck-typing.
+
+**Configuration Options**:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | `string` | method name | Custom task name |
+| `concurrent` | `boolean` | `false` | If `true`, automatically run returned workflows in parallel using `Promise.all()` |
+
+**How It Works**:
+- Workflow objects (with `id` property) are automatically attached as children
+- Non-workflow objects are silently skipped (not attached)
+- The original return value is always preserved
+- Duck-typing is used: any object with an `id` property is treated as workflow-like
+
+**Examples**:
+
 ```typescript
+// Standard usage - return single workflow
+@Task()
+async createChild(): Promise<ChildWorkflow> {
+  return new ChildWorkflow('child1', this);  // Attached as child
+}
+
+// Return multiple workflows
 @Task({ concurrent: true })
-async createWorkers(): Promise<WorkerWorkflow[]> { }
+async createWorkers(): Promise<WorkerWorkflow[]> {
+  return [
+    new WorkerWorkflow('worker1', 100, this),  // Attached
+    new WorkerWorkflow('worker2', 150, this),  // Attached
+  ];  // Both run concurrently
+}
+
+// Mixed return - only workflows are attached
+@Task()
+async mixedReturn(): Promise<(Workflow | string)[]> {
+  return [
+    new ChildWorkflow('child1', this),  // Attached
+    'some string',                       // Skipped (not a workflow)
+    new ChildWorkflow('child2', this),  // Attached
+  ];
+}
+
+// Non-workflow return - handled gracefully
+@Task()
+async returnsData(): Promise<string> {
+  return 'just some data';  // Returned as-is, no attachment attempted
+}
 ```
+
+**Important Notes**:
+- The decorator uses structural typing (duck-typing) via the `id` property check
+- This enables working with workflow-like objects, not just `Workflow` class instances
+- TypeScript compile-time type checking still catches obvious errors
+- Use `concurrent: true` for automatic parallel execution of returned workflows
 
 ### @ObservedState
 
