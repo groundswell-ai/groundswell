@@ -239,6 +239,9 @@ export class Workflow<T = unknown> {
       type: 'stateSnapshot',
       node: this.node,
     });
+
+    // Emit treeUpdated event to trigger tree debugger rebuild
+    this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node });
   }
 
   /**
