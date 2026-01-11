@@ -139,6 +139,35 @@ export class Workflow<T = unknown> {
   }
 
   /**
+   * Check if this workflow is a descendant of the given ancestor workflow
+   * Traverses the parent chain upward looking for the ancestor reference
+   * Uses visited Set to detect cycles during traversal
+   *
+   * @param ancestor - The potential ancestor workflow to check
+   * @returns true if ancestor is found in parent chain, false otherwise
+   * @throws Error if a cycle is detected during traversal
+   */
+  private isDescendantOf(ancestor: Workflow): boolean {
+    const visited = new Set<Workflow>();
+    let current: Workflow | null = this.parent;
+
+    while (current !== null) {
+      if (visited.has(current)) {
+        throw new Error('Circular parent-child relationship detected');
+      }
+      visited.add(current);
+
+      if (current === ancestor) {
+        return true;
+      }
+
+      current = current.parent;
+    }
+
+    return false;
+  }
+
+  /**
    * Get the root workflow
    * Uses cycle detection to prevent infinite loops from circular parent-child relationships
    */
