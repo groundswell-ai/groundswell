@@ -119,12 +119,23 @@ export class Workflow<T = unknown> {
   /**
    * Get observers from the root workflow
    * Traverses up the tree to find the root
+   * Uses cycle detection to prevent infinite loops from circular parent-child relationships
    */
   private getRootObservers(): WorkflowObserver[] {
-    if (this.parent) {
-      return this.parent.getRootObservers();
+    const visited = new Set<Workflow>();
+    let root: Workflow = this;
+    let current: Workflow | null = this;
+
+    while (current) {
+      if (visited.has(current)) {
+        throw new Error('Circular parent-child relationship detected');
+      }
+      visited.add(current);
+      root = current;
+      current = current.parent;
     }
-    return this.observers;
+
+    return root.observers;
   }
 
   /**

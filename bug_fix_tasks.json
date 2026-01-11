@@ -156,7 +156,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S3",
                   "title": "Add cycle detection to getRootObservers() method",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T1.S2"
