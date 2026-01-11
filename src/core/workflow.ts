@@ -228,6 +228,15 @@ export class Workflow<T = unknown> {
       throw new Error(errorMessage);
     }
 
+    // Check if child is an ancestor (would create circular reference)
+    if (this.isDescendantOf(child)) {
+      const errorMessage =
+        `Cannot attach child '${child.node.name}' - it is an ancestor of '${this.node.name}'. ` +
+        `This would create a circular reference.`;
+      console.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+
     // Update child's parent if it's currently null
     if (child.parent === null) {
       child.parent = this;
