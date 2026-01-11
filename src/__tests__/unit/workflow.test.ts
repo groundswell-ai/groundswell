@@ -237,4 +237,36 @@ describe('Workflow', () => {
       'Circular parent-child relationship detected'
     );
   });
+
+  it('should emit treeUpdated event when status changes', () => {
+    // Arrange: Create workflow instance
+    const wf = new SimpleWorkflow();
+
+    // Arrange: Create arrays to track event emissions and callback invocations
+    const events: WorkflowEvent[] = [];
+    const treeChangedCalls: WorkflowNode[] = [];
+
+    // Arrange: Create observer with callbacks
+    const observer: WorkflowObserver = {
+      onLog: () => {},  // Empty - not testing logs
+      onEvent: (event) => events.push(event),  // Capture events
+      onStateUpdated: () => {},  // Empty - not testing state updates
+      onTreeChanged: (root) => treeChangedCalls.push(root),  // Capture tree changes
+    };
+
+    // Act: Attach observer and trigger status change
+    wf.addObserver(observer);
+    wf.setStatus('running');
+
+    // Assert: Verify treeUpdated event was emitted
+    const treeUpdatedEvent = events.find((e) => e.type === 'treeUpdated');
+    expect(treeUpdatedEvent).toBeDefined();
+
+    // Assert: Verify event payload contains root node (type narrowing for discriminated union)
+    expect(treeUpdatedEvent?.type === 'treeUpdated' && treeUpdatedEvent.root).toBe(wf.getNode());
+
+    // Assert: Verify onTreeChanged callback was invoked with root node
+    expect(treeChangedCalls).toHaveLength(1);
+    expect(treeChangedCalls[0]).toBe(wf.getNode());
+  });
 });
