@@ -84,6 +84,7 @@ export { WorkflowTreeDebugger } from './debugger/tree-debugger.js';
 export { Observable } from './utils/observable.js';
 export type { Subscription, Observer } from './utils/observable.js';
 export { generateId } from './utils/id.js';
+export { mergeWorkflowErrors } from './utils/workflow-error-utils.js';
 
 // Factory functions
 export {

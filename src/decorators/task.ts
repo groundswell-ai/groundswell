@@ -1,4 +1,5 @@
 import type { TaskOptions, WorkflowNode, WorkflowEvent, WorkflowError, SerializedWorkflowState } from '../types/index.js';
+import { mergeWorkflowErrors } from '../utils/workflow-error-utils.js';
 
 // Type for workflow-like objects
 interface WorkflowLike {
@@ -14,46 +15,6 @@ interface WorkflowClass {
   parent: WorkflowLike | null;
   run(...args: unknown[]): Promise<unknown>;
 }
-
-/**
- * Default error merger for concurrent workflow failures
- * Creates a merged WorkflowError containing information from all errors
- * This will be extracted to src/utils/error-merger.ts in P1.M2.T2.S3
- */
-const defaultErrorMerger = (
-  errors: WorkflowError[],
-  taskName: string,
-  parentWorkflowId: string,
-  totalChildren: number
-): WorkflowError => {
-  // Create merged error message
-  const message = `${errors.length} of ${totalChildren} concurrent child workflows failed in task '${taskName}'`;
-
-  // Get all unique workflow IDs that failed
-  const failedWorkflowIds = [...new Set(errors.map((e) => e.workflowId))];
-
-  // Aggregate all logs
-  const allLogs = errors.flatMap((e) => e.logs);
-
-  // Create merged WorkflowError
-  const mergedError: WorkflowError = {
-    message,
-    original: {
-      name: 'WorkflowAggregateError',
-      message,
-      errors,
-      totalChildren,
-      failedChildren: errors.length,
-      failedWorkflowIds,
-    } as unknown,
-    workflowId: parentWorkflowId,
-    stack: errors[0]?.stack, // Use first error's stack trace
-    state: errors[0]?.state || ({} as SerializedWorkflowState), // Use first error's state
-    logs: allLogs,
-  };
-
-  return mergedError;
-};
 
 /**
  * @Task decorator
@@ -164,7 +125,7 @@ export function Task(opts: TaskOptions = {}) {
               // Merge errors using custom combine() or default merger
               const mergedError = opts.errorMergeStrategy?.combine
                 ? opts.errorMergeStrategy.combine(errors)
-                : defaultErrorMerger(errors, taskName, wf.id, runnable.length);
+                : mergeWorkflowErrors(errors, taskName, wf.id, runnable.length);
 
               // Emit error event with merged error
               wf.emitEvent({
