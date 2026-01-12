@@ -272,7 +272,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T2.S2",
                   "title": "Verify observer propagation (PRD Section 7)",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T2.S1"
