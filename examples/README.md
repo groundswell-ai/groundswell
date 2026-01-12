@@ -25,6 +25,7 @@ npm run start:agent-loops
 npm run start:sdk-features
 npm run start:reflection
 npm run start:introspection
+npm run start:reparenting
 ```
 
 ## Examples Overview
@@ -137,6 +138,18 @@ Agent self-awareness and hierarchy navigation:
 - inspect_cache_status - "Is this cached?"
 - request_spawn_workflow - "Can I create children?"
 
+### 11. Reparenting Workflows (`11-reparenting-workflows.ts`)
+
+Run: `npx tsx examples/examples/11-reparenting-workflows.ts`
+
+Workflow reparenting with detach-then-attach pattern:
+- WRONG way: Direct attachChild() throws error (single-parent invariant)
+- RIGHT way: detachChild() then attachChild() pattern
+- Tree structure verification before/after reparenting
+- Observer propagation updates after reparenting
+- Dual-tree synchronization (workflow tree + node tree)
+- Error handling for invalid reparenting operations
+
 ## Project Structure
 
 ```
@@ -151,7 +164,8 @@ examples/
 │   ├── 07-agent-loops.ts
 │   ├── 08-sdk-features.ts
 │   ├── 09-reflection.ts
-│   └── 10-introspection.ts
+│   ├── 10-introspection.ts
+│   └── 11-reparenting-workflows.ts
 ├── utils/
 │   └── helpers.ts
 ├── index.ts

@@ -26,6 +26,7 @@ import { runAgentLoopsExample } from './examples/07-agent-loops.js';
 import { runSDKFeaturesExample } from './examples/08-sdk-features.js';
 import { runReflectionExample } from './examples/09-reflection.js';
 import { runIntrospectionExample } from './examples/10-introspection.js';
+import { runReparentingExample } from './examples/11-reparenting-workflows.js';
 
 const BANNER = `
 ╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
@@ -55,6 +56,7 @@ Available Examples:
   8. SDK Features            - Tools, MCPs, hooks, skills integration
   9. Multi-level Reflection  - Workflow, agent, prompt reflection
  10. Introspection Tools     - Agent self-awareness and hierarchy navigation
+ 11. Reparenting Workflows   - Detach-then-attach pattern for moving workflows
 
   A. Run All Examples
   Q. Quit
@@ -88,6 +90,7 @@ async function runAllExamples(): Promise<void> {
     { name: '8. SDK Features', fn: runSDKFeaturesExample },
     { name: '9. Multi-level Reflection', fn: runReflectionExample },
     { name: '10. Introspection Tools', fn: runIntrospectionExample },
+    { name: '11. Reparenting Workflows', fn: runReparentingExample },
   ];
 
   for (const example of examples) {
@@ -131,6 +134,7 @@ Summary of Features Demonstrated:
 ✓ Multi-level reflection (workflow, agent, prompt)
 ✓ Introspection tools for hierarchy navigation
 ✓ Cache integration with metrics
+✓ Reparenting workflows with detach-then-attach pattern
 `);
 }
 

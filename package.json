@@ -45,6 +45,7 @@
     "start:sdk-features": "tsx examples/examples/08-sdk-features.ts",
     "start:reflection": "tsx examples/examples/09-reflection.ts",
     "start:introspection": "tsx examples/examples/10-introspection.ts",
+    "start:reparenting": "tsx examples/examples/11-reparenting-workflows.ts",
     "generate:llms": "npx tsx scripts/generate-llms-full.ts"
   },
   "dependencies": {

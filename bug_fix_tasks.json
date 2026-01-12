@@ -305,7 +305,7 @@
               "type": "Task",
               "id": "P1.M4.T1",
               "title": "Update Documentation and Examples",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Update code documentation (JSDoc comments) for attachChild(), detachChild(), and isDescendantOf(). Create usage examples showing correct reparenting workflow.",
               "subtasks": [
                 {
@@ -321,7 +321,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T1.S2",
                   "title": "Create reparenting usage example",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M4.T1.S1"
