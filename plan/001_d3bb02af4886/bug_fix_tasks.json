@@ -85,7 +85,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Analyze current Promise.all implementation in @Task decorator",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/error_handling_patterns.md, Promise.all is at src/decorators/task.ts:112. The implementation filters runnable workflows and executes them with Promise.all().\n2. INPUT: Access to src/decorators/task.ts and related test files.\n3. LOGIC: Read src/decorators/task.ts lines 104-114. Understand the runnable filtering logic. Document how errors currently propagate. Identify what happens when one concurrent workflow fails.\n4. OUTPUT: Create plan/bugfix/architecture/promise_all_analysis.md documenting current behavior, error flow, and requirements for Promise.allSettled migration."
