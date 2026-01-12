@@ -261,7 +261,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T2.S1",
                   "title": "Verify PRD Section 12.2 compliance",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S4"
