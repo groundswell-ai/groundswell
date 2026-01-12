@@ -78,7 +78,7 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Replace Promise.all with Promise.allSettled in Concurrent Tasks",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Update @Task decorator to use Promise.allSettled() instead of Promise.all() for concurrent execution, ensuring all child workflows complete even if some fail.",
               "subtasks": [
                 {
@@ -116,7 +116,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S4",
                   "title": "Run full test suite to ensure no regressions",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T1.S3"
