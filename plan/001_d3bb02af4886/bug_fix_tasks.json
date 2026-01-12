@@ -71,7 +71,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Major Fixes - Concurrent Execution & Error Handling",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Fix concurrent task execution error handling and implement the missing ErrorMergeStrategy functionality.",
           "tasks": [
             {
@@ -182,7 +182,7 @@
               "type": "Task",
               "id": "P1.M2.T3",
               "title": "Document trackTiming Default Value in PRD",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Update PRD documentation to explicitly state that trackTiming defaults to true, matching the implementation.",
               "subtasks": [
                 {
@@ -198,7 +198,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T3.S2",
                   "title": "Update PRD to state trackTiming defaults to true",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T3.S1"

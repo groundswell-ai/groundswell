@@ -180,7 +180,7 @@ Observers attach to the **root workflow** and receive all events.
 export interface StepOptions {
   name?: string;
   snapshotState?: boolean;
-  trackTiming?: boolean;
+  trackTiming?: boolean; // Default: true - Track and emit step duration
   logStart?: boolean;
   logFinish?: boolean;
 }
