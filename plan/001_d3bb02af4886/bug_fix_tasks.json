@@ -147,7 +147,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S2",
                   "title": "Implement error aggregation logic in @Task decorator",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S1"
