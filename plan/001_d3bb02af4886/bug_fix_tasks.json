@@ -227,7 +227,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Find all console.error calls for observer errors",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 5 and plan/bugfix/architecture/codebase_structure.md, console.error occurs at src/core/workflow.ts:376 and src/core/logger.ts:27.\n2. INPUT: Access to codebase and Grep tool.\n3. LOGIC: Use Grep to search for 'console.error' in src/ directory. Identify which calls are for observer errors vs other purposes. Document exact locations and context.\n4. OUTPUT: List of all console.error calls with categorization (observer-related vs other)."
