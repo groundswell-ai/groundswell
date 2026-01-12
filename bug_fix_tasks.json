@@ -209,7 +209,7 @@
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Add Adversarial and Edge Case Tests",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Write comprehensive adversarial tests to ensure the tree integrity fixes are robust against intentional misuse, unexpected inputs, and edge cases.",
               "subtasks": [
                 {
@@ -243,7 +243,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S4",
                   "title": "Write bidirectional consistency tests",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - PRD requires 1:1 mirror between workflow tree and node tree. Must verify this is maintained.\n2. INPUT: Use Workflow class with parent/child. Access both this.children and this.node.children.\n3. LOGIC: Write tests that verify after attachChild(): child.parent === parent AND child.node.parent === parent.node. After detachChild(): child.parent === null AND parent.node.children does NOT contain child.node. Test with multiple children, deep trees.\n4. OUTPUT: Tests that enforce bidirectional consistency invariant. Both trees must match at all times."
