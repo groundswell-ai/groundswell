@@ -1,3 +1,5 @@
+import type { ErrorMergeStrategy } from './error-strategy.js';
+
 /**
  * Configuration options for @Step decorator
  */
@@ -25,4 +27,6 @@ export interface TaskOptions {
   name?: string;
   /** If true, run returned workflows concurrently */
   concurrent?: boolean;
+  /** Strategy for merging errors from concurrent task execution */
+  errorMergeStrategy?: ErrorMergeStrategy;
 }
