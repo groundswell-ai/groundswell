@@ -341,7 +341,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T2.S1",
                   "title": "Verify TypeScript compilation and type checking",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - Project uses TypeScript. All types must be correct. New event type was added.\n2. INPUT: Run TypeScript compiler (tsc) on entire project. The modified src/types/events.ts and src/core/workflow.ts files.\n3. LOGIC: Execute 'npm run build' or 'tsc --noEmit'. Verify no type errors. Check that childDetached event type is properly typed. Verify WorkflowEvent discriminated union works correctly. Verify observer onEvent() accepts new event type.\n4. OUTPUT: TypeScript compilation succeeds with no errors. All types are correct."
