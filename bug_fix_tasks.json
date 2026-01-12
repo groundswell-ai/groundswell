@@ -3,105 +3,59 @@
     {
       "type": "Phase",
       "id": "P1",
-      "title": "Bug Fix: attachChild() Tree Integrity Violation",
-      "status": "Complete",
-      "description": "Fix critical bug in attachChild() method that allows creating inconsistent tree state by attaching a child workflow to multiple parents. Includes adding parent validation, circular reference detection, and implementing detachChild() method for proper reparenting support.",
+      "title": "Bug Fixes - Hierarchical Workflow Engine",
+      "status": "Ready",
+      "description": "Fix critical, major, and minor bugs identified during PRD validation testing. All fixes maintain backward compatibility and preserve the existing test suite's 100% pass rate.",
       "milestones": [
         {
           "type": "Milestone",
           "id": "P1.M1",
-          "title": "Core Validation Implementation",
-          "status": "Complete",
-          "description": "Implement the primary fix for attachChild() by adding parent state validation and circular reference detection to prevent inconsistent tree state.",
+          "title": "Critical Fixes - Signature Mismatches",
+          "status": "Planned",
+          "description": "Fix critical PRD signature mismatches that violate the public API contract.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M1.T1",
-              "title": "Add Parent Validation to attachChild()",
-              "status": "Complete",
-              "description": "Modify the attachChild() method in src/core/workflow.ts to validate if child already has a parent before attaching. Throw clear error if child.parent is already set to a different workflow.",
+              "title": "Fix WorkflowLogger.child() Signature Mismatch",
+              "status": "Planned",
+              "description": "Update WorkflowLogger.child() signature from child(parentLogId: string) to child(meta: Partial<LogEntry>) to match PRD specification in Section 12.1.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T1.S1",
-                  "title": "Write failing test for parent validation",
-                  "status": "Complete",
+                  "title": "Research PRD specification for child() signature",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md - The bug is in src/core/workflow.ts:187-201. The current attachChild() only checks if child is already attached to THIS workflow, not if child has a different parent.\n2. INPUT: Use Workflow class from src/core/workflow.ts. Create two parent workflows and one child workflow.\n3. LOGIC: Implement test that creates child with parent1, then attempts to attach to parent2. Verify Error is thrown with message containing 'already has a parent'. Mock console.log to verify error message is helpful.\n4. OUTPUT: Export test function that can be imported by Vitest. Test must fail initially (red), then pass after implementation in S2."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, WorkflowLogger is at src/core/logger.ts with current signature child(parentLogId: string). PRD Section 12.1 specifies child(meta: Partial<LogEntry>).\n2. INPUT: Access to PRD documentation and existing logger implementation.\n3. LOGIC: Read PRD Section 12.1 to understand exact signature requirements. Compare with src/core/logger.ts:84 implementation. Document the differences and create a migration plan.\n4. OUTPUT: Create plan/bugfix/architecture/logger_child_signature_analysis.md documenting the PRD spec, current implementation, differences, and recommended approach."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T1.S2",
-                  "title": "Implement parent validation check",
-                  "status": "Complete",
+                  "title": "Update WorkflowLogger.child() to accept Partial<LogEntry>",
+                  "status": "Planned",
                   "story_points": 2,
-                  "dependencies": [
-                    "P1.M1.T1.S1"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 1 - Add validation after the existing duplicate check (line 189-191 in current code). Check both child.parent !== null AND child.parent !== this.\n2. INPUT: Access child.parent property from S1's test. The child workflow instance with pre-existing parent.\n3. LOGIC: In src/core/workflow.ts attachChild() method, after line 191, add: if (child.parent !== null && child.parent !== this) { throw new Error(...) }. Include current parent's name in error message. Suggest using detachChild() first.\n4. OUTPUT: Updated attachChild() method that throws Error when child has existing parent. Error message must include both workflow names and suggest solution."
+                  "dependencies": ["P1.M1.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, LogEntry interface has fields: id, workflowId, timestamp, level, message, data, parentLogId. The child() method should extract parentLogId from meta parameter.\n2. INPUT: Analysis from S1 documenting the required signature change.\n3. LOGIC: Modify src/core/logger.ts:84 child() method signature from child(parentLogId: string) to child(meta: Partial<LogEntry>). Extract parentLogId from meta.parentLogId or generate from meta.id if parentLogId not provided. Maintain backward compatibility by accepting string as shorthand for parentLogId.\n4. OUTPUT: Updated child() method that accepts Partial<LogEntry> and is backward compatible with string argument. All existing calls to child() continue to work."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T1.S3",
-                  "title": "Verify test passes and no regression",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [
-                    "P1.M1.T1.S2"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - Test suite has 241 tests. All must pass after changes.\n2. INPUT: Run Vitest on the entire test suite. The test from S1 should now pass (green).\n3. LOGIC: Execute 'npm test' or equivalent Vitest command. Verify all 241 existing tests still pass. Verify the new test from S1 passes. Check for any test failures in observer propagation or tree tests.\n4. OUTPUT: Test run results showing 242+ tests passing. Report any failing tests with error messages. If regressions found, document them for next iteration."
-                }
-              ]
-            },
-            {
-              "type": "Task",
-              "id": "P1.M1.T2",
-              "title": "Add Circular Reference Detection",
-              "status": "Complete",
-              "description": "Implement isDescendantOf() helper method and add circular reference validation to attachChild() to prevent attaching an ancestor as a child, which would create cycles in the tree.",
-              "subtasks": [
-                {
-                  "type": "Subtask",
-                  "id": "P1.M1.T2.S1",
-                  "title": "Write failing test for circular reference detection",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 2 - Circular references occur when attaching an ancestor as a child. Example: root -> child1 -> child2, then child2.attachChild(root).\n2. INPUT: Use Workflow class. Create 3-level hierarchy: root, child1 (child of root), child2 (child of child1).\n3. LOGIC: Write test that attempts child2.attachChild(root). Should throw Error with message containing 'circular' or 'cycle' or 'ancestor'. Also test that immediate cycle (child.attachChild(parent)) throws.\n4. OUTPUT: Export test functions for both scenarios. Tests must fail initially (red), then pass after S2 implementation."
-                },
-                {
-                  "type": "Subtask",
-                  "id": "P1.M1.T2.S2",
-                  "title": "Implement isDescendantOf() helper method",
-                  "status": "Complete",
+                  "title": "Add tests for new child() signature with Partial<LogEntry>",
+                  "status": "Planned",
                   "story_points": 2,
-                  "dependencies": [
-                    "P1.M1.T2.S1"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 2 - isDescendantOf() traverses parent chain from this upward. Use visited Set for cycle detection during traversal itself.\n2. INPUT: Access this.parent chain from within Workflow instance. The ancestor parameter to check against.\n3. LOGIC: In src/core/workflow.ts, add private method isDescendantOf(ancestor: Workflow): boolean. Start with current = this, visited = new Set(). While current !== null: if visited.has(current) throw Error (cycle in traversal); if current === ancestor return true; visited.add(current); current = current.parent. Return false at end.\n4. OUTPUT: Private isDescendantOf() method that returns true if ancestor is found in parent chain, false otherwise. Throws if cycle detected during traversal."
+                  "dependencies": ["P1.M1.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, logger tests are in src/__tests__/unit/ folder. Test patterns use vitest with describe/it blocks.\n2. INPUT: Updated child() implementation from S2.\n3. LOGIC: Create tests in appropriate test file covering: child() with Partial<LogEntry> containing parentLogId, child() with Partial<LogEntry> containing id (should use as parentLogId), child() with string (backward compatibility), child() with empty object (should generate parentLogId). Verify parentLogId is correctly set in child logger's log entries.\n4. OUTPUT: New test suite for child() method covering all scenarios. All tests pass including backward compatibility cases."
                 },
                 {
                   "type": "Subtask",
-                  "id": "P1.M1.T2.S3",
-                  "title": "Integrate circular reference check into attachChild()",
-                  "status": "Complete",
+                  "id": "P1.M1.T1.S4",
+                  "title": "Verify all existing child() calls still work",
+                  "status": "Planned",
                   "story_points": 1,
-                  "dependencies": [
-                    "P1.M1.T2.S2"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md - Add circular reference check AFTER parent validation but BEFORE updating tree state. Order of validations matters.\n2. INPUT: Use the isDescendantOf() method from S2. The child parameter from attachChild().\n3. LOGIC: In src/core/workflow.ts attachChild() method, after parent validation from T1.S2, add: if (this.isDescendantOf(child)) { throw new Error('Cannot attach child...it is an ancestor...This would create a circular reference') }. Include both workflow names in error.\n4. OUTPUT: Updated attachChild() with circular reference check. Tests from S1 should now pass."
-                },
-                {
-                  "type": "Subtask",
-                  "id": "P1.M1.T2.S4",
-                  "title": "Verify no regressions in full test suite",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [
-                    "P1.M1.T2.S3"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - 241 existing tests. All must pass. No observer propagation breaks.\n2. INPUT: Run full Vitest suite. The circular reference tests from S1.\n3. LOGIC: Execute 'npm test'. Verify all 241+ tests pass. Specifically check getRoot() tests (should still work). Check observer propagation tests. Check tree debugger tests.\n4. OUTPUT: Test run results showing all passing. Report any failures. If regressions, document and fix."
+                  "dependencies": ["P1.M1.T1.S3"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, child() is used internally in WorkflowLogger and potentially in examples/tests. Use Grep to find all usages.\n2. INPUT: Updated child() implementation from S2.\n3. LOGIC: Search codebase for all calls to .child() method. Manually verify each call works with new signature. Run full test suite to ensure 344 existing tests still pass. Fix any breaking issues found.\n4. OUTPUT: All 344 existing tests pass. Document any edge cases discovered and how they were handled."
                 }
               ]
             }
@@ -110,89 +64,124 @@
         {
           "type": "Milestone",
           "id": "P1.M2",
-          "title": "Reparenting Support",
-          "status": "Complete",
-          "description": "Implement detachChild() method to enable proper reparenting workflow, allowing users to move a child from one parent to another without creating inconsistent state.",
+          "title": "Major Fixes - Concurrent Execution & Error Handling",
+          "status": "Planned",
+          "description": "Fix concurrent task execution error handling and implement the missing ErrorMergeStrategy functionality.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M2.T1",
-              "title": "Implement detachChild() Method",
-              "status": "Complete",
-              "description": "Add detachChild() method to Workflow class that properly removes a child from both the workflow tree and node tree, clears the child's parent reference, and emits a childDetached event.",
+              "title": "Replace Promise.all with Promise.allSettled in Concurrent Tasks",
+              "status": "Planned",
+              "description": "Update @Task decorator to use Promise.allSettled() instead of Promise.all() for concurrent execution, ensuring all child workflows complete even if some fail.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
-                  "title": "Add childDetached event type to events.ts",
-                  "status": "Complete",
+                  "title": "Analyze current Promise.all implementation in @Task decorator",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md - Event types are in src/types/events.ts as discriminated union. Need to add childDetached type.\n2. INPUT: Access existing WorkflowEvent type definition from src/types/events.ts. Follow pattern of childAttached event.\n3. LOGIC: Add new case to WorkflowEvent discriminated union: { type: 'childDetached'; parentId: string; childId: string }. Use childId (string) instead of child (WorkflowNode) because child is no longer in tree. Follow existing pattern exactly.\n4. OUTPUT: Updated WorkflowEvent type in src/types/events.ts with childDetached case. TypeScript must compile without errors."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/error_handling_patterns.md, Promise.all is at src/decorators/task.ts:112. The implementation filters runnable workflows and executes them with Promise.all().\n2. INPUT: Access to src/decorators/task.ts and related test files.\n3. LOGIC: Read src/decorators/task.ts lines 104-114. Understand the runnable filtering logic. Document how errors currently propagate. Identify what happens when one concurrent workflow fails.\n4. OUTPUT: Create plan/bugfix/architecture/promise_all_analysis.md documenting current behavior, error flow, and requirements for Promise.allSettled migration."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S2",
-                  "title": "Write failing tests for detachChild()",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [
-                    "P1.M2.T1.S1"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 4 - detachChild() should remove from both trees, clear parent, emit event.\n2. INPUT: Use Workflow class from src/core/workflow.ts. Create parent with child.\n3. LOGIC: Write tests: (1) detachChild removes child from parent.children, (2) clears child.parent to null, (3) removes from parent.node.children, (4) emits childDetached event, (5) throws if child not attached. Mock observer to verify event received.\n4. OUTPUT: Export 5 test functions. All must fail initially (method doesn't exist yet), then pass after S3."
+                  "title": "Implement Promise.allSettled with error collection",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M2.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/concurrent_execution_best_practices.md, use Promise.allSettled() to collect both fulfilled and rejected results. Filter for rejected results to collect errors.\n2. INPUT: Analysis from S1 and research from concurrent_execution_best_practices.md.\n3. LOGIC: Replace Promise.all() with Promise.allSettled() at src/decorators/task.ts:112. After promises settle, filter for PromiseRejectedResult results. If errors exist, collect them into an array. Maintain backward compatibility by throwing first error if no error merge strategy is configured.\n4. OUTPUT: Updated @Task decorator using Promise.allSettled. Errors are collected but first error is still thrown (backward compatible behavior)."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S3",
-                  "title": "Implement detachChild() method",
-                  "status": "Complete",
+                  "title": "Add tests for concurrent task failure scenarios",
+                  "status": "Planned",
                   "story_points": 2,
-                  "dependencies": [
-                    "P1.M2.T1.S2"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 4 - detachChild() must remove from this.children, this.node.children, clear child.parent, emit event. Order: validate, remove from arrays, clear reference, emit.\n2. INPUT: The child Workflow parameter. Access this.children array and this.node.children array.\n3. LOGIC: In src/core/workflow.ts, add public method detachChild(child: Workflow): void. First find index: const index = this.children.indexOf(child). If index === -1 throw Error. Then: this.children.splice(index, 1). Find in node.children and splice. Set child.parent = null. Emit childDetached event with this.id and child.id.\n4. OUTPUT: Working detachChild() method. All tests from S2 pass. Maintains bidirectional tree consistency."
+                  "dependencies": ["P1.M2.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Adversarial tests are in src/__tests__/adversarial/.\n2. INPUT: Updated Promise.allSettled implementation from S2.\n3. LOGIC: Create tests covering: single child failure, multiple children failing, mixed success/failure, all children fail. Verify that all children complete execution even when some fail. Verify error collection works correctly.\n4. OUTPUT: New test suite for concurrent task failures. All tests pass demonstrating all workflows complete before error is thrown."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S4",
-                  "title": "Update emitEvent() to handle childDetached events",
-                  "status": "Complete",
+                  "title": "Run full test suite to ensure no regressions",
+                  "status": "Planned",
                   "story_points": 1,
-                  "dependencies": [
-                    "P1.M2.T1.S3"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 6 - emitEvent() calls onTreeChanged() for tree update events like childAttached. Need to add childDetached.\n2. INPUT: Access emitEvent() method in src/core/workflow.ts. The event parameter with type: 'childDetached'.\n3. LOGIC: In emitEvent() method, find the conditional that checks for tree update events (currently checks event.type === 'treeUpdated' || event.type === 'childAttached'). Add ' || event.type === \"childDetached\"' to condition. This ensures onTreeChanged() is called for detach operations.\n4. OUTPUT: Updated emitEvent() that triggers onTreeChanged() callback for childDetached events. Observers receive tree change notifications."
+                  "dependencies": ["P1.M2.T1.S3"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, project has 344 existing tests with 100% pass rate. Use Bash tool to run tests.\n2. INPUT: Updated implementation and new tests from S3.\n3. LOGIC: Run full test suite using npm test or vitest command. Verify all 344 existing tests still pass. Verify new tests pass. Fix any regressions discovered.\n4. OUTPUT: Full test suite passes (344+ tests). No regressions introduced. Document any edge cases encountered."
                 }
               ]
             },
             {
               "type": "Task",
               "id": "P1.M2.T2",
-              "title": "Test Reparenting Workflow",
-              "status": "Complete",
-              "description": "Write comprehensive tests for the reparenting workflow (detach from old parent, attach to new parent) to ensure observer propagation updates correctly.",
+              "title": "Implement ErrorMergeStrategy Support",
+              "status": "Planned",
+              "description": "Add errorMergeStrategy option to TaskOptions and implement error aggregation logic when enabled.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
-                  "title": "Write reparenting integration test",
-                  "status": "Complete",
+                  "title": "Add errorMergeStrategy to TaskOptions interface",
+                  "status": "Planned",
                   "story_points": 1,
-                  "dependencies": [
-                    "P1.M2.T1.S4"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 7 - Observer propagation should update after reparenting. Events from child should only reach new parent's observers.\n2. INPUT: Use Workflow class with observer support. Create parent1 and parent2 with observers. Create child with parent1.\n3. LOGIC: Write test that: (1) attaches child to parent1, (2) emits event, verifies parent1 observer receives it, (3) detaches from parent1, (4) attaches to parent2, (5) emits event, verifies parent2 observer receives it, (6) verifies parent1 observer does NOT receive it. Use arrays to collect events.\n4. OUTPUT: Integration test that verifies complete reparenting workflow with observer propagation."
+                  "dependencies": ["P1.M2.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/error_handling_patterns.md, ErrorMergeStrategy interface exists at src/types/error-strategy.ts but is not used. TaskOptions is in src/types/decorators.ts.\n2. INPUT: Access to src/types/decorators.ts and src/types/error-strategy.ts.\n3. LOGIC: Import ErrorMergeStrategy into src/types/decorators.ts. Add optional errorMergeStrategy?: ErrorMergeStrategy field to TaskOptions interface. Export updated interface.\n4. OUTPUT: TaskOptions interface includes errorMergeStrategy field. TypeScript compiles without errors."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S2",
-                  "title": "Verify tree consistency after reparenting",
-                  "status": "Complete",
+                  "title": "Implement error aggregation logic in @Task decorator",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M2.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/concurrent_execution_best_practices.md, when errorMergeStrategy.enabled is true, use combine() function to merge errors. Default to simple aggregation if combine() not provided.\n2. INPUT: Updated TaskOptions from S1 and Promise.allSettled implementation from P1.M2.T1.S2.\n3. LOGIC: In @Task decorator after collecting errors from Promise.allSettled(), check if opts.errorMergeStrategy?.enabled is true. If true, call opts.errorMergeStrategy.combine?(errors) or use default merger. Throw merged error instead of first error. Emit error event with merged error.\n4. OUTPUT: @Task decorator implements error merge strategy when configured. Merged errors contain aggregated information from all failures."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S3",
+                  "title": "Create default error merger implementation",
+                  "status": "Planned",
                   "story_points": 1,
-                  "dependencies": [
-                    "P1.M2.T2.S1"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - Must maintain 1:1 tree mirror between workflow tree and node tree after all operations.\n2. INPUT: Use WorkflowTreeDebugger to inspect tree structure. The parent and child workflows from S1.\n3. LOGIC: Write test that reparents child, then uses WorkflowTreeDebugger to verify: child.parent points to new parent, new parent.children includes child, old parent.children does NOT include child, node tree mirrors workflow tree exactly.\n4. OUTPUT: Test that validates bidirectional tree consistency after reparenting. Uses debugger API to verify tree structure."
+                  "dependencies": ["P1.M2.T2.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/error_handling_patterns.md, default merger should aggregate: message with count, all original errors, parent workflowId, concatenated stacks, aggregated logs.\n2. INPUT: Error aggregation requirements from research.\n3. LOGIC: Create utility function mergeWorkflowErrors(errors: WorkflowError[]): WorkflowError. Combine messages with count. Aggregate original errors into array. Use first error's workflowId (parent). Concatenate stacks with separator. Flatten all logs arrays. Return merged WorkflowError object.\n4. OUTPUT: mergeWorkflowErrors() function created and exported from appropriate module. Function creates comprehensive merged error."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S4",
+                  "title": "Add tests for ErrorMergeStrategy functionality",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M2.T2.S3"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Tests should cover enabled/disabled, custom combine, default merge.\n2. INPUT: Error merge implementation from S2 and S3.\n3. LOGIC: Create tests covering: errorMergeStrategy.enabled=false (default behavior), errorMergeStrategy.enabled=true with default merge, errorMergeStrategy.enabled=true with custom combine function, maxMergeDepth validation if implemented. Verify merged error contains aggregated information.\n4. OUTPUT: Comprehensive test suite for ErrorMergeStrategy. All tests pass demonstrating correct error aggregation behavior."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M2.T3",
+              "title": "Document trackTiming Default Value in PRD",
+              "status": "Planned",
+              "description": "Update PRD documentation to explicitly state that trackTiming defaults to true, matching the implementation.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T3.S1",
+                  "title": "Locate PRD section for @Step decorator options",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Bug report references PRD Section 8.1 - @Step Decorator Options. PRD is likely in docs/ or PRDs/ directory.\n2. INPUT: Access to project documentation files.\n3. LOGIC: Use Grep or Glob to find PRD document containing @Step decorator options. Locate Section 8.1. Find trackTiming option documentation.\n4. OUTPUT: Identify exact file path and line number for trackTiming documentation."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T3.S2",
+                  "title": "Update PRD to state trackTiming defaults to true",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M2.T3.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 4, implementation uses 'if (opts.trackTiming !== false)' meaning default is true. PRD should explicitly state this.\n2. INPUT: PRD file location from S1.\n3. LOGIC: Edit PRD Section 8.1 to add explicit default value statement. Example: 'trackTiming?: boolean - Whether to track step execution timing. Default: true.' Save updated PRD.\n4. OUTPUT: PRD updated with explicit trackTiming default value. Documentation matches implementation behavior."
                 }
               ]
             }
@@ -201,94 +190,151 @@
         {
           "type": "Milestone",
           "id": "P1.M3",
-          "title": "Comprehensive Testing & Validation",
-          "status": "Complete",
-          "description": "Add adversarial tests, edge case coverage, and verify PRD compliance. Ensure all 241+ existing tests still pass and new functionality is thoroughly tested.",
+          "title": "Minor Fixes - Logging & Performance",
+          "status": "Planned",
+          "description": "Fix minor issues related to observer error handling, performance optimizations, and validation.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
-              "title": "Add Adversarial and Edge Case Tests",
-              "status": "Complete",
-              "description": "Write comprehensive adversarial tests to ensure the tree integrity fixes are robust against intentional misuse, unexpected inputs, and edge cases.",
+              "title": "Replace console.error with Logger for Observer Errors",
+              "status": "Planned",
+              "description": "Update observer error handling to use workflow logger instead of direct console.error output.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
-                  "title": "Write deep hierarchy stress test",
-                  "status": "Complete",
+                  "title": "Find all console.error calls for observer errors",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 8 - Test deep hierarchies (1000+ levels) to ensure no stack overflow in getRoot() or isDescendantOf().\n2. INPUT: Use Workflow class. Loop to create chain of 1000+ nested workflows.\n3. LOGIC: Write test that creates root, then attaches child1, child2, etc. 1000 times deep. Then call getRoot() on deepest child and verify it returns root without stack overflow. Also test isDescendantOf() doesn't overflow.\n4. OUTPUT: Stress test that verifies no stack overflow or performance issues with deep trees."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 5 and plan/bugfix/architecture/codebase_structure.md, console.error occurs at src/core/workflow.ts:376 and src/core/logger.ts:27.\n2. INPUT: Access to codebase and Grep tool.\n3. LOGIC: Use Grep to search for 'console.error' in src/ directory. Identify which calls are for observer errors vs other purposes. Document exact locations and context.\n4. OUTPUT: List of all console.error calls with categorization (observer-related vs other)."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S2",
-                  "title": "Write manual parent mutation test",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 8 - Even if someone manually mutates parent with 'as any', attachChild() should still validate.\n2. INPUT: Use Workflow class. Create parent1, parent2, child with parent1.\n3. LOGIC: Write test that manually mutates: (child as any).parent = parent2. Then try parent1.attachChild(child). Should throw because child.parent is now parent2, not parent1. Validates defensive programming works even with manual mutation.\n4. OUTPUT: Test that proves attachChild() validation works even if parent is manually mutated."
+                  "title": "Replace observer error console.error with logger.error",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M3.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, Workflow class has this.logger property. Observers errors occur in try-catch blocks around observer callbacks.\n2. INPUT: List of observer-related console.error calls from S1.\n3. LOGIC: For each observer error console.error, replace with this.logger.error() call. Pass appropriate error context. Ensure logger is available in all contexts (may need to pass logger to functions that don't have it).\n4. OUTPUT: All observer errors logged through WorkflowLogger instead of console. No console.error calls remain for observer errors."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S3",
-                  "title": "Write complex circular reference tests",
-                  "status": "Complete",
+                  "title": "Add tests for observer error logging",
+                  "status": "Planned",
                   "story_points": 1,
-                  "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 8 - Test cycles at various depths: immediate child, grandchild, great-grandchild.\n2. INPUT: Use Workflow class. Create 4-level hierarchy: root, child1, child2, child3.\n3. LOGIC: Write tests for: (1) child.attachChild(parent) - immediate cycle, (2) child2.attachChild(root) - 2-level cycle, (3) child3.attachChild(root) - 3-level cycle. All should throw with 'circular' or 'ancestor' in message.\n4. OUTPUT: Three test cases covering different cycle depths. All should pass with isDescendantOf() detection."
-                },
-                {
-                  "type": "Subtask",
-                  "id": "P1.M3.T1.S4",
-                  "title": "Write bidirectional consistency tests",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - PRD requires 1:1 mirror between workflow tree and node tree. Must verify this is maintained.\n2. INPUT: Use Workflow class with parent/child. Access both this.children and this.node.children.\n3. LOGIC: Write tests that verify after attachChild(): child.parent === parent AND child.node.parent === parent.node. After detachChild(): child.parent === null AND parent.node.children does NOT contain child.node. Test with multiple children, deep trees.\n4. OUTPUT: Tests that enforce bidirectional consistency invariant. Both trees must match at all times."
+                  "dependencies": ["P1.M3.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Observer tests should verify error handling.\n2. INPUT: Updated observer error handling from S2.\n3. LOGIC: Create test that adds observer throwing error. Verify error is logged to workflow logger (not console). Verify observer error doesn't crash workflow execution. Check log entries contain error context.\n4. OUTPUT: Test suite for observer error logging. All tests pass verifying errors go through logger."
                 }
               ]
             },
             {
               "type": "Task",
               "id": "P1.M3.T2",
-              "title": "Verify PRD Compliance",
-              "status": "Complete",
-              "description": "Verify that all fixes comply with PRD Section 12.2 requirements and other relevant sections. Create a compliance checklist and verify each requirement.",
+              "title": "Optimize Tree Debugger Node Map Updates",
+              "status": "Planned",
+              "description": "Implement incremental node map updates instead of full rebuild on tree changes.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T2.S1",
-                  "title": "Verify PRD Section 12.2 compliance",
-                  "status": "Complete",
+                  "title": "Analyze tree debugger onTreeChanged implementation",
+                  "status": "Planned",
                   "story_points": 1,
-                  "dependencies": [
-                    "P1.M3.T1.S4"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - PRD Section 12.2 requires: child has exactly one parent, child.parent matches parent, child appears in only one parent's children array.\n2. INPUT: Reference PRD document (attached to original project initiation). The fixed attachChild() and detachChild() implementations.\n3. LOGIC: Create compliance test that explicitly checks PRD requirements: (1) create child with parent, verify child.parent === parent, (2) try to attach to second parent, should throw, (3) verify child only appears in one children array, (4) verify node tree mirrors workflow tree.\n4. OUTPUT: PRD compliance test with clear assertions for each requirement. Document any deviations."
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 7 and plan/bugfix/architecture/codebase_structure.md, onTreeChanged at src/debugger/tree-debugger.ts:80-84 clears and rebuilds entire nodeMap.\n2. INPUT: Access to src/debugger/tree-debugger.ts.\n3. LOGIC: Read onTreeChanged(), buildNodeMap(), and understand nodeMap structure. Identify what types of tree changes trigger onTreeChanged (childAttached, childDetached). Document when full rebuild is necessary vs when incremental update is possible.\n4. OUTPUT: Analysis document explaining current rebuild logic and opportunities for incremental updates."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T2.S2",
-                  "title": "Verify observer propagation (PRD Section 7)",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [
-                    "P1.M3.T2.S1"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md - Bug broke observer propagation. Fix must ensure events reach correct observers via getRoot().\n2. INPUT: Use Workflow class with addObserver. Create 3-level tree: root, child, grandchild. Add observer to root.\n3. LOGIC: Write test that emits events from grandchild, verifies root observer receives them. After reparenting grandchild to different root, verify events go to new root's observer, not old root's. Validates getRoot() follows parent chain correctly.\n4. OUTPUT: Observer propagation test that verifies PRD Section 7 requirements are met. Events bubble to root observers correctly."
+                  "title": "Implement incremental node map update for childDetached",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M3.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, nodeMap is a Map<string, WorkflowNode>. For childDetached, only need to remove detached node and its descendants.\n2. INPUT: Analysis from S1.\n3. LOGIC: Modify onTreeChanged to detect event type. For childDetached events, recursively remove detached node and all its descendants from nodeMap. For childAttached, add new node and its descendants. For other events, keep full rebuild behavior. Add helper method removeNodeFromMap(node: WorkflowNode).\n4. OUTPUT: onTreeChanged implements incremental updates for attach/detach. Performance improves for large trees."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T2.S3",
-                  "title": "Run full test suite and verify all pass",
-                  "status": "Complete",
+                  "title": "Add benchmark tests for node map updates",
+                  "status": "Planned",
                   "story_points": 1,
-                  "dependencies": [
-                    "P1.M3.T2.S2"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - Original suite had 241 tests. After adding all new tests, should have 260+ tests. ALL must pass.\n2. INPUT: Run Vitest on entire src/__tests__ directory. All test files.\n3. LOGIC: Execute 'npm test' or 'vitest run'. Capture total test count and pass/fail status. Review any failing tests. If failures exist, determine if they're regressions from our changes or pre-existing issues. Document results.\n4. OUTPUT: Final test report with total count (expected 260+), pass rate (must be 100%), and list of any failures with analysis."
+                  "dependencies": ["P1.M3.T2.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, project has performance benchmarks in adversarial tests. Use performance.now() for timing.\n2. INPUT: Updated incremental update implementation from S2.\n3. LOGIC: Create benchmark test with large workflow tree (100+ nodes). Measure time for detaching single node with old full rebuild vs new incremental update. Verify incremental update is significantly faster.\n4. OUTPUT: Benchmark test demonstrating performance improvement. Incremental update is faster than full rebuild."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M3.T3",
+              "title": "Add Workflow Name Validation",
+              "status": "Planned",
+              "description": "Add validation to reject empty or whitespace-only workflow names.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T3.S1",
+                  "title": "Determine validation requirements for workflow names",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 8, empty string names are currently accepted. Need to decide if validation should be added or if empty names are valid.\n2. INPUT: Access to PRD documentation and workflow examples.\n3. LOGIC: Check PRD for workflow name requirements. Review examples to see if empty names are used. Consult with team on whether empty names should be allowed. If validation is desired, define rules (non-empty? no whitespace? minimum length?).\n4. OUTPUT: Document decision on workflow name validation with rationale. If validation is chosen, specify exact validation rules."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T3.S2",
+                  "title": "Implement workflow name validation in constructor",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M3.T3.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, Workflow constructor takes name parameter. Validation should occur early in constructor.\n2. INPUT: Validation rules from S1.\n3. LOGIC: If validation is desired, add check at start of Workflow constructor. Throw error with descriptive message if name is invalid (empty, whitespace-only, etc.). Error type should be appropriate (TypeError or custom WorkflowValidationError). If validation is NOT desired, document that empty names are intentionally allowed.\n4. OUTPUT: Workflow name validation implemented OR documented as intentionally not validated. TypeScript compiles without errors."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T3.S3",
+                  "title": "Add tests for workflow name validation",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M3.T3.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Validation tests should use expect().toThrow() for invalid names.\n2. INPUT: Validation implementation from S2.\n3. LOGIC: If validation added: tests for empty string, whitespace-only, valid names. If validation NOT added: tests verifying empty names are accepted. Ensure tests match documented requirements.\n4. OUTPUT: Test suite for workflow name validation. All tests pass matching implementation behavior."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M3.T4",
+              "title": "Consider Exposing isDescendantOf as Public API",
+              "status": "Planned",
+              "description": "Evaluate making the isDescendantOf method public for external ancestry checking.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T4.S1",
+                  "title": "Evaluate use cases for public isDescendantOf API",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 9, isDescendantOf is private and only used for cycle detection. Consider if external ancestry checks are useful.\n2. INPUT: Access to workflow examples, use cases, and potential user scenarios.\n3. LOGIC: Research if users need to check ancestry relationships. Look for feature requests, examples, or use cases where this would be helpful. Consider if this is internal implementation detail or useful public API. Evaluate security implications of exposing ancestry information.\n4. OUTPUT: Document recommendation: make public vs keep private. Include rationale and potential use cases if public."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T4.S2",
+                  "title": "Implement public isDescendantOf if approved",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M3.T4.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, isDescendantOf is at src/core/workflow.ts:151-169. It's private and used internally.\n2. INPUT: Decision from S1.\n3. LOGIC: IF decision is to make public: change private keyword to public. Add JSDoc comment explaining usage and behavior. Add parameter validation. Consider if method should be on Workflow class or WorkflowNode interface. IF decision is to keep private: document that this is intentionally internal-only.\n4. OUTPUT: isDescendantOf is public with documentation OR documented as intentionally private. No breaking changes to existing code."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T4.S3",
+                  "title": "Add tests for public isDescendantOf API",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M3.T4.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Ancestry tests should cover direct child, descendant, not descendant, circular reference scenarios.\n2. INPUT: Public API from S2 (if applicable).\n3. LOGIC: IF made public: tests covering true positive (is descendant), true negative (not descendant), edge cases (same workflow, circular reference). Verify method works from external code. IF kept private: no new tests needed (already tested internally).\n4. OUTPUT: Test suite for public isDescendantOf OR note that no tests needed for private method."
                 }
               ]
             }
@@ -297,87 +343,88 @@
         {
           "type": "Milestone",
           "id": "P1.M4",
-          "title": "Documentation & Final Validation",
-          "status": "Complete",
-          "description": "Update documentation, create usage examples for the new reparenting workflow, and perform final validation to ensure the fix is production-ready.",
+          "title": "Validation & Documentation",
+          "status": "Planned",
+          "description": "Ensure all bug fixes are validated, tested, and documented.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M4.T1",
-              "title": "Update Documentation and Examples",
-              "status": "Complete",
-              "description": "Update code documentation (JSDoc comments) for attachChild(), detachChild(), and isDescendantOf(). Create usage examples showing correct reparenting workflow.",
+              "title": "Run Full Test Suite and Verify 100% Pass Rate",
+              "status": "Planned",
+              "description": "Execute complete test suite to ensure all 344 existing tests pass plus new tests for bug fixes.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T1.S1",
-                  "title": "Add JSDoc comments to modified methods",
-                  "status": "Complete",
+                  "title": "Run full test suite",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md - attachChild() now throws new errors. detachChild() is new. isDescendantOf() is new. All need JSDoc.\n2. INPUT: The modified methods in src/core/workflow.ts. Follow existing JSDoc patterns in the file.\n3. LOGIC: Add JSDoc comments above attachChild() documenting the two new error cases (has parent, circular ref). Add JSDoc for detachChild() with @throws documentation. Add JSDoc for isDescendantOf() explaining it's a private helper. Use @param, @throws, @returns tags.\n4. OUTPUT: Well-documented methods with clear JSDoc comments. IDE shows documentation on hover. TypeScript generates proper types."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, project uses vitest. Run with npm test or vitest command.\n2. INPUT: All bug fix implementations from previous milestones.\n3. LOGIC: Execute full test suite using appropriate command. Capture total test count, pass count, fail count. Review any failing tests and determine if they're pre-existing failures or caused by bug fixes.\n4. OUTPUT: Test execution results showing 344+ tests passing. Document any failures and their causes."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T1.S2",
-                  "title": "Create reparenting usage example",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [
-                    "P1.M4.T1.S1"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md Migration Path - Users need to know how to properly reparent workflows with the new API.\n2. INPUT: Use Workflow class API. Document the detach-then-attach pattern.\n3. LOGIC: Create example file or documentation comment showing: (1) WRONG way (attaching directly throws), (2) RIGHT way (detach first, then attach). Show complete example with error handling. Explain why this is necessary.\n4. OUTPUT: Usage example code that can be included in README, docs, or examples directory. Shows correct reparenting pattern."
+                  "title": "Fix any test failures caused by bug fixes",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M4.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, existing tests cover PRD requirements. Bug fixes should not break existing functionality.\n2. INPUT: Test failures from S1.\n3. LOGIC: Analyze each failing test. Determine if failure is due to bug fix changing behavior (need to update test) or bug in fix implementation. Fix implementation bugs or update tests to reflect new correct behavior. Re-run tests until all pass.\n4. OUTPUT: All tests pass. 100% pass rate maintained. Document any test changes and rationale."
                 }
               ]
             },
             {
               "type": "Task",
               "id": "P1.M4.T2",
-              "title": "Final Validation and Release Preparation",
-              "status": "Complete",
-              "description": "Perform final validation checks including TypeScript compilation, linting, performance testing, and create a summary of changes for the release.",
+              "title": "Create Bug Fix Summary Document",
+              "status": "Planned",
+              "description": "Document all bug fixes applied, including rationale, implementation details, and migration guide if needed.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T2.S1",
-                  "title": "Verify TypeScript compilation and type checking",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/system_context.md - Project uses TypeScript. All types must be correct. New event type was added.\n2. INPUT: Run TypeScript compiler (tsc) on entire project. The modified src/types/events.ts and src/core/workflow.ts files.\n3. LOGIC: Execute 'npm run build' or 'tsc --noEmit'. Verify no type errors. Check that childDetached event type is properly typed. Verify WorkflowEvent discriminated union works correctly. Verify observer onEvent() accepts new event type.\n4. OUTPUT: TypeScript compilation succeeds with no errors. All types are correct."
+                  "title": "Document critical and major bug fixes",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M4.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report PRD, critical fixes: WorkflowLogger.child() signature. Major fixes: Promise.allSettled, ErrorMergeStrategy, trackTiming default.\n2. INPUT: All implemented bug fixes from P1.M1, P1.M2, P1.M3.\n3. LOGIC: Create comprehensive bug fix summary document. For each fix: describe issue, severity, solution, breaking changes (if any), migration steps. Include code examples showing before/after. Highlight any backward compatibility concerns.\n4. OUTPUT: Bug fix summary document at plan/bugfix/BUG_FIX_SUMMARY.md. Complete with all fixes, code examples, and migration guide."
                 },
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T2.S2",
-                  "title": "Check for performance regressions",
-                  "status": "Complete",
+                  "title": "Update changelog and release notes",
+                  "status": "Planned",
                   "story_points": 1,
-                  "dependencies": [
-                    "P1.M4.T2.S1"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md - Added isDescendantOf() which traverses parent chain. Could impact performance in hot paths.\n2. INPUT: Create performance test or benchmark. Large tree with 1000+ workflows. Measure attachChild() time.\n3. LOGIC: Write performance test that times attachChild() before and after fix. Create 100-workflow tree, measure total time. Verify overhead is minimal (<10% slower). If regression is significant, optimize isDescendantOf() or add caching.\n4. OUTPUT: Performance test results showing acceptable overhead. Document any performance characteristics."
+                  "dependencies": ["P1.M4.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Project likely has CHANGELOG.md or similar. If not, create one following standard format.\n2. INPUT: Bug fix summary from S1.\n3. LOGIC: Update CHANGELOG.md with new version entry. List all bug fixes categorized by severity. Note any breaking changes. Add migration guide links. Follow semantic versioning principles (determine if this is patch, minor, or major release).\n4. OUTPUT: Updated CHANGELOG.md with all bug fixes documented. Release notes ready for users."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M4.T3",
+              "title": "Verify Backward Compatibility",
+              "status": "Planned",
+              "description": "Ensure all bug fixes maintain backward compatibility where possible and document any breaking changes.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T3.S1",
+                  "title": "Audit bug fixes for breaking changes",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M4.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report PRD, most fixes should be backward compatible. Potential breaking change: WorkflowLogger.child() signature change.\n2. INPUT: All bug fix implementations.\n3. LOGIC: Review each bug fix for breaking changes. Identify changes to public API signatures, behavior changes, removed features. Document which changes are breaking vs backward compatible. For breaking changes, assess if migration path exists.\n4. OUTPUT: List of breaking changes with severity assessment. Document mitigation strategies and migration paths."
                 },
                 {
                   "type": "Subtask",
-                  "id": "P1.M4.T2.S3",
-                  "title": "Create change summary and release notes",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [
-                    "P1.M4.T2.S2"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md - Critical bug fix with new detachChild() API. Breaking changes: none (fixes buggy behavior).\n2. INPUT: All changes made: attachChild() validation, isDescendantOf(), detachChild(), childDetached event, tests.\n3. LOGIC: Create CHANGELOG entry or release notes summarizing: (1) Bug fixed: attachChild() no longer allows inconsistent state, (2) New feature: detachChild() method, (3) New event: childDetached, (4) Migration guide for users affected by bug fix, (5) Test count increase.\n4. OUTPUT: Release notes document suitable for GitHub release, CHANGELOG.md, or version notes. Clear description of changes and impact."
-                },
-                {
-                  "type": "Subtask",
-                  "id": "P1.M4.T2.S4",
-                  "title": "Final validation checklist",
-                  "status": "Complete",
-                  "story_points": 1,
-                  "dependencies": [
-                    "P1.M4.T2.S3"
-                  ],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md Validation Checklist - 10 items to verify before considering fix complete.\n2. INPUT: The complete implementation and test suite. The validation checklist from bug analysis.\n3. LOGIC: Go through checklist: [x] Implementation matches PRD, [x] All tests pass, [x] Observer works, [x] Tree debugger consistent, [x] getRoot() correct, [x] Clear errors, [x] Circular detection works, [x] Reparenting works, [x] Code follows patterns, [x] Types correct, [x] No performance regression.\n4. OUTPUT: Completed validation checklist. Any items marked as failures must be addressed before release."
+                  "id": "P1.M4.T3.S2",
+                  "title": "Add backward compatibility tests",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M4.T3.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, existing tests provide good coverage. Need specific tests for old API usage patterns.\n2. INPUT: List of potentially breaking changes from S1.\n3. LOGIC: For each potentially breaking change, create tests using old API patterns. Verify old patterns still work or fail with clear error messages directing to new API. Test examples from documentation work as expected.\n4. OUTPUT: Backward compatibility test suite. Existing code patterns continue to work. Clear errors for deprecated patterns."
                 }
               ]
             }
