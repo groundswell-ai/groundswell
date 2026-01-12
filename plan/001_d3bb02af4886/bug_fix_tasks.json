@@ -11,14 +11,14 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Critical Fixes - Signature Mismatches",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Fix critical PRD signature mismatches that violate the public API contract.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "Fix WorkflowLogger.child() Signature Mismatch",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Update WorkflowLogger.child() signature from child(parentLogId: string) to child(meta: Partial<LogEntry>) to match PRD specification in Section 12.1.",
               "subtasks": [
                 {
@@ -56,7 +56,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S4",
                   "title": "Verify all existing child() calls still work",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S3"
