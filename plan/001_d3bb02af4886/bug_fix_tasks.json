@@ -129,7 +129,7 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Implement ErrorMergeStrategy Support",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Add errorMergeStrategy option to TaskOptions and implement error aggregation logic when enabled.",
               "subtasks": [
                 {
@@ -169,7 +169,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S4",
                   "title": "Add tests for ErrorMergeStrategy functionality",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S3"
