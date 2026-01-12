@@ -109,7 +109,15 @@ export function Task(opts: TaskOptions = {}) {
         );
 
         if (runnable.length > 0) {
-          await Promise.all(runnable.map((w) => w.run()));
+          const results = await Promise.allSettled(runnable.map((w) => w.run()));
+
+          const rejected = results.filter(
+            (r): r is PromiseRejectedResult => r.status === 'rejected'
+          );
+
+          if (rejected.length > 0) {
+            throw rejected[0].reason;
+          }
         }
       }
 
