@@ -80,8 +80,16 @@ export class WorkflowLogger {
 
   /**
    * Create a child logger that includes parentLogId
+   * @param parentLogId - ID of the parent log entry (legacy API)
    */
-  child(parentLogId: string): WorkflowLogger {
+  child(parentLogId: string): WorkflowLogger;
+  /**
+   * Create a child logger with metadata
+   * @param meta - Partial log entry metadata (typically { parentLogId: string })
+   */
+  child(meta: Partial<LogEntry>): WorkflowLogger;
+  child(input: string | Partial<LogEntry>): WorkflowLogger {
+    const parentLogId = typeof input === 'string' ? input : input.parentLogId;
     return new WorkflowLogger(this.node, this.observers, parentLogId);
   }
 }
