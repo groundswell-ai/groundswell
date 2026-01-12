@@ -361,7 +361,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T2.S3",
                   "title": "Create change summary and release notes",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M4.T2.S2"
