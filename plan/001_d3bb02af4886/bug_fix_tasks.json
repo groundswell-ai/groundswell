@@ -45,7 +45,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S3",
                   "title": "Add tests for new child() signature with Partial<LogEntry>",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S2"
