@@ -105,7 +105,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S3",
                   "title": "Add tests for concurrent task failure scenarios",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S2"
