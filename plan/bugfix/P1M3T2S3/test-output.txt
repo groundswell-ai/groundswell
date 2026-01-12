@@ -1,0 +1,58 @@
+
+> groundswell@0.0.1 test
+> vitest run
+
+
+ RUN  v1.6.1 /home/dustin/projects/groundswell
+
+ ✓ src/__tests__/unit/cache.test.ts  (16 tests) 9ms
+ ✓ src/__tests__/unit/reflection.test.ts  (19 tests) 9ms
+ ✓ src/__tests__/unit/cache-key.test.ts  (17 tests) 13ms
+ ✓ src/__tests__/unit/prompt.test.ts  (10 tests) 8ms
+ ✓ src/__tests__/unit/introspection-tools.test.ts  (20 tests) 14ms
+ ✓ src/__tests__/unit/agent.test.ts  (11 tests) 7ms
+ ✓ src/__tests__/adversarial/parent-validation.test.ts  (3 tests) 5ms
+ ✓ src/__tests__/unit/workflow-emitEvent-childDetached.test.ts  (5 tests) 5ms
+ ✓ src/__tests__/adversarial/circular-reference.test.ts  (2 tests) 8ms
+ ✓ src/__tests__/integration/workflow-reparenting.test.ts  (3 tests) 7ms
+ ✓ src/__tests__/adversarial/complex-circular-reference.test.ts  (3 tests) 10ms
+ ✓ src/__tests__/adversarial/observer-propagation.test.ts  (12 tests) 13ms
+ ✓ src/__tests__/unit/workflow.test.ts  (13 tests) 22ms
+ ✓ src/__tests__/integration/agent-workflow.test.ts  (9 tests) 31ms
+ ✓ src/__tests__/unit/context.test.ts  (11 tests) 27ms
+ ✓ src/__tests__/adversarial/e2e-prd-validation.test.ts  (9 tests) 25ms
+ ✓ src/__tests__/adversarial/prd-12-2-compliance.test.ts  (27 tests) 23ms
+stderr | src/__tests__/integration/bidirectional-consistency.test.ts > Bidirectional Consistency: Invariants > Acyclicity invariant > should prevent circular references
+Cannot attach child 'Root' - it is an ancestor of 'Child'. This would create a circular reference.
+
+stderr | src/__tests__/integration/bidirectional-consistency.test.ts > Bidirectional Consistency: Invariants > Acyclicity invariant > should detect complex circular references
+Cannot attach child 'Root' - it is an ancestor of 'Child3'. This would create a circular reference.
+
+ ✓ src/__tests__/integration/bidirectional-consistency.test.ts  (34 tests) 26ms
+stderr | src/__tests__/adversarial/edge-case.test.ts > Adversarial Edge Case Tests > Edge Case: Observers and Event Handling > should handle observer that throws errors
+Observer onEvent error: Error: Event observer error
+    at Object.onEvent (/home/dustin/projects/groundswell/src/__tests__/adversarial/edge-case.test.ts:448:17)
+    at TestWorkflow.emitEvent (/home/dustin/projects/groundswell/src/core/workflow.ts:319:13)
+    at TestWorkflow.run (/home/dustin/projects/groundswell/src/__tests__/adversarial/edge-case.test.ts:436:16)
+    at /home/dustin/projects/groundswell/src/__tests__/adversarial/edge-case.test.ts:459:22
+    at file:///home/dustin/projects/groundswell/node_modules/@vitest/runner/dist/index.js:135:14
+    at file:///home/dustin/projects/groundswell/node_modules/@vitest/runner/dist/index.js:60:26
+    at runTest (file:///home/dustin/projects/groundswell/node_modules/@vitest/runner/dist/index.js:781:17)
+    at runSuite (file:///home/dustin/projects/groundswell/node_modules/@vitest/runner/dist/index.js:909:15)
+    at runSuite (file:///home/dustin/projects/groundswell/node_modules/@vitest/runner/dist/index.js:909:15)
+    at runSuite (file:///home/dustin/projects/groundswell/node_modules/@vitest/runner/dist/index.js:909:15)
+
+ ✓ src/__tests__/adversarial/deep-analysis.test.ts  (34 tests) 41ms
+ ✓ src/__tests__/adversarial/edge-case.test.ts  (27 tests) 39ms
+ ✓ src/__tests__/adversarial/prd-compliance.test.ts  (29 tests) 47ms
+ ✓ src/__tests__/unit/workflow-detachChild.test.ts  (5 tests) 48ms
+ ✓ src/__tests__/unit/decorators.test.ts  (6 tests) 21ms
+ ✓ src/__tests__/unit/tree-debugger.test.ts  (5 tests) 11ms
+ ✓ src/__tests__/adversarial/deep-hierarchy-stress.test.ts  (5 tests) 691ms
+ ✓ src/__tests__/integration/tree-mirroring.test.ts  (4 tests) 1377ms
+
+ Test Files  26 passed (26)
+      Tests  339 passed (339)
+   Start at  10:02:08
+   Duration  2.42s (transform 2.97s, setup 6ms, collect 10.42s, tests 2.54s, environment 9ms, prepare 4.77s)
+
