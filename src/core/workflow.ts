@@ -143,9 +143,10 @@ export class Workflow<T = unknown> {
    * Traverses the parent chain upward looking for the ancestor reference
    * Uses visited Set to detect cycles during traversal
    *
+   * @private
    * @param ancestor - The potential ancestor workflow to check
    * @returns true if ancestor is found in parent chain, false otherwise
-   * @throws Error if a cycle is detected during traversal
+   * @throws {Error} If a cycle is detected during traversal
    */
   private isDescendantOf(ancestor: Workflow): boolean {
     const visited = new Set<Workflow>();
@@ -210,8 +211,57 @@ export class Workflow<T = unknown> {
   }
 
   /**
-   * Attach a child workflow
-   * Called automatically in constructor when parent is provided
+   * Attach a child workflow to this parent workflow.
+   *
+   * Validates that the child can be attached by checking:
+   * 1. Child is not already attached to this parent workflow
+   * 2. Child does not have a different parent (enforces single-parent invariant)
+   * 3. Child is not an ancestor of this parent (prevents circular references)
+   *
+   * **Structural Changes:**
+   * - Adds child to this.children array (workflow tree)
+   * - Adds child.node to this.node.children array (node tree)
+   * - Sets child.parent = this (workflow tree)
+   * - Sets child.node.parent = this.node (node tree)
+   * - Emits childAttached event to notify observers
+   *
+   * **Invariants Maintained:**
+   * - Single-parent rule: A workflow can only have one parent
+   * - 1:1 tree mirror: workflow tree and node tree stay synchronized
+   * - No cycles: A workflow cannot be its own ancestor
+   *
+   * **Cycle Detection:**
+   * - Uses isDescendantOf() helper with Set-based cycle detection
+   * - Throws immediately if circular reference would be created
+   *
+   * @param child - The child workflow to attach
+   * @throws {Error} If the child is already attached to this workflow
+   * @throws {Error} If the child already has a different parent (use detachChild() first for reparenting)
+   * @throws {Error} If the child is an ancestor of this parent (would create circular reference)
+   *
+   * @example
+   * ```ts
+   * const parent = new Workflow('Parent');
+   * const child = new Workflow('Child');
+   * parent.attachChild(child);
+   * // child.parent === parent
+   * // parent.children.includes(child) === true
+   * ```
+   *
+   * @example Reparenting workflow
+   * ```ts
+   * const parent1 = new Workflow('Parent1');
+   * const parent2 = new Workflow('Parent2');
+   * const child = new Workflow('Child', parent1); // Attached to parent1
+   *
+   * // Later, move child to parent2
+   * parent1.detachChild(child);
+   * parent2.attachChild(child);
+   * // child.parent === parent2
+   * ```
+   *
+   * @see detachChild - For detaching children (enables reparenting)
+   * @see isDescendantOf - Private helper for circular reference detection
    */
   public attachChild(child: Workflow): void {
     if (this.children.includes(child)) {

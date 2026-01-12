@@ -312,7 +312,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T1.S1",
                   "title": "Add JSDoc comments to modified methods",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/bug_analysis.md - attachChild() now throws new errors. detachChild() is new. isDescendantOf() is new. All need JSDoc.\n2. INPUT: The modified methods in src/core/workflow.ts. Follow existing JSDoc patterns in the file.\n3. LOGIC: Add JSDoc comments above attachChild() documenting the two new error cases (has parent, circular ref). Add JSDoc for detachChild() with @throws documentation. Add JSDoc for isDescendantOf() explaining it's a private helper. Use @param, @throws, @returns tags.\n4. OUTPUT: Well-documented methods with clear JSDoc comments. IDE shows documentation on hover. TypeScript generates proper types."
