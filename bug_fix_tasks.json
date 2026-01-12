@@ -225,7 +225,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S2",
                   "title": "Write manual parent mutation test",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 8 - Even if someone manually mutates parent with 'as any', attachChild() should still validate.\n2. INPUT: Use Workflow class. Create parent1, parent2, child with parent1.\n3. LOGIC: Write test that manually mutates: (child as any).parent = parent2. Then try parent1.attachChild(child). Should throw because child.parent is now parent2, not parent1. Validates defensive programming works even with manual mutation.\n4. OUTPUT: Test that proves attachChild() validation works even if parent is manually mutated."
