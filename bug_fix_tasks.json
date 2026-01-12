@@ -234,7 +234,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S3",
                   "title": "Write complex circular reference tests",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/implementation_patterns.md Pattern 8 - Test cycles at various depths: immediate child, grandchild, great-grandchild.\n2. INPUT: Use Workflow class. Create 4-level hierarchy: root, child1, child2, child3.\n3. LOGIC: Write tests for: (1) child.attachChild(parent) - immediate cycle, (2) child2.attachChild(root) - 2-level cycle, (3) child3.attachChild(root) - 3-level cycle. All should throw with 'circular' or 'ancestor' in message.\n4. OUTPUT: Three test cases covering different cycle depths. All should pass with isDescendantOf() detection."
