@@ -316,7 +316,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T3.S2",
                   "title": "Implement workflow name validation in constructor",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T3.S1"

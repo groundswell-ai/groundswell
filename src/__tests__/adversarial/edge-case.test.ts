@@ -104,16 +104,14 @@ describe('Adversarial Edge Case Tests', () => {
   });
 
   describe('Edge Case: Empty and Null Values', () => {
-    it('should handle empty string workflow name', async () => {
+    it('should reject empty string workflow name', async () => {
       class TestWorkflow extends Workflow {
         async run() {
           return 'done';
         }
       }
 
-      const workflow = new TestWorkflow('');
-      expect(workflow.node.name).toBe('');
-      await workflow.run();
+      expect(() => new TestWorkflow('')).toThrow('Workflow name cannot be empty or whitespace only');
     });
 
     it('should handle null and undefined observed state values', async () => {

@@ -95,6 +95,17 @@ export class Workflow<T = unknown> {
       this.parent = (parentOrExecutor as Workflow) ?? null;
     }
 
+    // Validate workflow name (after config is normalized)
+    if (typeof this.config.name === 'string') {
+      const trimmedName = this.config.name.trim();
+      if (trimmedName.length === 0) {
+        throw new Error('Workflow name cannot be empty or whitespace only');
+      }
+      if (this.config.name.length > 100) {
+        throw new Error('Workflow name cannot exceed 100 characters');
+      }
+    }
+
     // Create the node representation
     this.node = {
       id: this.id,

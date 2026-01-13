@@ -10,6 +10,80 @@ class SimpleWorkflow extends Workflow {
   }
 }
 
+describe('Workflow Name Validation', () => {
+  it('should reject empty string name', () => {
+    expect(() => new SimpleWorkflow('')).toThrow('Workflow name cannot be empty or whitespace only');
+  });
+
+  it('should reject whitespace-only name (spaces)', () => {
+    expect(() => new SimpleWorkflow('   ')).toThrow('Workflow name cannot be empty or whitespace only');
+  });
+
+  it('should reject whitespace-only name (tabs)', () => {
+    expect(() => new SimpleWorkflow('\t\t')).toThrow('Workflow name cannot be empty or whitespace only');
+  });
+
+  it('should reject whitespace-only name (newlines)', () => {
+    expect(() => new SimpleWorkflow('\n\n')).toThrow('Workflow name cannot be empty or whitespace only');
+  });
+
+  it('should reject whitespace-only name (mixed whitespace)', () => {
+    expect(() => new SimpleWorkflow('  \t\n  ')).toThrow('Workflow name cannot be empty or whitespace only');
+  });
+
+  it('should reject name exceeding 100 characters', () => {
+    const longName = 'a'.repeat(101);
+    expect(() => new SimpleWorkflow(longName)).toThrow('Workflow name cannot exceed 100 characters');
+  });
+
+  it('should accept name with exactly 100 characters', () => {
+    const exactly100 = 'a'.repeat(100);
+    const wf = new SimpleWorkflow(exactly100);
+    expect(wf.getNode().name).toBe(exactly100);
+    expect(wf.getNode().name.length).toBe(100);
+  });
+
+  it('should accept valid names with leading/trailing whitespace', () => {
+    const wf1 = new SimpleWorkflow('  MyWorkflow  ');
+    expect(wf1.getNode().name).toBe('  MyWorkflow  ');
+
+    const wf2 = new SimpleWorkflow('\tValidName\t');
+    expect(wf2.getNode().name).toBe('\tValidName\t');
+  });
+
+  it('should use class name when name is undefined', () => {
+    const wf = new SimpleWorkflow();
+    expect(wf.getNode().name).toBe('SimpleWorkflow');
+  });
+
+  it('should use class name when name is null', () => {
+    const wf = new SimpleWorkflow(null as any);
+    expect(wf.getNode().name).toBe('SimpleWorkflow');
+  });
+
+  it('should validate both constructor patterns - class-based with empty name', () => {
+    expect(() => new SimpleWorkflow('')).toThrow('Workflow name cannot be empty or whitespace only');
+  });
+
+  it('should validate both constructor patterns - functional with empty name', () => {
+    expect(() => new Workflow({ name: '' }, async () => {})).toThrow('Workflow name cannot be empty or whitespace only');
+  });
+
+  it('should validate both constructor patterns - functional with whitespace name', () => {
+    expect(() => new Workflow({ name: '   ' }, async () => {})).toThrow('Workflow name cannot be empty or whitespace only');
+  });
+
+  it('should validate both constructor patterns - functional with name exceeding 100 characters', () => {
+    const longName = 'a'.repeat(101);
+    expect(() => new Workflow({ name: longName }, async () => {})).toThrow('Workflow name cannot exceed 100 characters');
+  });
+
+  it('should accept valid name in functional pattern', () => {
+    const wf = new Workflow({ name: 'ValidFunctionalWorkflow' }, async () => 'done');
+    expect(wf.getNode().name).toBe('ValidFunctionalWorkflow');
+  });
+});
+
 describe('Workflow', () => {
   it('should create with unique id', () => {
     const wf1 = new SimpleWorkflow();
