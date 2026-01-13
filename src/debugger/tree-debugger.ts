@@ -57,6 +57,32 @@ export class WorkflowTreeDebugger implements WorkflowObserver {
     }
   }
 
+  /**
+   * Remove entire subtree from node map using BFS traversal
+   * O(k) complexity where k = number of nodes in subtree
+   * Uses iterative BFS to avoid stack overflow on deep trees
+   */
+  private removeSubtreeNodes(nodeId: string): void {
+    const node = this.nodeMap.get(nodeId);
+    if (!node) return;  // Already removed or never existed
+
+    // BFS traversal to collect all descendant IDs
+    const toRemove: string[] = [];
+    const queue: WorkflowNode[] = [node];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      toRemove.push(current.id);
+      // Add children to queue for BFS traversal
+      queue.push(...current.children);
+    }
+
+    // Batch delete all collected keys (atomic update)
+    for (const id of toRemove) {
+      this.nodeMap.delete(id);
+    }
+  }
+
   // WorkflowObserver implementation
 
   onLog(_entry: LogEntry): void {
@@ -64,12 +90,29 @@ export class WorkflowTreeDebugger implements WorkflowObserver {
   }
 
   onEvent(event: WorkflowEvent): void {
-    // Rebuild node map on structural changes
-    if (event.type === 'childAttached') {
-      this.buildNodeMap(event.child);
+    // Handle structural events with incremental updates
+    switch (event.type) {
+      case 'childAttached':
+        // Keep existing logic - already optimal O(k)
+        this.buildNodeMap(event.child);
+        break;
+
+      case 'childDetached':
+        // NEW: Incremental subtree removal
+        this.removeSubtreeNodes(event.childId);
+        break;
+
+      case 'treeUpdated':
+        // NEW: Update root reference only
+        this.root = event.root;
+        break;
+
+      default:
+        // Non-structural events - no map update needed
+        break;
     }
 
-    // Forward to event stream
+    // Always forward to event stream (existing behavior)
     this.events.next(event);
   }
 
@@ -78,9 +121,11 @@ export class WorkflowTreeDebugger implements WorkflowObserver {
   }
 
   onTreeChanged(root: WorkflowNode): void {
-    this.root = root;
-    this.nodeMap.clear();
-    this.buildNodeMap(root);
+    // All tree changes now handled incrementally in onEvent()
+    // Just update root reference if different
+    if (this.root !== root) {
+      this.root = root;
+    }
   }
 
   // Public API
