@@ -323,6 +323,233 @@ describe('Observer Error Logging Integration Tests', () => {
     });
   });
 
+  describe('Observer onTreeChanged error', () => {
+    it('should log observer onTreeChanged errors (caught as onEvent error)', () => {
+      const onTreeChangedError = new Error('Observer onTreeChanged failed');
+
+      const throwingObserver: WorkflowObserver = {
+        onLog: () => {},
+        onEvent: () => {},
+        onStateUpdated: () => {},
+        onTreeChanged: () => {
+          throw onTreeChangedError;
+        },
+      };
+
+      class TestWorkflow extends Workflow {
+        async run() {
+          // Trigger treeUpdated event which calls onTreeChanged
+          this.emitEvent({ type: 'treeUpdated', root: this.node });
+        }
+      }
+
+      const workflow = new TestWorkflow();
+      workflow.addObserver(throwingObserver);
+
+      workflow.run();
+
+      // Should have error log entry (logged as "Observer onEvent error" since onTreeChanged is in onEvent try-catch)
+      const errorLog = workflow.node.logs.find((log) => log.message === 'Observer onEvent error');
+      expect(errorLog).toBeDefined();
+      expect(errorLog?.level).toBe('error');
+      expect(errorLog?.data).toEqual({
+        error: onTreeChangedError,
+        eventType: 'treeUpdated',
+      });
+    });
+
+    it('should log observer onTreeChanged errors for childAttached events', () => {
+      const onTreeChangedError = new Error('Tree changed on attach');
+
+      const throwingObserver: WorkflowObserver = {
+        onLog: () => {},
+        onEvent: () => {},
+        onStateUpdated: () => {},
+        onTreeChanged: () => {
+          throw onTreeChangedError;
+        },
+      };
+
+      const parent = new Workflow('ParentWorkflow');
+      const child = new Workflow('ChildWorkflow');
+
+      parent.addObserver(throwingObserver);
+
+      // Trigger childAttached event which calls onTreeChanged
+      parent.attachChild(child);
+
+      // Should have error log entry (logged as "Observer onEvent error")
+      const errorLog = parent.node.logs.find((log) => log.message === 'Observer onEvent error');
+      expect(errorLog).toBeDefined();
+      expect(errorLog?.data).toEqual({
+        error: onTreeChangedError,
+        eventType: 'childAttached',
+      });
+    });
+
+    it('should log observer onTreeChanged errors for childDetached events', () => {
+      const onTreeChangedError = new Error('Tree changed on detach');
+
+      const throwingObserver: WorkflowObserver = {
+        onLog: () => {},
+        onEvent: () => {},
+        onStateUpdated: () => {},
+        onTreeChanged: () => {
+          throw onTreeChangedError;
+        },
+      };
+
+      const parent = new Workflow('ParentWorkflow');
+      const child = new Workflow('ChildWorkflow', parent);
+
+      parent.addObserver(throwingObserver);
+
+      // Clear logs from setup
+      parent.node.logs = [];
+
+      // Trigger childDetached event which calls onTreeChanged
+      parent.detachChild(child);
+
+      // Should have error log entry (logged as "Observer onEvent error")
+      const errorLog = parent.node.logs.find((log) => log.message === 'Observer onEvent error');
+      expect(errorLog).toBeDefined();
+      expect(errorLog?.data).toEqual({
+        error: onTreeChangedError,
+        eventType: 'childDetached',
+      });
+    });
+  });
+
+  describe('Console.error negative verification', () => {
+    it('should NOT call console.error for observer onLog errors', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const throwingObserver: WorkflowObserver = {
+        onLog: () => {
+          throw new Error('Observer onLog error');
+        },
+        onEvent: () => {},
+        onStateUpdated: () => {},
+        onTreeChanged: () => {},
+      };
+
+      class TestWorkflow extends Workflow {
+        async run() {
+          this.logger.info('Test message');
+        }
+      }
+
+      const workflow = new TestWorkflow();
+      workflow.addObserver(throwingObserver);
+      await workflow.run();
+
+      // Verify console.error was NOT called for observer error
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      // Verify error was logged to workflow.node.logs instead
+      const errorLog = workflow.node.logs.find((log) => log.message === 'Observer onLog error');
+      expect(errorLog).toBeDefined();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should NOT call console.error for observer onEvent errors', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const throwingObserver: WorkflowObserver = {
+        onLog: () => {},
+        onEvent: () => {
+          throw new Error('Observer onEvent error');
+        },
+        onStateUpdated: () => {},
+        onTreeChanged: () => {},
+      };
+
+      class TestWorkflow extends Workflow {
+        async run() {
+          this.emitEvent({ type: 'testEvent' });
+        }
+      }
+
+      const workflow = new TestWorkflow();
+      workflow.addObserver(throwingObserver);
+      workflow.run();
+
+      // Verify console.error was NOT called for observer error
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      // Verify error was logged to workflow.node.logs instead
+      const errorLog = workflow.node.logs.find((log) => log.message === 'Observer onEvent error');
+      expect(errorLog).toBeDefined();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should NOT call console.error for observer onStateUpdated errors', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const throwingObserver: WorkflowObserver = {
+        onLog: () => {},
+        onEvent: () => {},
+        onStateUpdated: () => {
+          throw new Error('Observer onStateUpdated error');
+        },
+        onTreeChanged: () => {},
+      };
+
+      class TestWorkflow extends Workflow {
+        async run() {
+          this.snapshotState();
+        }
+      }
+
+      const workflow = new TestWorkflow();
+      workflow.addObserver(throwingObserver);
+      await workflow.run();
+
+      // Verify console.error was NOT called for observer error
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      // Verify error was logged to workflow.node.logs instead
+      const errorLog = workflow.node.logs.find(
+        (log) => log.message === 'Observer onStateUpdated error'
+      );
+      expect(errorLog).toBeDefined();
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should NOT call console.error for observer onTreeChanged errors', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const throwingObserver: WorkflowObserver = {
+        onLog: () => {},
+        onEvent: () => {},
+        onStateUpdated: () => {},
+        onTreeChanged: () => {
+          throw new Error('Observer onTreeChanged error');
+        },
+      };
+
+      const parent = new Workflow('ParentWorkflow');
+      const child = new Workflow('ChildWorkflow');
+
+      parent.addObserver(throwingObserver);
+
+      // Trigger childAttached which calls onTreeChanged
+      parent.attachChild(child);
+
+      // Verify console.error was NOT called for observer error
+      expect(consoleErrorSpy).not.toHaveBeenCalled();
+
+      // Verify error was logged to workflow.node.logs instead (as onEvent error)
+      const errorLog = parent.node.logs.find((log) => log.message === 'Observer onEvent error');
+      expect(errorLog).toBeDefined();
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
   describe('Multiple observers', () => {
     it('should continue notifying other observers after one throws', async () => {
       let observer2Called = false;

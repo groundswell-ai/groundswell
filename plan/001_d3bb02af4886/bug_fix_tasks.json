@@ -220,7 +220,7 @@
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Replace console.error with Logger for Observer Errors",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Update observer error handling to use workflow logger instead of direct console.error output.",
               "subtasks": [
                 {
@@ -247,7 +247,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S3",
                   "title": "Add tests for observer error logging",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S2"
