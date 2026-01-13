@@ -213,7 +213,7 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Minor Fixes - Logging & Performance",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Fix minor issues related to observer error handling, performance optimizations, and validation.",
           "tasks": [
             {
@@ -340,7 +340,7 @@
               "type": "Task",
               "id": "P1.M3.T4",
               "title": "Consider Exposing isDescendantOf as Public API",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Evaluate making the isDescendantOf method public for external ancestry checking.",
               "subtasks": [
                 {
@@ -356,7 +356,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T4.S2",
                   "title": "Implement public isDescendantOf if approved",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T4.S1"
@@ -367,7 +367,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T4.S3",
                   "title": "Add tests for public isDescendantOf API",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T4.S2"

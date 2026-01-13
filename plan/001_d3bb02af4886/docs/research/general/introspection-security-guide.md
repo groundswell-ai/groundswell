@@ -716,6 +716,62 @@ Malicious Agent → Requests event history for very large time range
 
 ---
 
+### Threat 5: Topology Exposure via isDescendantOf
+
+**Attack Scenario:**
+```
+Attacker → Calls workflow.isDescendantOf(suspectWorkflow)
+         → Learns hierarchy relationship between workflows
+         → Maps workflow tree structure
+         → Extracts business intelligence from topology
+```
+
+**Risk Level:** LOW (same as current exposure)
+
+**Rationale:**
+- `parent` and `children` properties are already public
+- `getNode()` exposes full tree structure
+- `isDescendantOf()` only provides convenience, not new information
+- Attacker can already traverse tree manually
+
+**Affected Method:** `Workflow.isDescendantOf()` (newly public)
+
+**Mitigation:**
+1. **Application-Level Access Control** - If exposing workflows via API:
+   ```typescript
+   // Validate user has permission to access workflow
+   if (!user.canAccessWorkflow(workflowId)) {
+     throw new Error('Unauthorized');
+   }
+   // Only then allow isDescendantOf calls
+   ```
+
+2. **Filter Hierarchy Information** - For unauthenticated users:
+   ```typescript
+   // Return filtered view without hierarchy
+   const filteredWorkflow = {
+     id: workflow.id,
+     name: workflow.name,
+     // Omit parent, children, isDescendantOf
+   };
+   ```
+
+3. **Audit Topology Access** - Log calls to isDescendantOf:
+   ```typescript
+   auditLog.log({
+     timestamp: Date.now(),
+     userId: user.id,
+     action: 'isDescendantOf',
+     workflowId: workflow.id,
+     ancestorId: ancestor.id
+   });
+   ```
+
+**Recommendation:** Document that applications should implement access control
+if exposing workflows via APIs. The library itself provides no built-in security.
+
+---
+
 ## Implementation Checklist
 
 ### Data Protection

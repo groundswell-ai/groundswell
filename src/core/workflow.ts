@@ -150,16 +150,55 @@ export class Workflow<T = unknown> {
   }
 
   /**
-   * Check if this workflow is a descendant of the given ancestor workflow
-   * Traverses the parent chain upward looking for the ancestor reference
-   * Uses visited Set to detect cycles during traversal
+   * Check if this workflow is a descendant of the given ancestor workflow.
    *
-   * @private
+   * Traverses the parent chain upward looking for the ancestor reference.
+   * Uses a visited Set to detect cycles during traversal. This method provides
+   * a convenient way to check workflow hierarchy relationships without manually
+   * traversing the parent chain.
+   *
+   * @warning This method reveals workflow hierarchy information. If your
+   * application exposes workflows via an API, ensure you implement proper
+   * access control to prevent unauthorized topology discovery. Note that
+   * the `parent` and `children` properties are already public, so this
+   * method does not expose any new information beyond what is currently
+   * accessible.
+   *
+   * **Time Complexity**: O(d) where d is the depth of the hierarchy
+   * **Space Complexity**: O(d) for the visited Set in worst case (cycle detection)
+   *
+   * @example Check if a workflow belongs to a specific hierarchy
+   * ```typescript
+   * const root = new Workflow('root');
+   * const child = new Workflow('child', { parent: root });
+   *
+   * if (child.isDescendantOf(root)) {
+   *   console.log('Child is in root hierarchy');
+   * }
+   * ```
+   *
+   * @example Validate before attaching to prevent circular references
+   * ```typescript
+   * if (!newChild.isDescendantOf(parent)) {
+   *   parent.attachChild(newChild);
+   * } else {
+   *   throw new Error('Would create circular reference');
+   * }
+   * ```
+   *
+   * @example Check for ancestor relationship in conditional logic
+   * ```typescript
+   * const isInProductionBranch = workflow.isDescendantOf(productionRoot);
+   * if (isInProductionBranch) {
+   *   // Apply production-specific logic
+   * }
+   * ```
+   *
    * @param ancestor - The potential ancestor workflow to check
    * @returns true if ancestor is found in parent chain, false otherwise
-   * @throws {Error} If a cycle is detected during traversal
+   * @throws {Error} If a cycle is detected during traversal (indicates corrupted tree structure)
    */
-  private isDescendantOf(ancestor: Workflow): boolean {
+  public isDescendantOf(ancestor: Workflow): boolean {
     const visited = new Set<Workflow>();
     let current: Workflow | null = this.parent;
 
