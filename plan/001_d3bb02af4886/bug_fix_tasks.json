@@ -396,7 +396,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T1.S1",
                   "title": "Run full test suite",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, project uses vitest. Run with npm test or vitest command.\n2. INPUT: All bug fix implementations from previous milestones.\n3. LOGIC: Execute full test suite using appropriate command. Capture total test count, pass count, fail count. Review any failing tests and determine if they're pre-existing failures or caused by bug fixes.\n4. OUTPUT: Test execution results showing 344+ tests passing. Document any failures and their causes."
