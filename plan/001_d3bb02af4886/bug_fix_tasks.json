@@ -260,7 +260,7 @@
               "type": "Task",
               "id": "P1.M3.T2",
               "title": "Optimize Tree Debugger Node Map Updates",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Implement incremental node map updates instead of full rebuild on tree changes.",
               "subtasks": [
                 {
@@ -287,7 +287,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T2.S3",
                   "title": "Add benchmark tests for node map updates",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T2.S2"
