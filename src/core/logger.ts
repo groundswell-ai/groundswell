@@ -16,6 +16,14 @@ export class WorkflowLogger {
   }
 
   /**
+   * Emit a log entry directly to the node without notifying observers
+   * Used to avoid infinite recursion when observer.onLog() throws
+   */
+  private emitWithoutObserverNotification(entry: LogEntry): void {
+    this.node.logs.push(entry);
+  }
+
+  /**
    * Emit a log entry to the node and all observers
    */
   private emit(entry: LogEntry): void {
@@ -24,7 +32,16 @@ export class WorkflowLogger {
       try {
         obs.onLog(entry);
       } catch (err) {
-        console.error('Observer onLog error:', err);
+        // Create error entry and emit without observer notification to avoid infinite recursion
+        const errorEntry: LogEntry = {
+          id: generateId(),
+          workflowId: this.node.id,
+          timestamp: Date.now(),
+          level: 'error',
+          message: 'Observer onLog error',
+          data: { error: err },
+        };
+        this.emitWithoutObserverNotification(errorEntry);
       }
     }
   }

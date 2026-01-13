@@ -12,8 +12,25 @@ export interface Observer<T> {
   complete?: () => void;
 }
 
+/**
+ * Logger interface for Observable error logging
+ * Matches WorkflowLogger.error() signature for compatibility
+ */
+export interface ObservableLogger {
+  error(message: string, data?: unknown): void;
+}
+
 export class Observable<T> {
   private subscribers: Set<Observer<T>> = new Set();
+  private logger?: ObservableLogger;
+
+  /**
+   * Create a new Observable
+   * @param logger Optional logger for error reporting (falls back to console.error)
+   */
+  constructor(logger?: ObservableLogger) {
+    this.logger = logger;
+  }
 
   /**
    * Subscribe to this observable
@@ -29,6 +46,18 @@ export class Observable<T> {
   }
 
   /**
+   * Log errors using injected logger or fallback to console.error
+   */
+  private logError(message: string, error: unknown): void {
+    if (this.logger) {
+      this.logger.error(message, { error });
+    } else {
+      // Fallback for backward compatibility
+      console.error(message, error);
+    }
+  }
+
+  /**
    * Emit a value to all subscribers
    */
   next(value: T): void {
@@ -36,7 +65,7 @@ export class Observable<T> {
       try {
         subscriber.next?.(value);
       } catch (err) {
-        console.error('Observable subscriber error:', err);
+        this.logError('Observable subscriber error', err);
       }
     }
   }
@@ -49,7 +78,7 @@ export class Observable<T> {
       try {
         subscriber.error?.(err);
       } catch (e) {
-        console.error('Observable error handler failed:', e);
+        this.logError('Observable error handler failed', e);
       }
     }
   }
@@ -62,7 +91,7 @@ export class Observable<T> {
       try {
         subscriber.complete?.();
       } catch (err) {
-        console.error('Observable complete handler failed:', err);
+        this.logError('Observable complete handler failed', err);
       }
     }
     this.subscribers.clear();

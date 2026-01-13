@@ -373,7 +373,7 @@ export class Workflow<T = unknown> {
           obs.onTreeChanged(this.getRoot().node);
         }
       } catch (err) {
-        console.error('Observer onEvent error:', err);
+        this.logger.error('Observer onEvent error', { error: err, eventType: event.type });
       }
     }
   }
@@ -391,7 +391,7 @@ export class Workflow<T = unknown> {
       try {
         obs.onStateUpdated(this.node);
       } catch (err) {
-        console.error('Observer onStateUpdated error:', err);
+        this.logger.error('Observer onStateUpdated error', { error: err, nodeId: this.node.id });
       }
     }
 
