@@ -267,7 +267,7 @@ describe('PRD Compliance Tests', () => {
       expect(capturedError).toHaveProperty('stack');
       expect(capturedError).toHaveProperty('state');
       expect(capturedError).toHaveProperty('logs');
-      expect(Array.isArray(capturedError.logs)).toBe(true);
+      expect(Array.isArray(capturedError?.logs)).toBe(true);
     });
   });
 

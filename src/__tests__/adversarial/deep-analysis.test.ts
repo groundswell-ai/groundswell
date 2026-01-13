@@ -237,7 +237,7 @@ describe('Deep Analysis Tests', () => {
       // The returned object is mutated to have a parent property
       expect(result.id).toBe('duck-123');
       expect(result.name).toBe('Duck');
-      expect(result.parent).toBeDefined();
+      expect((result as { parent?: unknown }).parent).toBeDefined();
       // Duck typing treats it as a workflow and attaches it
       expect(workflow.children.length).toBe(1);
     });

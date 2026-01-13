@@ -89,7 +89,7 @@ describe('Observer Error Logging Integration Tests', () => {
 
       class TestWorkflow extends Workflow {
         async run() {
-          this.emitEvent({ type: 'testEvent' });
+          this.emitEvent({ type: 'testEvent' } as any);
         }
       }
 
@@ -279,9 +279,9 @@ describe('Observer Error Logging Integration Tests', () => {
 
       class TestWorkflow extends Workflow {
         async run() {
-          this.emitEvent({ type: 'event1' });
-          this.emitEvent({ type: 'event2' });
-          this.emitEvent({ type: 'event3' });
+          this.emitEvent({ type: 'event1' } as any);
+          this.emitEvent({ type: 'event2' } as any);
+          this.emitEvent({ type: 'event3' } as any);
         }
       }
 
@@ -467,7 +467,7 @@ describe('Observer Error Logging Integration Tests', () => {
 
       class TestWorkflow extends Workflow {
         async run() {
-          this.emitEvent({ type: 'testEvent' });
+          this.emitEvent({ type: 'testEvent' } as any);
         }
       }
 

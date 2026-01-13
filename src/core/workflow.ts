@@ -58,7 +58,7 @@ export class Workflow<T = unknown> {
   protected readonly logger: WorkflowLogger;
 
   /** The node representation of this workflow */
-  protected readonly node: WorkflowNode;
+  public readonly node: WorkflowNode;
 
   /** Observers (only populated on root workflow) */
   private observers: WorkflowObserver[] = [];
