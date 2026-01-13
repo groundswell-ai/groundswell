@@ -425,7 +425,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T2.S1",
                   "title": "Document critical and major bug fixes",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M4.T1.S2"
