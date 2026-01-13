@@ -300,7 +300,7 @@
               "type": "Task",
               "id": "P1.M3.T3",
               "title": "Add Workflow Name Validation",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Add validation to reject empty or whitespace-only workflow names.",
               "subtasks": [
                 {
@@ -327,7 +327,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T3.S3",
                   "title": "Add tests for workflow name validation",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T3.S2"
