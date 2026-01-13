@@ -347,7 +347,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T4.S1",
                   "title": "Evaluate use cases for public isDescendantOf API",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 9, isDescendantOf is private and only used for cycle detection. Consider if external ancestry checks are useful.\n2. INPUT: Access to workflow examples, use cases, and potential user scenarios.\n3. LOGIC: Research if users need to check ancestry relationships. Look for feature requests, examples, or use cases where this would be helpful. Consider if this is internal implementation detail or useful public API. Evaluate security implications of exposing ancestry information.\n4. OUTPUT: Document recommendation: make public vs keep private. Include rationale and potential use cases if public."
