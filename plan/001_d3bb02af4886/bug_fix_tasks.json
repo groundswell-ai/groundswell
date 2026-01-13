@@ -456,7 +456,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T3.S1",
                   "title": "Audit bug fixes for breaking changes",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M4.T2.S1"
