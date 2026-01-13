@@ -389,7 +389,7 @@
               "type": "Task",
               "id": "P1.M4.T1",
               "title": "Run Full Test Suite and Verify 100% Pass Rate",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Execute complete test suite to ensure all 344 existing tests pass plus new tests for bug fixes.",
               "subtasks": [
                 {
@@ -405,7 +405,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T1.S2",
                   "title": "Fix any test failures caused by bug fixes",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M4.T1.S1"
