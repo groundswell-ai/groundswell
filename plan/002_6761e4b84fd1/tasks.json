@@ -1,0 +1,472 @@
+{
+  "backlog": [
+    {
+      "type": "Phase",
+      "id": "P1",
+      "title": "Phase 1: Agent Response Standardization",
+      "status": "Ready",
+      "description": "Implement PRD requirement: 'All agent responses MUST be valid JSON' conforming to the AgentResponse interface. This is the ONLY critical gap identified in the PRD analysis.",
+      "milestones": [
+        {
+          "type": "Milestone",
+          "id": "P1.M1",
+          "title": "Milestone 1.1: Core AgentResponse Implementation",
+          "status": "Planned",
+          "description": "Implement AgentResponse wrapping in Agent class and update type system",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M1.T1",
+              "title": "Update Agent.prompt() to return AgentResponse<T>",
+              "status": "Planned",
+              "description": "Modify the Agent class prompt() method to wrap all responses in the AgentResponse schema instead of returning raw data.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S1",
+                  "title": "Read and analyze current Agent.prompt() implementation",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per plan/002_6761e4b84fd1/architecture/SYSTEM_CONTEXT.md, Agent class is at src/core/agent.ts. Current implementation returns generic type T directly from prompt() method.\n2. INPUT: None - this is research subtask.\n3. LOGIC: Use Read tool to examine src/core/agent.ts. Identify all prompt() method signatures. Understand current return type pattern. Note all call sites that will be affected.\n4. OUTPUT: Document current prompt() implementation pattern, return type signature, and list of files that import/use this method."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S2",
+                  "title": "Create AgentResponse factory helper functions",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M1.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: AgentResponse interface is defined in src/types/agent.ts per SYSTEM_CONTEXT.md.\n2. INPUT: Current prompt() implementation from S1. AgentResponse interface definition from src/types/agent.ts.\n3. LOGIC: Create helper functions in src/core/agent.ts (or new utils file) for creating success, error, and partial AgentResponse objects. Functions must conform to PRD section 6.4 (Null over undefined, consistent structure). Implement type guards for status checking.\n4. OUTPUT: Exported helper functions: createSuccessResponse<T>(data: T, metadata: AgentResponseMetadata): AgentResponse<T>, createErrorResponse(code: string, message: string, details?: Record<string, unknown>, recoverable?: boolean): AgentResponse<null>, createPartialResponse<T>(data: T): AgentResponse<T>."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S3",
+                  "title": "Refactor Agent.prompt() to wrap responses in AgentResponse",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M1.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Current prompt() method calls Anthropic SDK (src/core/agent.ts) and returns validated Zod data. Per EXTERNAL_DEPENDENCIES.md, @anthropic-ai/sdk returns Message objects.\n2. INPUT: Original Anthropic Message object, Zod-validated data, timing metrics. Helper functions from S2.\n3. LOGIC: Modify prompt() method signature to return Promise<AgentResponse<T>> instead of Promise<T>. Wrap successful Zod-validated responses in createSuccessResponse(). Catch errors and wrap in createErrorResponse(). Include duration in metadata. Handle streaming vs non-streaming responses.\n4. OUTPUT: Updated prompt() method that always returns AgentResponse<T>. Never throws (errors are wrapped in response). Type signature: prompt<T>(prompt: Prompt<T>): Promise<AgentResponse<T>>."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S4",
+                  "title": "Add INVALID_RESPONSE_FORMAT error handling",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M1.T1.S3"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per PRD section 6.6, invalid responses must be treated as errors with code INVALID_RESPONSE_FORMAT.\n2. INPUT: Response from Anthropic SDK, Zod validation result.\n3. LOGIC: In prompt() method, after receiving SDK response, validate structure conforms to expected format. If Zod validation fails with unexpected error, create error response with code='INVALID_RESPONSE_FORMAT'. Log validation failure.\n4. OUTPUT: Error handling branch that catches malformed responses and returns AgentResponse with error.code='INVALID_RESPONSE_FORMAT'."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M1.T2",
+              "title": "Update all Agent.prompt() call sites to handle AgentResponse",
+              "status": "Planned",
+              "description": "Update all existing code that calls Agent.prompt() to handle the new AgentResponse<T> return type instead of raw T.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T2.S1",
+                  "title": "Find all Agent.prompt() call sites in codebase",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per SYSTEM_CONTEXT.md, there are 11 example files and source files that use Agent.prompt().\n2. INPUT: None - research subtask.\n3. LOGIC: Use Grep tool to search for 'agent.prompt(' or '.prompt(' patterns in src/ and examples/ directories. List all files and line numbers. Categorize by usage (workflows, examples, tests).\n4. OUTPUT: Complete list of files containing prompt() calls with line counts and usage context."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T2.S2",
+                  "title": "Update example files (01-11) to handle AgentResponse",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M1.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Examples are in examples/examples/ per SYSTEM_CONTEXT.md. These are public-facing and must demonstrate correct usage.\n2. INPUT: List of example files from S1. AgentResponse interface from src/types/agent.ts.\n3. LOGIC: For each example file (01-basic-workflow.ts through 11-reparenting-workflows.ts), update prompt() call sites to destructure AgentResponse: const response = await agent.prompt(...); if (response.status === 'success') { const data = response.data; } else { handle error }. Show error handling pattern.\n4. OUTPUT: All 11 example files updated to handle AgentResponse return type with proper status checking and error handling."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T2.S3",
+                  "title": "Update source code prompt() call sites",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M1.T2.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Source code in src/core/, src/reflection/, etc. may use prompt().\n2. INPUT: List of source files from S1. AgentResponse interface.\n3. LOGIC: Update all non-example source files to handle AgentResponse. Focus on reflection system, error handling, and any internal prompt usage. Ensure error responses are properly propagated or handled.\n4. OUTPUT: All source code files updated to handle AgentResponse return type."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T2.S4",
+                  "title": "Update test files to assert on AgentResponse",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M1.T2.S3"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Tests are in src/__tests__/ per SYSTEM_CONTEXT.md. 36 test files exist.\n2. INPUT: List of test files from S1 that test prompt() functionality.\n3. LOGIC: Update test assertions to check response.status field. For success tests: expect(response.status).toBe('success'); expect(response.data).toEqual(...). For error tests: expect(response.status).toBe('error'); expect(response.error).not.toBeNull(); expect(response.error?.code).toBe('EXPECTED_CODE').\n4. OUTPUT: All test files updated with proper AgentResponse assertions."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M1.T3",
+              "title": "Update AgentResponse type definitions and exports",
+              "status": "Planned",
+              "description": "Ensure AgentResponse types are properly exported and documented for public API.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T3.S1",
+                  "title": "Verify AgentResponse types are exported from index.ts",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Public API exports are in src/index.ts per SYSTEM_CONTEXT.md.\n2. INPUT: src/types/agent.ts (AgentResponse definitions). src/index.ts (exports).\n3. LOGIC: Read src/index.ts to verify AgentResponse, AgentResponseStatus, AgentErrorDetails, AgentResponseMetadata are all exported. If missing, add exports.\n4. OUTPUT: All AgentResponse types exported from main index.ts for public consumption."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T3.S2",
+                  "title": "Add JSDoc comments to AgentResponse types",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M1.T3.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per PRD section 6, AgentResponse is non-negotiable for system interoperability.\n2. INPUT: src/types/agent.ts file.\n3. LOGIC: Add comprehensive JSDoc comments to AgentResponse interface documenting: (1) Strict JSON requirement, (2) No prose wrapping, (3) Consistent structure, (4) Null over undefined, (5) Error response requirements. Include examples from PRD section 6.5.\n4. OUTPUT: Fully documented AgentResponse types with usage examples."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P1.M2",
+          "title": "Milestone 1.2: Validation & Error Handling",
+          "status": "Planned",
+          "description": "Add runtime validation and error handling for AgentResponse compliance",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M2.T1",
+              "title": "Create AgentResponse Zod schema validation",
+              "status": "Planned",
+              "description": "Add Zod schema to validate AgentResponse objects at runtime",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S1",
+                  "title": "Define Zod schemas for all AgentResponse types",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Project uses Zod ^3.23.0 per EXTERNAL_DEPENDENCIES.md. Existing Zod patterns in src/core/prompt.ts.\n2. INPUT: AgentResponse interface from src/types/agent.ts.\n3. LOGIC: Create Zod schemas in src/types/agent.ts or new validation file. Schemas: AgentResponseStatusSchema (enum), AgentErrorDetailsSchema, AgentResponseMetadataSchema, AgentResponseSchema (generic). Use z.discriminatedUnion() for status-based validation. Ensure null handling (z.null() not z.undefined()).\n4. OUTPUT: Exported Zod schemas: AgentResponseSchema, AgentErrorDetailsSchema, AgentResponseMetadataSchema."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S2",
+                  "title": "Add validation to Agent.prompt() return path",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M2.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per PRD section 6.6, workflows should validate AgentResponse schema before processing.\n2. INPUT: AgentResponseSchema from S1. prompt() method from P1.M1.T1.S3.\n3. LOGIC: Before returning AgentResponse from prompt(), validate against AgentResponseSchema using .safeParse(). If validation fails (shouldn't happen with factory helpers), log error and return error response with code='INTERNAL_ERROR'. This ensures contract compliance even with bugs.\n4. OUTPUT: All prompt() return values validated against schema before being returned."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M2.T2",
+              "title": "Add integration tests for AgentResponse compliance",
+              "status": "Planned",
+              "description": "Create comprehensive tests ensuring AgentResponse contract is always met",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S1",
+                  "title": "Write tests for valid AgentResponse structures",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Tests use Vitest framework per SYSTEM_CONTEXT.md. Test location: src/__tests__/unit/.\n2. INPUT: AgentResponse interface, Zod schemas from P1.M2.T1.S1.\n3. LOGIC: Create new test file src/__tests__/unit/agent-response.test.ts. Test cases: (1) Success response has all required fields, (2) Error response has populated error field, (3) Metadata always includes agentId and timestamp, (4) Null is used instead of undefined, (5) All responses are valid JSON (JSON.parse(JSON.stringify(response)) succeeds).\n4. OUTPUT: Comprehensive test suite validating AgentResponse contract compliance."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S2",
+                  "title": "Write tests for error code handling",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M2.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per PRD section 6.2, error codes must be machine-readable.\n2. INPUT: Error code constants from P1.M1.T1.S2.\n3. LOGIC: Add tests for error code scenarios: (1) INVALID_RESPONSE_FORMAT code on malformed response, (2) EXECUTION_FAILED on workflow errors, (3) Custom codes from tool use failures, (4) recoverable field affects retry logic.\n4. OUTPUT: Test cases covering all error code paths and validation."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S3",
+                  "title": "Write adversarial tests for AgentResponse edge cases",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M2.T2.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Adversarial tests in src/__tests__/adversarial/ per SYSTEM_CONTEXT.md.\n2. INPUT: AgentResponse interface.\n3. LOGIC: Create src/__tests__/adversarial/agent-response-edge-cases.test.ts. Test: (1) Response with undefined fields (should fail validation), (2) Response with extra unknown fields (should pass), (3) Response with wrong status value (should fail), (4) Response with non-serializable data (circular refs, functions), (5) Response with invalid metadata.\n4. OUTPUT: Adversarial test suite ensuring robustness against malformed inputs."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P1.M3",
+          "title": "Milestone 1.3: Documentation & Examples",
+          "status": "Planned",
+          "description": "Update documentation and create migration guide for AgentResponse changes",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M3.T1",
+              "title": "Create migration guide for AgentResponse changes",
+              "status": "Planned",
+              "description": "Document how to update existing code to use new AgentResponse return type",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T1.S1",
+                  "title": "Write migration guide with before/after examples",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This is a breaking API change. Users need clear migration path.\n2. INPUT: Old prompt() signature (returns T), new signature (returns AgentResponse<T>). Updated example files from P1.M1.T2.S2.\n3. LOGIC: Create docs/migration-guide-agent-response.md. Document: (1) What changed, (2) Why this change (PRD requirement), (3) Before/after code examples, (4) Common patterns (status checking, error handling, data extraction), (5) Migration checklist. Use actual example conversions.\n4. OUTPUT: Comprehensive migration guide with code examples."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T1.S2",
+                  "title": "Update README.md with AgentResponse usage",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M3.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: README.md is at project root per SYSTEM_CONTEXT.md.\n2. INPUT: Migration guide from S1. AgentResponse types.\n3. LOGIC: Update README.md Quick Start section to show AgentResponse pattern. Update API usage examples. Add link to full migration guide. Ensure code examples are current.\n4. OUTPUT: README updated with AgentResponse examples and migration link."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P1.M4",
+          "title": "Milestone 1.4: Build Verification & Release",
+          "status": "Planned",
+          "description": "Verify build, run all tests, and prepare for release",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M4.T1",
+              "title": "Run full test suite and fix failures",
+              "status": "Planned",
+              "description": "Execute all tests (unit, integration, adversarial) and fix any issues",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T1.S1",
+                  "title": "Run unit tests and fix failures",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Test command is 'npm test' per SYSTEM_CONTEXT.md. Unit tests in src/__tests__/unit/.\n2. INPUT: Updated codebase with AgentResponse changes.\n3. LOGIC: Run 'npm test' to execute Vitest suite. If any unit tests fail, debug and fix. Common issues: missing status checks, incorrect error handling, type mismatches. Update test assertions if test logic was outdated.\n4. OUTPUT: All unit tests passing (100% pass rate)."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T1.S2",
+                  "title": "Run integration tests and fix failures",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M4.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Integration tests in src/__tests__/integration/ per SYSTEM_CONTEXT.md.\n2. INPUT: Passing unit tests from S1.\n3. LOGIC: Run integration test suite. These tests exercise full workflows with Agent.prompt() calls. Fix any issues with AgentResponse handling in multi-step workflows. Ensure child workflows properly propagate responses.\n4. OUTPUT: All integration tests passing."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T1.S3",
+                  "title": "Run adversarial tests and fix failures",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P1.M4.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Adversarial tests in src/__tests__/adversarial/ per SYSTEM_CONTEXT.md.\n2. INPUT: Passing integration tests from S2.\n3. LOGIC: Run adversarial test suite. These tests may intentionally trigger errors. Verify AgentResponse error codes are correct. Fix any unexpected failures.\n4. OUTPUT: All adversarial tests passing."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M4.T2",
+              "title": "Verify TypeScript compilation and type checking",
+              "status": "Planned",
+              "description": "Ensure no type errors and build succeeds",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T2.S1",
+                  "title": "Run TypeScript compiler and fix errors",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Build command is 'npm run build' (tsc) per SYSTEM_CONTEXT.md. Lint command is 'npm run lint' (tsc --noEmit).\n2. INPUT: Complete codebase with AgentResponse changes.\n3. LOGIC: Run 'npm run lint' to check types. Fix any type errors: missing properties, incorrect generic usage, wrong return types. Common issues: forgetting to check response.status before accessing response.data. Then run 'npm run build' to generate dist/.\n4. OUTPUT: Clean TypeScript compilation with zero errors. dist/ directory populated."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M4.T3",
+              "title": "Verify example scripts run successfully",
+              "status": "Planned",
+              "description": "Test all example workflows to ensure they work with AgentResponse",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T3.S1",
+                  "title": "Run example scripts and verify output",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P1.M4.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Example scripts in package.json (start:basic, start:decorators, etc.) per SYSTEM_CONTEXT.md. 11 example files.\n2. INPUT: Compiled dist/ from build. Updated example files from P1.M1.T2.S2.\n3. LOGIC: Run each example script: npm run start:basic, npm run start:decorators, npm run start:parent-child, npm run start:observers, npm run start:errors, npm run start:concurrent, npm run start:agent-loops. Verify each executes without errors. Check console output shows correct AgentResponse handling.\n4. OUTPUT: All 11 example scripts running successfully with proper AgentResponse usage."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Phase",
+      "id": "P2",
+      "title": "Phase 2: Optional Enhancements",
+      "status": "Planned",
+      "description": "Optional improvements identified during research. Not required for PRD compliance but valuable for long-term maintainability.",
+      "milestones": [
+        {
+          "type": "Milestone",
+          "id": "P2.M1",
+          "title": "Milestone 2.1: Event Replay System",
+          "status": "Planned",
+          "description": "Implement time-travel debugging by replaying event streams to reconstruct workflow tree state",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P2.M1.T1",
+              "title": "Design WorkflowEventReplayer class",
+              "status": "Planned",
+              "description": "Create class that can rebuild WorkflowNode tree from event history",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P2.M1.T1.S1",
+                  "title": "Define replayer interface and event handling strategy",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per plan/002_6761e4b84fd1/architecture/OBSERVABILITY_PATTERNS_RESEARCH.md, event replay enables time-travel debugging. 15+ event types exist in src/types/events.ts.\n2. INPUT: WorkflowEvent type from src/types/events.ts. WorkflowNode structure from src/types/workflow.ts.\n3. LOGIC: Create new file src/debugger/event-replayer.ts. Define class WorkflowEventReplayer with method replay(events: WorkflowEvent[]): WorkflowNode. Strategy: Iterate events chronologically, mutate in-memory tree. Handle childAttached (attach node), childDetached (remove subtree), stateSnapshot (update node), error (add to node.errors). Use Map<string, WorkflowNode> for O(1) lookups.\n4. OUTPUT: WorkflowEventReplayer class skeleton with replay() method signature and documentation of event handling strategy."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P2.M1.T1.S2",
+                  "title": "Implement replay logic for tree structure events",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P2.M1.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Tree structure events: childAttached, childDetached, treeUpdated per events.ts.\n2. INPUT: Event stream array. Node Map from S1.\n3. LOGIC: In replay() method, initialize empty Map. For each event: if type='childAttached', create child node if not exists, add to parent's children array in Map. If type='childDetached', remove child node from parent's children, delete from Map. If type='treeUpdated', update root reference. Maintain parent-child invariants.\n4. OUTPUT: Working replay of tree structure events that reconstructs WorkflowNode hierarchy."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P2.M1.T1.S3",
+                  "title": "Implement replay logic for node state events",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P2.M1.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Node state events: stateSnapshot, stepStart, stepEnd, error, etc.\n2. INPUT: Event stream. Tree structure from S2.\n3. LOGIC: For state events, find node in Map by ID. Update node properties: stateSnapshot -> node.stateSnapshot = event.node.stateSnapshot, stepStart -> add to events array, stepEnd -> update duration, error -> push to errors array. Handle events for non-existent nodes (log warning).\n4. OUTPUT: Complete replay logic that reconstructs full tree state including snapshots, timings, and errors."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P2.M1.T2",
+              "title": "Add event persistence and replay API",
+              "status": "Planned",
+              "description": "Enable saving event streams to disk and loading them for replay",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P2.M1.T2.S1",
+                  "title": "Add event persistence to WorkflowTreeDebugger",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P2.M1.T1.S3"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: WorkflowTreeDebugger at src/debugger/tree-debugger.ts currently doesn't persist events.\n2. INPUT: WorkflowEvent stream from debugger.events Observable.\n3. LOGIC: Modify WorkflowTreeDebugger to accept { persistEvents: boolean } option. If true, maintain in-memory event history array. Add method getEventHistory(): WorkflowEvent[] and saveEventHistory(path: string): Promise<void> (write to JSON file). Add loadEventHistory(path: string): Promise<WorkflowEvent[]> static method.\n4. OUTPUT: WorkflowTreeDebugger with event persistence capabilities."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P2.M1.T2.S2",
+                  "title": "Integrate WorkflowEventReplayer with debugger",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": ["P2.M1.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Replayer from P2.M1.T1 can load saved event histories.\n2. INPUT: Saved event JSON file. WorkflowEventReplayer class.\n3. LOGIC: Add static method WorkflowTreeDebugger.replay(path: string): WorkflowTreeDebugger. Loads events from file, replays using WorkflowEventReplayer, returns new debugger instance with reconstructed tree (read-only, no live workflow).\n4. OUTPUT: Time-travel debugging API: WorkflowTreeDebugger.replay('workflow-events.json')."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P2.M2",
+          "title": "Milestone 2.2: Ink-Based Terminal UI (Optional)",
+          "status": "Planned",
+          "description": "Build reactive terminal UI using Ink for interactive tree debugging",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P2.M2.T1",
+              "title": "Evaluate Ink and create prototype",
+              "status": "Planned",
+              "description": "Research Ink library and build basic tree visualization prototype",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P2.M2.T1.S1",
+                  "title": "Research Ink library and create hello-world prototype",
+                  "status": "Planned",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per plan/002_6761e4b84fd1/architecture/OBSERVABILITY_PATTERNS_RESEARCH.md, Ink is React for CLI. Current ASCII rendering in toTreeString() works but lacks interactivity.\n2. INPUT: Ink documentation (https://ink.think.io/). Current WorkflowTreeDebugger.\n3. LOGIC: Install Ink: npm install ink. Create examples/ink-debugger-hello.tsx. Build simple component: <Box><Text>Hello Workflow</Text></Box>. Test with tsx. Verify Ink works with Node.js >=18.\n4. OUTPUT: Working Ink prototype and evaluation notes on performance, bundle size, compatibility."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P2.M2.T1.S2",
+                  "title": "Build reactive tree component prototype",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P2.M2.T1.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Current toTreeString() generates ASCII. Need equivalent Ink component.\n2. INPUT: WorkflowNode structure. toTreeString() logic for reference.\n3. LOGIC: Create component <WorkflowTree node={WorkflowNode} />. Use useStatic hook for tree data. Recursively render child nodes with indentation. Use status symbols (○ ◐ ✓ ✗ ⊘). Add color with <Text color="green"> for status. Make it reactive: re-render on debugger.events Observable updates.\n4. OUTPUT: Interactive tree component that updates in real-time as workflow runs."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P2.M2.T2",
+              "title": "Add interactive features (expand/collapse, navigation)",
+              "status": "Planned",
+              "description": "Implement user interactions for tree exploration",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P2.M2.T2.S1",
+                  "title": "Implement expand/collapse for tree nodes",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P2.M2.T1.S2"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Large trees need collapse to avoid overwhelming UI. Ink supports useInput() for keyboard handling.\n2. INPUT: WorkflowTree component from S2.\n3. LOGIC: Add state: Set<string> of expanded node IDs. Default: root expanded. Add key listener: Enter to toggle expand/collapse. Modify tree rendering to hide collapsed children (show placeholder like '... [5 children]'). Use <Text> with onClick or keyboard navigation.\n4. OUTPUT: Collapsible tree with keyboard navigation."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P2.M2.T2.S2",
+                  "title": "Add split-pane layout with node details",
+                  "status": "Planned",
+                  "story_points": 2,
+                  "dependencies": ["P2.M2.T2.S1"],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Need to show node details (logs, state snapshot, events) alongside tree.\n2. INPUT: Selected node state from tree component.\n3. LOGIC: Use Ink <Box flexDirection="row"> for split-pane. Left pane: tree (60% width). Right pane: node details (40% width). Add arrow key navigation to select nodes. Show details: node.name, node.status, node.stateSnapshot (redacted), recent logs, event count. Handle large output with scrolling.\n4. OUTPUT: Split-pane debugger UI with tree navigation and details panel."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
