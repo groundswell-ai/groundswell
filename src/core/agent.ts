@@ -63,6 +63,9 @@ export class Agent {
   /** MCP handler for tool management */
   private readonly mcpHandler: MCPHandler;
 
+  /** Direct MCPHandler instances for delegated execution */
+  private readonly mcpHandlers: MCPHandler[] = [];
+
   /** Default model to use */
   private readonly model: string;
 
@@ -87,6 +90,12 @@ export class Agent {
     // Register MCP servers
     if (config.mcps) {
       for (const mcp of config.mcps) {
+        // If the MCP is already an MCPHandler instance, store it directly
+        // for delegated tool execution (preserves registered executors)
+        if (mcp instanceof MCPHandler) {
+          this.mcpHandlers.push(mcp);
+        }
+        // Always register with main handler for tool discovery
         this.mcpHandler.registerServer(mcp);
       }
     }
@@ -463,7 +472,18 @@ export class Agent {
    * Execute a tool (either direct or via MCP)
    */
   private async executeTool(name: string, input: unknown): Promise<unknown> {
-    // Check if it's an MCP tool
+    // First, check stored MCPHandler instances (they have registered executors)
+    for (const handler of this.mcpHandlers) {
+      if (handler.hasTool(name)) {
+        const result = await handler.executeTool(name, input);
+        if (result.is_error) {
+          throw new Error(result.content as string);
+        }
+        return result.content;
+      }
+    }
+
+    // Fall back to main mcpHandler (for non-MCPHandler MCPServers)
     if (this.mcpHandler.hasTool(name)) {
       const result = await this.mcpHandler.executeTool(name, input);
       if (result.is_error) {

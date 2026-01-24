@@ -137,5 +137,6 @@ export type {
 } from './tools/introspection.js';
 
 // Examples (for reference)
-export { TestCycleWorkflow } from './examples/test-cycle-workflow.js';
-export { TDDOrchestrator } from './examples/tdd-orchestrator.js';
+// Temporarily commented out due to decorator compatibility issues with vitest
+// export { TestCycleWorkflow } from './examples/test-cycle-workflow.js';
+// export { TDDOrchestrator } from './examples/tdd-orchestrator.js';
