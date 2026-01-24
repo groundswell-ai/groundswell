@@ -420,8 +420,63 @@ export class Agent {
 
       const parsed = JSON.parse(jsonMatch[0]);
 
-      // Validate with schema
-      const validated = prompt.validateResponse(parsed);
+      // Validate with schema - use safeValidateResponse to catch Zod errors
+      const validationResult = prompt.safeValidateResponse(parsed);
+
+      if (!validationResult.success) {
+        const zodError = validationResult.error;
+
+        // Format user-friendly error summary
+        const errorSummary = zodError.errors
+          .map(err => {
+            const field = err.path.length > 0 ? err.path.join('.') : 'response';
+            return `${field}: ${err.message}`;
+          })
+          .join('; ');
+
+        // Log validation failure
+        console.error('Response validation failed', {
+          agentId: this.id,
+          agentName: this.name,
+          requestId,
+          errorCount: zodError.errors.length,
+          validationErrors: zodError.errors.map(err => ({
+            path: err.path.join('.'),
+            message: err.message,
+            code: err.code,
+          })),
+        });
+
+        // Calculate duration for metadata
+        const duration = Date.now() - startTime;
+
+        // Return error response
+        const errorResponse = createErrorResponse(
+          'INVALID_RESPONSE_FORMAT',
+          `Response validation failed: ${errorSummary}`,
+          {
+            validationErrors: zodError.errors.map(err => ({
+              field: err.path.join('.') || 'root',
+              message: err.message,
+              code: err.code,
+            })),
+            errorCount: zodError.errors.length,
+          },
+          false // not recoverable
+        );
+
+        // Override metadata with actual execution values
+        errorResponse.metadata = {
+          agentId: this.id,
+          timestamp: startTime,
+          duration,
+          requestId,
+        };
+
+        return errorResponse as AgentResponse<T>;
+      }
+
+      const validated = validationResult.data;
 
       // Call session end hooks
       await this.callHooks(effectiveHooks?.sessionEnd, {

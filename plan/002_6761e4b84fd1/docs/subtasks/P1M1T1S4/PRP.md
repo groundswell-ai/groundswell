@@ -114,7 +114,7 @@ This task implements **PRD section 6.6** requirement: "Invalid responses must be
 
 # CRITICAL - Previous PRP (P1.M1.T1.S3) Dependency
 
-- docfile: plan/002_6761e4b84fd1/P1M1T1S3/PRP.md
+- docfile: plan/002_6761e4b84fd1/docs/subtasks/P1M1T1S3/PRP.md
   why: Defines the AgentResponse wrapping pattern this task extends
   section:
     - Goal Section: Agent.prompt() returns Promise<AgentResponse<T>>
@@ -183,7 +183,7 @@ This task implements **PRD section 6.6** requirement: "Invalid responses must be
 
 # CRITICAL - Logging Patterns
 
-- docfile: plan/002_6761e4b84fd1/P1M1T1S4/research/logging-patterns.md
+- docfile: plan/002_6761e4b84fd1/docs/subtasks/P1M1T1S4/research/logging-patterns.md
   why: Documents logging patterns in the codebase
   section:
     - Section 1: WorkflowLogger for structured logging
@@ -206,7 +206,7 @@ This task implements **PRD section 6.6** requirement: "Invalid responses must be
 
 # CRITICAL - Zod Error Handling Best Practices
 
-- docfile: plan/002_6761e4b84fd1/P1M1T1S4/research/error-handling-best-practices.md
+- docfile: plan/002_6761e4b84fd1/docs/subtasks/P1M1T1S4/research/error-handling-best-practices.md
   why: External research on Zod error handling patterns
   section:
     - Section 1: safeParse() vs parse() patterns
