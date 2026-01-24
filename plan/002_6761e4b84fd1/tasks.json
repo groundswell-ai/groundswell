@@ -76,7 +76,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "Find all Agent.prompt() call sites in codebase",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per SYSTEM_CONTEXT.md, there are 11 example files and source files that use Agent.prompt().\n2. INPUT: None - research subtask.\n3. LOGIC: Use Grep tool to search for 'agent.prompt(' or '.prompt(' patterns in src/ and examples/ directories. List all files and line numbers. Categorize by usage (workflows, examples, tests).\n4. OUTPUT: Complete list of files containing prompt() calls with line counts and usage context."
@@ -85,7 +85,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S2",
                   "title": "Update example files (01-11) to handle AgentResponse",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T2.S1"
