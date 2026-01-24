@@ -17,7 +17,13 @@ import type {
   SessionStartContext,
   SessionEndContext,
   WorkflowEvent,
+  AgentResponse,
+  AgentResponseMetadata,
 } from '../types/index.js';
+import {
+  createSuccessResponse,
+  createErrorResponse,
+} from '../types/agent.js';
 import type { Prompt } from './prompt.js';
 import { MCPHandler } from './mcp-handler.js';
 import { generateId } from '../utils/id.js';
@@ -105,14 +111,13 @@ export class Agent {
    * Execute a prompt and return validated response
    * @param prompt Prompt to execute
    * @param overrides Optional overrides for this execution
-   * @returns Validated response of type T
+   * @returns AgentResponse containing validated response or error
    */
   public async prompt<T>(
     prompt: Prompt<T>,
     overrides?: PromptOverrides
-  ): Promise<T> {
-    const result = await this.executePrompt(prompt, overrides);
-    return result.data;
+  ): Promise<AgentResponse<T>> {
+    return this.executePrompt(prompt, overrides);
   }
 
   /**
@@ -120,24 +125,35 @@ export class Agent {
    * @param prompt Prompt to execute
    * @param overrides Optional overrides for this execution
    * @returns Full result including metadata
+   * @deprecated Use prompt() which now returns AgentResponse with metadata
    */
   public async promptWithMetadata<T>(
     prompt: Prompt<T>,
     overrides?: PromptOverrides
   ): Promise<PromptResult<T>> {
-    return this.executePrompt(prompt, overrides);
+    const response = await this.executePrompt(prompt, overrides);
+    // Convert AgentResponse back to PromptResult for backward compatibility
+    if (response.status === 'error') {
+      throw new Error(response.error?.message ?? 'Unknown error');
+    }
+    return {
+      data: response.data as T, // Type assertion: data is T when status is not 'error'
+      usage: response.metadata.usage ?? { input_tokens: 0, output_tokens: 0 },
+      duration: response.metadata.duration ?? 0,
+      toolCalls: response.metadata.toolCalls ?? 0,
+    };
   }
 
   /**
    * Execute a prompt with reflection capabilities
    * @param prompt Prompt to execute
    * @param overrides Optional overrides for this execution
-   * @returns Validated response of type T
+   * @returns AgentResponse containing validated response or error
    */
   public async reflect<T>(
     prompt: Prompt<T>,
     overrides?: PromptOverrides
-  ): Promise<T> {
+  ): Promise<AgentResponse<T>> {
     // Add reflection system prefix if reflection is enabled
     const reflectionEnabled =
       prompt.enableReflection ??
@@ -155,8 +171,7 @@ export class Agent {
         (prompt.systemOverride ?? overrides?.system ?? this.config.system ?? ''),
     };
 
-    const result = await this.executePrompt(prompt, effectiveOverrides);
-    return result.data;
+    return this.executePrompt(prompt, effectiveOverrides);
   }
 
   /**
@@ -182,8 +197,9 @@ export class Agent {
   private async executePrompt<T>(
     prompt: Prompt<T>,
     overrides?: PromptOverrides
-  ): Promise<PromptResult<T>> {
+  ): Promise<AgentResponse<T>> {
     const startTime = Date.now();
+    const requestId = generateId();
     let toolCallCount = 0;
     let totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
 
@@ -218,8 +234,12 @@ export class Agent {
       };
       cacheKey = generateCacheKey(cacheInputs);
 
-      const cached = await defaultCache.get(cacheKey) as PromptResult<T> | undefined;
-      if (cached) {
+      const cached = await defaultCache.get(cacheKey) as
+        | AgentResponse<T>
+        | PromptResult<T>
+        | undefined;
+      if (cached && 'status' in cached) {
+        // New AgentResponse format - has 'status' field
         // Emit cache hit event
         if (ctx) {
           this.emitWorkflowEvent({
@@ -230,6 +250,7 @@ export class Agent {
         }
         return cached;
       }
+      // Old PromptResult format or undefined - re-execute
 
       // Emit cache miss event
       if (ctx) {
@@ -315,6 +336,12 @@ export class Agent {
           // Execute tool
           const result = await this.executeTool(toolUse.name, toolUse.input);
 
+          // Check if tool execution returned an error response
+          if (result && typeof result === 'object' && 'status' in result) {
+            // This is an AgentResponse error - return it immediately
+            return result as AgentResponse<T>;
+          }
+
           const toolDuration = Date.now() - toolStartTime;
 
           // Emit tool invocation event if in workflow context
@@ -372,13 +399,23 @@ export class Agent {
       );
 
       if (!textContent) {
-        throw new Error('No text response received from API');
+        return createErrorResponse(
+          'INVALID_RESPONSE_FORMAT',
+          'No text response received from API',
+          { stopReason: response.stop_reason },
+          false
+        ) as AgentResponse<T>;
       }
 
       // Parse JSON from response
       const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
-        throw new Error('No JSON object found in response');
+        return createErrorResponse(
+          'INVALID_RESPONSE_FORMAT',
+          'No JSON object found in response',
+          { responseText: textContent.text.substring(0, 200) },
+          false
+        ) as AgentResponse<T>;
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
@@ -415,12 +452,24 @@ export class Agent {
         toolCalls: toolCallCount,
       };
 
+      // Create AgentResponse with metadata including usage and toolCalls
+      const metadata: AgentResponseMetadata = {
+        agentId: this.id,
+        timestamp: startTime,
+        duration,
+        requestId,
+        usage: totalUsage,
+        toolCalls: toolCallCount,
+      };
+
+      const agentResponse = createSuccessResponse(validated, metadata);
+
       // Store in cache if enabled
       if (cacheEnabled && cacheKey) {
-        await defaultCache.set(cacheKey, result, { prefix: this.id });
+        await defaultCache.set(cacheKey, agentResponse, { prefix: this.id });
       }
 
-      return result;
+      return agentResponse;
     } finally {
       // Restore environment
       this.restoreEnvironment(originalEnv);
@@ -470,14 +519,23 @@ export class Agent {
 
   /**
    * Execute a tool (either direct or via MCP)
+   * Returns the tool result on success, or AgentResponse<null> on error
    */
-  private async executeTool(name: string, input: unknown): Promise<unknown> {
+  private async executeTool(
+    name: string,
+    input: unknown
+  ): Promise<unknown | AgentResponse<null>> {
     // First, check stored MCPHandler instances (they have registered executors)
     for (const handler of this.mcpHandlers) {
       if (handler.hasTool(name)) {
         const result = await handler.executeTool(name, input);
         if (result.is_error) {
-          throw new Error(result.content as string);
+          return createErrorResponse(
+            'TOOL_EXECUTION_FAILED',
+            result.content as string,
+            { toolName: name, toolInput: input },
+            false
+          );
         }
         return result.content;
       }
@@ -487,13 +545,23 @@ export class Agent {
     if (this.mcpHandler.hasTool(name)) {
       const result = await this.mcpHandler.executeTool(name, input);
       if (result.is_error) {
-        throw new Error(result.content as string);
+        return createErrorResponse(
+          'TOOL_EXECUTION_FAILED',
+          result.content as string,
+          { toolName: name, toolInput: input },
+          false
+        );
       }
       return result.content;
     }
 
-    // Look for direct tool handler - this would be set by subclasses
-    throw new Error(`No handler found for tool '${name}'`);
+    // No handler found
+    return createErrorResponse(
+      'TOOL_EXECUTION_FAILED',
+      `No handler found for tool '${name}'`,
+      { toolName: name },
+      false
+    );
   }
 
   /**

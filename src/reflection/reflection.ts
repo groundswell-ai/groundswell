@@ -265,11 +265,26 @@ export class ReflectionManager implements ReflectionAPI {
 
     try {
       const response = await this.agent.prompt(reflectionPrompt);
+      // Handle AgentResponse return type
+      if (response.status === 'error') {
+        return {
+          shouldRetry: false,
+          reason: `Reflection analysis failed: ${response.error?.message ?? 'Unknown error'}`,
+        };
+      }
+      // Type assertion: data is non-null when status is not 'error'
+      const data = response.data;
+      if (!data) {
+        return {
+          shouldRetry: false,
+          reason: 'Reflection analysis failed: No data returned',
+        };
+      }
       return {
-        shouldRetry: response.shouldRetry,
-        reason: response.reason,
-        revisedPromptData: response.revisedPromptData,
-        revisedSystemPrompt: response.revisedSystemPrompt,
+        shouldRetry: data.shouldRetry,
+        reason: data.reason,
+        revisedPromptData: data.revisedPromptData,
+        revisedSystemPrompt: data.revisedSystemPrompt,
       };
     } catch (reflectionError) {
       // If reflection itself fails, don't retry the original

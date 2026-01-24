@@ -3,7 +3,7 @@
  * All properties map 1:1 to Anthropic SDK
  */
 
-import type { Tool, MCPServer, Skill, AgentHooks } from './sdk-primitives.js';
+import type { Tool, MCPServer, Skill, AgentHooks, TokenUsage } from './sdk-primitives.js';
 
 /**
  * Configuration for creating an Agent instance
@@ -151,6 +151,12 @@ export interface AgentResponseMetadata {
 
   /** Request correlation ID (optional) */
   requestId?: string | null;
+
+  /** Token usage from the API (optional, for backward compatibility) */
+  usage?: TokenUsage;
+
+  /** Number of tool invocations (optional, for backward compatibility) */
+  toolCalls?: number;
 }
 
 // ========================

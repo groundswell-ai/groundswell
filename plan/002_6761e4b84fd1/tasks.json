@@ -18,7 +18,7 @@
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "Update Agent.prompt() to return AgentResponse<T>",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Modify the Agent class prompt() method to wrap all responses in the AgentResponse schema instead of returning raw data.",
               "subtasks": [
                 {
@@ -45,7 +45,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S3",
                   "title": "Refactor Agent.prompt() to wrap responses in AgentResponse",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S2"
@@ -56,7 +56,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S4",
                   "title": "Add INVALID_RESPONSE_FORMAT error handling",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S3"
