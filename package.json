@@ -1,6 +1,6 @@
 {
   "name": "groundswell",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "url": "https://github.com/groundswell-ai/groundswell",
   "description": "Hierarchical workflow orchestration engine with full observability",
   "keywords": [
