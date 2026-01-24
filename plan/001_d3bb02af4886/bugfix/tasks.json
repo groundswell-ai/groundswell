@@ -1,0 +1,484 @@
+{
+  "backlog": [
+    {
+      "type": "Phase",
+      "id": "P1",
+      "title": "Bug Fixes - Hierarchical Workflow Engine",
+      "status": "Complete",
+      "description": "Fix critical, major, and minor bugs identified during PRD validation testing. All fixes maintain backward compatibility and preserve the existing test suite's 100% pass rate.",
+      "milestones": [
+        {
+          "type": "Milestone",
+          "id": "P1.M1",
+          "title": "Critical Fixes - Signature Mismatches",
+          "status": "Complete",
+          "description": "Fix critical PRD signature mismatches that violate the public API contract.",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M1.T1",
+              "title": "Fix WorkflowLogger.child() Signature Mismatch",
+              "status": "Complete",
+              "description": "Update WorkflowLogger.child() signature from child(parentLogId: string) to child(meta: Partial<LogEntry>) to match PRD specification in Section 12.1.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S1",
+                  "title": "Research PRD specification for child() signature",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, WorkflowLogger is at src/core/logger.ts with current signature child(parentLogId: string). PRD Section 12.1 specifies child(meta: Partial<LogEntry>).\n2. INPUT: Access to PRD documentation and existing logger implementation.\n3. LOGIC: Read PRD Section 12.1 to understand exact signature requirements. Compare with src/core/logger.ts:84 implementation. Document the differences and create a migration plan.\n4. OUTPUT: Create plan/bugfix/architecture/logger_child_signature_analysis.md documenting the PRD spec, current implementation, differences, and recommended approach."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S2",
+                  "title": "Update WorkflowLogger.child() to accept Partial<LogEntry>",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, LogEntry interface has fields: id, workflowId, timestamp, level, message, data, parentLogId. The child() method should extract parentLogId from meta parameter.\n2. INPUT: Analysis from S1 documenting the required signature change.\n3. LOGIC: Modify src/core/logger.ts:84 child() method signature from child(parentLogId: string) to child(meta: Partial<LogEntry>). Extract parentLogId from meta.parentLogId or generate from meta.id if parentLogId not provided. Maintain backward compatibility by accepting string as shorthand for parentLogId.\n4. OUTPUT: Updated child() method that accepts Partial<LogEntry> and is backward compatible with string argument. All existing calls to child() continue to work."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S3",
+                  "title": "Add tests for new child() signature with Partial<LogEntry>",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M1.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, logger tests are in src/__tests__/unit/ folder. Test patterns use vitest with describe/it blocks.\n2. INPUT: Updated child() implementation from S2.\n3. LOGIC: Create tests in appropriate test file covering: child() with Partial<LogEntry> containing parentLogId, child() with Partial<LogEntry> containing id (should use as parentLogId), child() with string (backward compatibility), child() with empty object (should generate parentLogId). Verify parentLogId is correctly set in child logger's log entries.\n4. OUTPUT: New test suite for child() method covering all scenarios. All tests pass including backward compatibility cases."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M1.T1.S4",
+                  "title": "Verify all existing child() calls still work",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M1.T1.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, child() is used internally in WorkflowLogger and potentially in examples/tests. Use Grep to find all usages.\n2. INPUT: Updated child() implementation from S2.\n3. LOGIC: Search codebase for all calls to .child() method. Manually verify each call works with new signature. Run full test suite to ensure 344 existing tests still pass. Fix any breaking issues found.\n4. OUTPUT: All 344 existing tests pass. Document any edge cases discovered and how they were handled."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P1.M2",
+          "title": "Major Fixes - Concurrent Execution & Error Handling",
+          "status": "Complete",
+          "description": "Fix concurrent task execution error handling and implement the missing ErrorMergeStrategy functionality.",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M2.T1",
+              "title": "Replace Promise.all with Promise.allSettled in Concurrent Tasks",
+              "status": "Complete",
+              "description": "Update @Task decorator to use Promise.allSettled() instead of Promise.all() for concurrent execution, ensuring all child workflows complete even if some fail.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S1",
+                  "title": "Analyze current Promise.all implementation in @Task decorator",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/error_handling_patterns.md, Promise.all is at src/decorators/task.ts:112. The implementation filters runnable workflows and executes them with Promise.all().\n2. INPUT: Access to src/decorators/task.ts and related test files.\n3. LOGIC: Read src/decorators/task.ts lines 104-114. Understand the runnable filtering logic. Document how errors currently propagate. Identify what happens when one concurrent workflow fails.\n4. OUTPUT: Create plan/bugfix/architecture/promise_all_analysis.md documenting current behavior, error flow, and requirements for Promise.allSettled migration."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S2",
+                  "title": "Implement Promise.allSettled with error collection",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M2.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/concurrent_execution_best_practices.md, use Promise.allSettled() to collect both fulfilled and rejected results. Filter for rejected results to collect errors.\n2. INPUT: Analysis from S1 and research from concurrent_execution_best_practices.md.\n3. LOGIC: Replace Promise.all() with Promise.allSettled() at src/decorators/task.ts:112. After promises settle, filter for PromiseRejectedResult results. If errors exist, collect them into an array. Maintain backward compatibility by throwing first error if no error merge strategy is configured.\n4. OUTPUT: Updated @Task decorator using Promise.allSettled. Errors are collected but first error is still thrown (backward compatible behavior)."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S3",
+                  "title": "Add tests for concurrent task failure scenarios",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M2.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Adversarial tests are in src/__tests__/adversarial/.\n2. INPUT: Updated Promise.allSettled implementation from S2.\n3. LOGIC: Create tests covering: single child failure, multiple children failing, mixed success/failure, all children fail. Verify that all children complete execution even when some fail. Verify error collection works correctly.\n4. OUTPUT: New test suite for concurrent task failures. All tests pass demonstrating all workflows complete before error is thrown."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T1.S4",
+                  "title": "Run full test suite to ensure no regressions",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T1.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, project has 344 existing tests with 100% pass rate. Use Bash tool to run tests.\n2. INPUT: Updated implementation and new tests from S3.\n3. LOGIC: Run full test suite using npm test or vitest command. Verify all 344 existing tests still pass. Verify new tests pass. Fix any regressions discovered.\n4. OUTPUT: Full test suite passes (344+ tests). No regressions introduced. Document any edge cases encountered."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M2.T2",
+              "title": "Implement ErrorMergeStrategy Support",
+              "status": "Complete",
+              "description": "Add errorMergeStrategy option to TaskOptions and implement error aggregation logic when enabled.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S1",
+                  "title": "Add errorMergeStrategy to TaskOptions interface",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/error_handling_patterns.md, ErrorMergeStrategy interface exists at src/types/error-strategy.ts but is not used. TaskOptions is in src/types/decorators.ts.\n2. INPUT: Access to src/types/decorators.ts and src/types/error-strategy.ts.\n3. LOGIC: Import ErrorMergeStrategy into src/types/decorators.ts. Add optional errorMergeStrategy?: ErrorMergeStrategy field to TaskOptions interface. Export updated interface.\n4. OUTPUT: TaskOptions interface includes errorMergeStrategy field. TypeScript compiles without errors."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S2",
+                  "title": "Implement error aggregation logic in @Task decorator",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M2.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/concurrent_execution_best_practices.md, when errorMergeStrategy.enabled is true, use combine() function to merge errors. Default to simple aggregation if combine() not provided.\n2. INPUT: Updated TaskOptions from S1 and Promise.allSettled implementation from P1.M2.T1.S2.\n3. LOGIC: In @Task decorator after collecting errors from Promise.allSettled(), check if opts.errorMergeStrategy?.enabled is true. If true, call opts.errorMergeStrategy.combine?(errors) or use default merger. Throw merged error instead of first error. Emit error event with merged error.\n4. OUTPUT: @Task decorator implements error merge strategy when configured. Merged errors contain aggregated information from all failures."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S3",
+                  "title": "Create default error merger implementation",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T2.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/error_handling_patterns.md, default merger should aggregate: message with count, all original errors, parent workflowId, concatenated stacks, aggregated logs.\n2. INPUT: Error aggregation requirements from research.\n3. LOGIC: Create utility function mergeWorkflowErrors(errors: WorkflowError[]): WorkflowError. Combine messages with count. Aggregate original errors into array. Use first error's workflowId (parent). Concatenate stacks with separator. Flatten all logs arrays. Return merged WorkflowError object.\n4. OUTPUT: mergeWorkflowErrors() function created and exported from appropriate module. Function creates comprehensive merged error."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T2.S4",
+                  "title": "Add tests for ErrorMergeStrategy functionality",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M2.T2.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Tests should cover enabled/disabled, custom combine, default merge.\n2. INPUT: Error merge implementation from S2 and S3.\n3. LOGIC: Create tests covering: errorMergeStrategy.enabled=false (default behavior), errorMergeStrategy.enabled=true with default merge, errorMergeStrategy.enabled=true with custom combine function, maxMergeDepth validation if implemented. Verify merged error contains aggregated information.\n4. OUTPUT: Comprehensive test suite for ErrorMergeStrategy. All tests pass demonstrating correct error aggregation behavior."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M2.T3",
+              "title": "Document trackTiming Default Value in PRD",
+              "status": "Complete",
+              "description": "Update PRD documentation to explicitly state that trackTiming defaults to true, matching the implementation.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T3.S1",
+                  "title": "Locate PRD section for @Step decorator options",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Bug report references PRD Section 8.1 - @Step Decorator Options. PRD is likely in docs/ or PRDs/ directory.\n2. INPUT: Access to project documentation files.\n3. LOGIC: Use Grep or Glob to find PRD document containing @Step decorator options. Locate Section 8.1. Find trackTiming option documentation.\n4. OUTPUT: Identify exact file path and line number for trackTiming documentation."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M2.T3.S2",
+                  "title": "Update PRD to state trackTiming defaults to true",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M2.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 4, implementation uses 'if (opts.trackTiming !== false)' meaning default is true. PRD should explicitly state this.\n2. INPUT: PRD file location from S1.\n3. LOGIC: Edit PRD Section 8.1 to add explicit default value statement. Example: 'trackTiming?: boolean - Whether to track step execution timing. Default: true.' Save updated PRD.\n4. OUTPUT: PRD updated with explicit trackTiming default value. Documentation matches implementation behavior."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P1.M3",
+          "title": "Minor Fixes - Logging & Performance",
+          "status": "Complete",
+          "description": "Fix minor issues related to observer error handling, performance optimizations, and validation.",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M3.T1",
+              "title": "Replace console.error with Logger for Observer Errors",
+              "status": "Complete",
+              "description": "Update observer error handling to use workflow logger instead of direct console.error output.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T1.S1",
+                  "title": "Find all console.error calls for observer errors",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 5 and plan/bugfix/architecture/codebase_structure.md, console.error occurs at src/core/workflow.ts:376 and src/core/logger.ts:27.\n2. INPUT: Access to codebase and Grep tool.\n3. LOGIC: Use Grep to search for 'console.error' in src/ directory. Identify which calls are for observer errors vs other purposes. Document exact locations and context.\n4. OUTPUT: List of all console.error calls with categorization (observer-related vs other)."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T1.S2",
+                  "title": "Replace observer error console.error with logger.error",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M3.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, Workflow class has this.logger property. Observers errors occur in try-catch blocks around observer callbacks.\n2. INPUT: List of observer-related console.error calls from S1.\n3. LOGIC: For each observer error console.error, replace with this.logger.error() call. Pass appropriate error context. Ensure logger is available in all contexts (may need to pass logger to functions that don't have it).\n4. OUTPUT: All observer errors logged through WorkflowLogger instead of console. No console.error calls remain for observer errors."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T1.S3",
+                  "title": "Add tests for observer error logging",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M3.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Observer tests should verify error handling.\n2. INPUT: Updated observer error handling from S2.\n3. LOGIC: Create test that adds observer throwing error. Verify error is logged to workflow logger (not console). Verify observer error doesn't crash workflow execution. Check log entries contain error context.\n4. OUTPUT: Test suite for observer error logging. All tests pass verifying errors go through logger."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M3.T2",
+              "title": "Optimize Tree Debugger Node Map Updates",
+              "status": "Complete",
+              "description": "Implement incremental node map updates instead of full rebuild on tree changes.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T2.S1",
+                  "title": "Analyze tree debugger onTreeChanged implementation",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 7 and plan/bugfix/architecture/codebase_structure.md, onTreeChanged at src/debugger/tree-debugger.ts:80-84 clears and rebuilds entire nodeMap.\n2. INPUT: Access to src/debugger/tree-debugger.ts.\n3. LOGIC: Read onTreeChanged(), buildNodeMap(), and understand nodeMap structure. Identify what types of tree changes trigger onTreeChanged (childAttached, childDetached). Document when full rebuild is necessary vs when incremental update is possible.\n4. OUTPUT: Analysis document explaining current rebuild logic and opportunities for incremental updates."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T2.S2",
+                  "title": "Implement incremental node map update for childDetached",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M3.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, nodeMap is a Map<string, WorkflowNode>. For childDetached, only need to remove detached node and its descendants.\n2. INPUT: Analysis from S1.\n3. LOGIC: Modify onTreeChanged to detect event type. For childDetached events, recursively remove detached node and all its descendants from nodeMap. For childAttached, add new node and its descendants. For other events, keep full rebuild behavior. Add helper method removeNodeFromMap(node: WorkflowNode).\n4. OUTPUT: onTreeChanged implements incremental updates for attach/detach. Performance improves for large trees."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T2.S3",
+                  "title": "Add benchmark tests for node map updates",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M3.T2.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, project has performance benchmarks in adversarial tests. Use performance.now() for timing.\n2. INPUT: Updated incremental update implementation from S2.\n3. LOGIC: Create benchmark test with large workflow tree (100+ nodes). Measure time for detaching single node with old full rebuild vs new incremental update. Verify incremental update is significantly faster.\n4. OUTPUT: Benchmark test demonstrating performance improvement. Incremental update is faster than full rebuild."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M3.T3",
+              "title": "Add Workflow Name Validation",
+              "status": "Complete",
+              "description": "Add validation to reject empty or whitespace-only workflow names.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T3.S1",
+                  "title": "Determine validation requirements for workflow names",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 8, empty string names are currently accepted. Need to decide if validation should be added or if empty names are valid.\n2. INPUT: Access to PRD documentation and workflow examples.\n3. LOGIC: Check PRD for workflow name requirements. Review examples to see if empty names are used. Consult with team on whether empty names should be allowed. If validation is desired, define rules (non-empty? no whitespace? minimum length?).\n4. OUTPUT: Document decision on workflow name validation with rationale. If validation is chosen, specify exact validation rules."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T3.S2",
+                  "title": "Implement workflow name validation in constructor",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M3.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, Workflow constructor takes name parameter. Validation should occur early in constructor.\n2. INPUT: Validation rules from S1.\n3. LOGIC: If validation is desired, add check at start of Workflow constructor. Throw error with descriptive message if name is invalid (empty, whitespace-only, etc.). Error type should be appropriate (TypeError or custom WorkflowValidationError). If validation is NOT desired, document that empty names are intentionally allowed.\n4. OUTPUT: Workflow name validation implemented OR documented as intentionally not validated. TypeScript compiles without errors."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T3.S3",
+                  "title": "Add tests for workflow name validation",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M3.T3.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Validation tests should use expect().toThrow() for invalid names.\n2. INPUT: Validation implementation from S2.\n3. LOGIC: If validation added: tests for empty string, whitespace-only, valid names. If validation NOT added: tests verifying empty names are accepted. Ensure tests match documented requirements.\n4. OUTPUT: Test suite for workflow name validation. All tests pass matching implementation behavior."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M3.T4",
+              "title": "Consider Exposing isDescendantOf as Public API",
+              "status": "Complete",
+              "description": "Evaluate making the isDescendantOf method public for external ancestry checking.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T4.S1",
+                  "title": "Evaluate use cases for public isDescendantOf API",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report Issue 9, isDescendantOf is private and only used for cycle detection. Consider if external ancestry checks are useful.\n2. INPUT: Access to workflow examples, use cases, and potential user scenarios.\n3. LOGIC: Research if users need to check ancestry relationships. Look for feature requests, examples, or use cases where this would be helpful. Consider if this is internal implementation detail or useful public API. Evaluate security implications of exposing ancestry information.\n4. OUTPUT: Document recommendation: make public vs keep private. Include rationale and potential use cases if public."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T4.S2",
+                  "title": "Implement public isDescendantOf if approved",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M3.T4.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, isDescendantOf is at src/core/workflow.ts:151-169. It's private and used internally.\n2. INPUT: Decision from S1.\n3. LOGIC: IF decision is to make public: change private keyword to public. Add JSDoc comment explaining usage and behavior. Add parameter validation. Consider if method should be on Workflow class or WorkflowNode interface. IF decision is to keep private: document that this is intentionally internal-only.\n4. OUTPUT: isDescendantOf is public with documentation OR documented as intentionally private. No breaking changes to existing code."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M3.T4.S3",
+                  "title": "Add tests for public isDescendantOf API",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M3.T4.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, test patterns use vitest. Ancestry tests should cover direct child, descendant, not descendant, circular reference scenarios.\n2. INPUT: Public API from S2 (if applicable).\n3. LOGIC: IF made public: tests covering true positive (is descendant), true negative (not descendant), edge cases (same workflow, circular reference). Verify method works from external code. IF kept private: no new tests needed (already tested internally).\n4. OUTPUT: Test suite for public isDescendantOf OR note that no tests needed for private method."
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "Milestone",
+          "id": "P1.M4",
+          "title": "Validation & Documentation",
+          "status": "Complete",
+          "description": "Ensure all bug fixes are validated, tested, and documented.",
+          "tasks": [
+            {
+              "type": "Task",
+              "id": "P1.M4.T1",
+              "title": "Run Full Test Suite and Verify 100% Pass Rate",
+              "status": "Complete",
+              "description": "Execute complete test suite to ensure all 344 existing tests pass plus new tests for bug fixes.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T1.S1",
+                  "title": "Run full test suite",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, project uses vitest. Run with npm test or vitest command.\n2. INPUT: All bug fix implementations from previous milestones.\n3. LOGIC: Execute full test suite using appropriate command. Capture total test count, pass count, fail count. Review any failing tests and determine if they're pre-existing failures or caused by bug fixes.\n4. OUTPUT: Test execution results showing 344+ tests passing. Document any failures and their causes."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T1.S2",
+                  "title": "Fix any test failures caused by bug fixes",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M4.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, existing tests cover PRD requirements. Bug fixes should not break existing functionality.\n2. INPUT: Test failures from S1.\n3. LOGIC: Analyze each failing test. Determine if failure is due to bug fix changing behavior (need to update test) or bug in fix implementation. Fix implementation bugs or update tests to reflect new correct behavior. Re-run tests until all pass.\n4. OUTPUT: All tests pass. 100% pass rate maintained. Document any test changes and rationale."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M4.T2",
+              "title": "Create Bug Fix Summary Document",
+              "status": "Complete",
+              "description": "Document all bug fixes applied, including rationale, implementation details, and migration guide if needed.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T2.S1",
+                  "title": "Document critical and major bug fixes",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M4.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report PRD, critical fixes: WorkflowLogger.child() signature. Major fixes: Promise.allSettled, ErrorMergeStrategy, trackTiming default.\n2. INPUT: All implemented bug fixes from P1.M1, P1.M2, P1.M3.\n3. LOGIC: Create comprehensive bug fix summary document. For each fix: describe issue, severity, solution, breaking changes (if any), migration steps. Include code examples showing before/after. Highlight any backward compatibility concerns.\n4. OUTPUT: Bug fix summary document at plan/bugfix/BUG_FIX_SUMMARY.md. Complete with all fixes, code examples, and migration guide."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T2.S2",
+                  "title": "Update changelog and release notes",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M4.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Project likely has CHANGELOG.md or similar. If not, create one following standard format.\n2. INPUT: Bug fix summary from S1.\n3. LOGIC: Update CHANGELOG.md with new version entry. List all bug fixes categorized by severity. Note any breaking changes. Add migration guide links. Follow semantic versioning principles (determine if this is patch, minor, or major release).\n4. OUTPUT: Updated CHANGELOG.md with all bug fixes documented. Release notes ready for users."
+                }
+              ]
+            },
+            {
+              "type": "Task",
+              "id": "P1.M4.T3",
+              "title": "Verify Backward Compatibility",
+              "status": "Complete",
+              "description": "Ensure all bug fixes maintain backward compatibility where possible and document any breaking changes.",
+              "subtasks": [
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T3.S1",
+                  "title": "Audit bug fixes for breaking changes",
+                  "status": "Complete",
+                  "story_points": 1,
+                  "dependencies": [
+                    "P1.M4.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From bug report PRD, most fixes should be backward compatible. Potential breaking change: WorkflowLogger.child() signature change.\n2. INPUT: All bug fix implementations.\n3. LOGIC: Review each bug fix for breaking changes. Identify changes to public API signatures, behavior changes, removed features. Document which changes are breaking vs backward compatible. For breaking changes, assess if migration path exists.\n4. OUTPUT: List of breaking changes with severity assessment. Document mitigation strategies and migration paths."
+                },
+                {
+                  "type": "Subtask",
+                  "id": "P1.M4.T3.S2",
+                  "title": "Add backward compatibility tests",
+                  "status": "Complete",
+                  "story_points": 2,
+                  "dependencies": [
+                    "P1.M4.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From plan/bugfix/architecture/codebase_structure.md, existing tests provide good coverage. Need specific tests for old API usage patterns.\n2. INPUT: List of potentially breaking changes from S1.\n3. LOGIC: For each potentially breaking change, create tests using old API patterns. Verify old patterns still work or fail with clear error messages directing to new API. Test examples from documentation work as expected.\n4. OUTPUT: Backward compatibility test suite. Existing code patterns continue to work. Clear errors for deprecated patterns."
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

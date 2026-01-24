@@ -136,15 +136,126 @@ export interface WorkflowError {
 
 ---
 
-# **6. Snapshot System**
+# **6. Agent Response Model**
 
-## **6.1 State Snapshot**
+**All agent responses MUST be valid JSON.** This is a non-negotiable requirement for system interoperability, parsing reliability, and debugging capability.
+
+## **6.1 AgentResponse Interface**
+
+```ts
+export type AgentResponseStatus = 'success' | 'error' | 'partial';
+
+export interface AgentResponse<T = unknown> {
+  status: AgentResponseStatus;
+  data: T | null;
+  error: AgentErrorDetails | null;
+  metadata: AgentResponseMetadata;
+}
+```
+
+## **6.2 AgentErrorDetails**
+
+```ts
+export interface AgentErrorDetails {
+  code: string;                    // machine-readable error code (e.g., "VALIDATION_FAILED")
+  message: string;                 // human-readable error description
+  details?: Record<string, unknown>; // additional context
+  recoverable: boolean;            // hint for parent workflow retry logic
+}
+```
+
+## **6.3 AgentResponseMetadata**
+
+```ts
+export interface AgentResponseMetadata {
+  agentId: string;                 // ID of the responding agent/workflow
+  timestamp: number;               // Unix timestamp (ms)
+  duration?: number;               // execution time in ms
+  requestId?: string;              // correlation ID for tracing
+}
+```
+
+## **6.4 Response Requirements**
+
+1. **Strict JSON**: All responses must be parseable by `JSON.parse()` without modification.
+2. **No Prose Wrapping**: Responses must not be wrapped in markdown code blocks, conversational text, or any non-JSON content.
+3. **Consistent Structure**: Every response must conform to the `AgentResponse` interface—no ad-hoc formats.
+4. **Null over Undefined**: Use `null` for absent values; `undefined` is not valid JSON.
+5. **Error Responses**: Failed operations must still return valid JSON with `status: 'error'` and populated `error` field.
+
+## **6.5 Example Responses**
+
+**Success Response:**
+```ts
+{
+  "status": "success",
+  "data": {
+    "result": "Task completed",
+    "artifacts": ["file1.ts", "file2.ts"]
+  },
+  "error": null,
+  "metadata": {
+    "agentId": "agent-abc123",
+    "timestamp": 1706140800000,
+    "duration": 1523
+  }
+}
+```
+
+**Error Response:**
+```ts
+{
+  "status": "error",
+  "data": null,
+  "error": {
+    "code": "EXECUTION_FAILED",
+    "message": "Failed to compile TypeScript files",
+    "details": {
+      "failedFiles": ["src/index.ts"],
+      "compilerErrors": ["TS2307: Cannot find module 'foo'"]
+    },
+    "recoverable": true
+  },
+  "metadata": {
+    "agentId": "agent-abc123",
+    "timestamp": 1706140800000,
+    "duration": 892
+  }
+}
+```
+
+**Partial Response (for streaming/incremental results):**
+```ts
+{
+  "status": "partial",
+  "data": {
+    "completedSteps": 3,
+    "totalSteps": 5,
+    "intermediateResult": { ... }
+  },
+  "error": null,
+  "metadata": {
+    "agentId": "agent-abc123",
+    "timestamp": 1706140800000
+  }
+}
+```
+
+## **6.6 Validation**
+
+Workflows receiving agent responses SHOULD validate against the `AgentResponse` schema before processing. Invalid responses must be treated as errors with code `INVALID_RESPONSE_FORMAT`.
+
+---
+
+# **7. Snapshot System**
+
+## **7.1 State Snapshot**
 
 ```ts
 export type SerializedWorkflowState = Record<string, unknown>;
 ```
 
-## **6.2 ObservedState Metadata**
+## **7.2 ObservedState Metadata**
 
 ```ts
 export interface StateFieldMetadata {
@@ -155,9 +266,9 @@ export interface StateFieldMetadata {
 
 ---
 
-# **7. Observers**
+# **8. Observers**
 
-## **7.1 WorkflowObserver**
+## **8.1 WorkflowObserver**
 
 ```ts
 export interface WorkflowObserver {
@@ -172,9 +283,9 @@ Observers attach to the **root workflow** and receive all events.
 
 ---
 
-# **8. Decorators (Complete Technical Specification)**
+# **9. Decorators (Complete Technical Specification)**
 
-## **8.1 @Step() Decorator**
+## **9.1 @Step() Decorator**
 
 ```ts
 export interface StepOptions {
@@ -196,7 +307,7 @@ export function Step(options: StepOptions = {}): MethodDecorator;
 
 ---
 
-## **8.2 @Task() Decorator**
+## **9.2 @Task() Decorator**
 
 ```ts
 export interface TaskOptions {
@@ -215,7 +326,7 @@ export function Task(options: TaskOptions = {}): MethodDecorator;
 
 ---
 
-## **8.3 @ObservedState Decorator**
+## **9.3 @ObservedState Decorator**
 
 ```ts
 export function ObservedState(meta: StateFieldMetadata = {}): PropertyDecorator;
@@ -225,7 +336,7 @@ Fields marked with this decorator are included in snapshots.
 
 ---
 
-# **9. Restart Semantics**
+# **10. Restart Semantics**
 
 * Descendant workflows never request restart upward.
 * A parent step decides whether restart is needed by analyzing:
@@ -243,7 +354,7 @@ Restartability is **opt-in** at the step method level; not global.
 
 ---
 
-# **10. Optional Multi-Error Merging**
+# **11. Optional Multi-Error Merging**
 
 ```ts
 export interface ErrorMergeStrategy {
@@ -257,9 +368,9 @@ Default: **disabled** → first error wins (race is preserved).
 
 ---
 
-# **11. Tree Debugger API**
+# **12. Tree Debugger API**
 
-## **11.1 Tree Debugger Interface**
+## **12.1 Tree Debugger Interface**
 
 ```ts
 export interface WorkflowTreeDebugger {
@@ -277,13 +388,13 @@ This is consumed by the terminal UI.
 
 ---
 
-# **12. Base Classes (Class Skeletons)**
+# **13. Base Classes (Class Skeletons)**
 
 Below are implementation-ready class skeletons with exact method signatures.
 
 ---
 
-# **12.1 WorkflowLogger Skeleton**
+# **13.1 WorkflowLogger Skeleton**
 
 ```ts
 export class WorkflowLogger {
@@ -308,7 +419,7 @@ export class WorkflowLogger {
 
 ---
 
-# **12.2 Workflow Base Class Skeleton**
+# **13.2 Workflow Base Class Skeleton**
 
 ```ts
 export abstract class Workflow {
@@ -369,7 +480,7 @@ export abstract class Workflow {
 
 ---
 
-# **12.3 Decorator Skeletons**
+# **13.3 Decorator Skeletons**
 
 These are implementation-level scaffolds.
 
@@ -489,7 +600,7 @@ export function Task(opts: TaskOptions = {}): MethodDecorator {
 
 ---
 
-# **13. Example Workflow Using the System**
+# **14. Example Workflow Using the System**
 
 ```ts
 class TestCycleWorkflow extends Workflow {
@@ -527,7 +638,7 @@ class TDDOrchestrator extends Workflow {
 
 ---
 
-# **14. Acceptance Criteria (Updated)**
+# **15. Acceptance Criteria (Updated)**
 
 This PRD now includes:
 
@@ -539,5 +650,6 @@ This PRD now includes:
 * real-time debugger interface
 * error/restart models
 * snapshot system
+* **agent response model (all responses MUST be JSON)**
 
 A senior engineer should be able to implement the full engine from this PRD.
