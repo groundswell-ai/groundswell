@@ -24,7 +24,26 @@ export type {
 } from './sdk-primitives.js';
 
 // Agent types
-export type { AgentConfig, PromptOverrides } from './agent.js';
+export type {
+  AgentConfig,
+  PromptOverrides,
+  AgentResponseStatus,
+  AgentResponse,
+  AgentErrorDetails,
+  AgentResponseMetadata,
+  SuccessResponse,
+  ErrorResponse,
+  PartialResponse,
+} from './agent.js';
+export {
+  AGENT_ERROR_CODES,
+  createSuccessResponse,
+  createErrorResponse,
+  createPartialResponse,
+  isSuccess,
+  isError,
+  isPartial,
+} from './agent.js';
 
 // Prompt types
 export type { PromptConfig } from './prompt.js';
