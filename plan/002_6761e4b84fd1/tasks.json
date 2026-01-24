@@ -85,7 +85,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S2",
                   "title": "Update example files (01-11) to handle AgentResponse",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T2.S1"
@@ -96,7 +96,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S3",
                   "title": "Update source code prompt() call sites",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T2.S2"

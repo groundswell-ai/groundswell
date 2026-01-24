@@ -11,7 +11,7 @@
  * - request_spawn_workflow - "Can I create children?"
  */
 
-import { z } from 'zod';
+import { z } from "zod";
 import {
   Workflow,
   Step,
@@ -30,7 +30,7 @@ import {
   createChildContext,
   agentExecutionStorage,
   defaultCache,
-} from 'groundswell';
+} from "groundswell";
 import type {
   CurrentNodeInfo,
   AncestorChainResult,
@@ -40,8 +40,13 @@ import type {
   SpawnWorkflowRequest,
   WorkflowNode,
   AgentExecutionContext,
-} from 'groundswell';
-import { printHeader, printSection, sleep, prettyJson } from '../utils/helpers.js';
+} from "groundswell";
+import {
+  printHeader,
+  printSection,
+  sleep,
+  prettyJson,
+} from "../utils/helpers.js";
 
 // ============================================================================
 // Helper to simulate execution context
@@ -53,7 +58,7 @@ import { printHeader, printSection, sleep, prettyJson } from '../utils/helpers.j
 function createMockNode(
   name: string,
   parent?: WorkflowNode,
-  status: 'idle' | 'running' | 'completed' = 'running'
+  status: "idle" | "running" | "completed" = "running",
 ): WorkflowNode {
   return {
     id: `node-${name}-${Date.now()}`,
@@ -70,7 +75,7 @@ function createMockNode(
  */
 async function executeInMockContext<T>(
   node: WorkflowNode,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T> {
   const context: AgentExecutionContext = {
     workflowId: node.id,
@@ -101,26 +106,26 @@ class IntrospectionDemoWorkflow extends Workflow {
 
   @Step({ trackTiming: true, snapshotState: true })
   async setupStep(): Promise<string> {
-    this.logger.info('Setting up introspection demo');
+    this.logger.info("Setting up introspection demo");
     await sleep(50);
-    return 'Setup complete';
+    return "Setup complete";
   }
 
   @Step({ trackTiming: true, snapshotState: true })
   async processStep(): Promise<string> {
-    this.logger.info('Processing data');
+    this.logger.info("Processing data");
     await sleep(50);
-    return 'Processing complete';
+    return "Processing complete";
   }
 
   async run(): Promise<void> {
-    this.setStatus('running');
-    this.logger.info('Starting introspection demo workflow');
+    this.setStatus("running");
+    this.logger.info("Starting introspection demo workflow");
 
     await this.setupStep();
     await this.processStep();
 
-    this.setStatus('completed');
+    this.setStatus("completed");
   }
 }
 
@@ -144,9 +149,9 @@ class ChildIntrospectionWorkflow extends Workflow {
   }
 
   async run(): Promise<string> {
-    this.setStatus('running');
+    this.setStatus("running");
     const result = await this.childWork();
-    this.setStatus('completed');
+    this.setStatus("completed");
     return result;
   }
 }
@@ -159,23 +164,25 @@ class ChildIntrospectionWorkflow extends Workflow {
  * Demonstrate inspect_current_node tool
  */
 async function demonstrateCurrentNode(): Promise<void> {
-  console.log('Tool: inspect_current_node');
-  console.log('Purpose: "Where am I?" - Get info about current workflow node\n');
+  console.log("Tool: inspect_current_node");
+  console.log(
+    'Purpose: "Where am I?" - Get info about current workflow node\n',
+  );
 
   // Create mock hierarchy
-  const root = createMockNode('RootWorkflow');
-  const child = createMockNode('ChildWorkflow', root);
+  const root = createMockNode("RootWorkflow");
+  const child = createMockNode("ChildWorkflow", root);
   root.children.push(child);
 
   await executeInMockContext(child, async () => {
     const result = await handleInspectCurrentNode();
 
-    console.log('Result:');
+    console.log("Result:");
     console.log(`  ID: ${result.id}`);
     console.log(`  Name: ${result.name}`);
     console.log(`  Status: ${result.status}`);
-    console.log(`  Parent ID: ${result.parentId ?? '(none)'}`);
-    console.log(`  Parent Name: ${result.parentName ?? '(none)'}`);
+    console.log(`  Parent ID: ${result.parentId ?? "(none)"}`);
+    console.log(`  Parent Name: ${result.parentName ?? "(none)"}`);
     console.log(`  Child Count: ${result.childCount}`);
     console.log(`  Depth: ${result.depth}`);
   });
@@ -185,13 +192,13 @@ async function demonstrateCurrentNode(): Promise<void> {
  * Demonstrate read_ancestor_chain tool
  */
 async function demonstrateAncestorChain(): Promise<void> {
-  console.log('Tool: read_ancestor_chain');
+  console.log("Tool: read_ancestor_chain");
   console.log('Purpose: "What\'s above me?" - Get all ancestor nodes\n');
 
   // Create 3-level hierarchy
-  const root = createMockNode('RootWorkflow', undefined, 'running');
-  const level1 = createMockNode('Level1Workflow', root, 'running');
-  const level2 = createMockNode('Level2Workflow', level1, 'running');
+  const root = createMockNode("RootWorkflow", undefined, "running");
+  const level1 = createMockNode("Level1Workflow", root, "running");
+  const level2 = createMockNode("Level2Workflow", level1, "running");
   root.children.push(level1);
   level1.children.push(level2);
 
@@ -199,9 +206,11 @@ async function demonstrateAncestorChain(): Promise<void> {
     const result = await handleReadAncestorChain({ maxDepth: 10 });
 
     console.log(`Total depth: ${result.totalDepth}`);
-    console.log('Ancestors (from current to root):');
+    console.log("Ancestors (from current to root):");
     for (const ancestor of result.ancestors) {
-      console.log(`  Depth ${ancestor.depth}: ${ancestor.name} [${ancestor.status}]`);
+      console.log(
+        `  Depth ${ancestor.depth}: ${ancestor.name} [${ancestor.status}]`,
+      );
     }
   });
 }
@@ -210,32 +219,32 @@ async function demonstrateAncestorChain(): Promise<void> {
  * Demonstrate list_siblings_children tool
  */
 async function demonstrateSiblingsChildren(): Promise<void> {
-  console.log('Tool: list_siblings_children');
+  console.log("Tool: list_siblings_children");
   console.log('Purpose: "What\'s around me?" - List siblings or children\n');
 
   // Create hierarchy with siblings
-  const root = createMockNode('RootWorkflow', undefined, 'running');
-  const sibling1 = createMockNode('Sibling1', root, 'completed');
-  const sibling2 = createMockNode('Sibling2', root, 'running');
-  const sibling3 = createMockNode('Sibling3', root, 'idle');
+  const root = createMockNode("RootWorkflow", undefined, "running");
+  const sibling1 = createMockNode("Sibling1", root, "completed");
+  const sibling2 = createMockNode("Sibling2", root, "running");
+  const sibling3 = createMockNode("Sibling3", root, "idle");
   root.children.push(sibling1, sibling2, sibling3);
 
   // Add children to sibling2
-  const child1 = createMockNode('Child1', sibling2, 'completed');
-  const child2 = createMockNode('Child2', sibling2, 'running');
+  const child1 = createMockNode("Child1", sibling2, "completed");
+  const child2 = createMockNode("Child2", sibling2, "running");
   sibling2.children.push(child1, child2);
 
   await executeInMockContext(sibling2, async () => {
     // Get siblings
-    const siblings = await handleListSiblingsChildren({ type: 'siblings' });
-    console.log('Siblings:');
+    const siblings = await handleListSiblingsChildren({ type: "siblings" });
+    console.log("Siblings:");
     for (const node of siblings.nodes) {
       console.log(`  - ${node.name} [${node.status}]`);
     }
 
     // Get children
-    const children = await handleListSiblingsChildren({ type: 'children' });
-    console.log('\nChildren:');
+    const children = await handleListSiblingsChildren({ type: "children" });
+    console.log("\nChildren:");
     for (const node of children.nodes) {
       console.log(`  - ${node.name} [${node.status}]`);
     }
@@ -246,18 +255,20 @@ async function demonstrateSiblingsChildren(): Promise<void> {
  * Demonstrate inspect_prior_outputs tool
  */
 async function demonstratePriorOutputs(): Promise<void> {
-  console.log('Tool: inspect_prior_outputs');
-  console.log('Purpose: "What happened before?" - Get outputs from prior steps\n');
+  console.log("Tool: inspect_prior_outputs");
+  console.log(
+    'Purpose: "What happened before?" - Get outputs from prior steps\n',
+  );
 
   // Create hierarchy with completed siblings
-  const root = createMockNode('RootWorkflow', undefined, 'running');
-  const step1 = createMockNode('Step1', root, 'completed');
-  const step2 = createMockNode('Step2', root, 'completed');
-  const step3 = createMockNode('CurrentStep', root, 'running');
+  const root = createMockNode("RootWorkflow", undefined, "running");
+  const step1 = createMockNode("Step1", root, "completed");
+  const step2 = createMockNode("Step2", root, "completed");
+  const step3 = createMockNode("CurrentStep", root, "running");
 
   // Add events to completed steps
-  step1.events.push({ type: 'stepEnd', payload: { result: 'Step 1 output' } });
-  step2.events.push({ type: 'stepEnd', payload: { result: 'Step 2 output' } });
+  step1.events.push({ type: "stepEnd", payload: { result: "Step 1 output" } });
+  step2.events.push({ type: "stepEnd", payload: { result: "Step 2 output" } });
 
   root.children.push(step1, step2, step3);
 
@@ -277,14 +288,16 @@ async function demonstratePriorOutputs(): Promise<void> {
  * Demonstrate inspect_cache_status tool
  */
 async function demonstrateCacheStatus(): Promise<void> {
-  console.log('Tool: inspect_cache_status');
-  console.log('Purpose: "Is this cached?" - Check if a prompt response is cached\n');
+  console.log("Tool: inspect_cache_status");
+  console.log(
+    'Purpose: "Is this cached?" - Check if a prompt response is cached\n',
+  );
 
   // Set up some cache entries
-  const testKey1 = 'test-prompt-hash-12345';
-  const testKey2 = 'test-prompt-hash-67890';
+  const testKey1 = "test-prompt-hash-12345";
+  const testKey2 = "test-prompt-hash-67890";
 
-  await defaultCache.set(testKey1, { result: 'Cached response' });
+  await defaultCache.set(testKey1, { result: "Cached response" });
 
   // Check existing key
   const result1 = await handleInspectCacheStatus({ promptHash: testKey1 });
@@ -298,7 +311,7 @@ async function demonstrateCacheStatus(): Promise<void> {
 
   // Show cache metrics
   const metrics = defaultCache.metrics();
-  console.log('\nCache metrics:');
+  console.log("\nCache metrics:");
   console.log(`  Entries: ${metrics.entries}`);
   console.log(`  Hits: ${metrics.hits}`);
   console.log(`  Misses: ${metrics.misses}`);
@@ -308,23 +321,27 @@ async function demonstrateCacheStatus(): Promise<void> {
  * Demonstrate request_spawn_workflow tool
  */
 async function demonstrateSpawnWorkflow(): Promise<void> {
-  console.log('Tool: request_spawn_workflow');
-  console.log('Purpose: "Can I create children?" - Request to spawn new workflow\n');
+  console.log("Tool: request_spawn_workflow");
+  console.log(
+    'Purpose: "Can I create children?" - Request to spawn new workflow\n',
+  );
 
-  const root = createMockNode('OrchestratorWorkflow');
+  const root = createMockNode("OrchestratorWorkflow");
 
   await executeInMockContext(root, async () => {
     const request = await handleRequestSpawnWorkflow({
-      name: 'DynamicChildWorkflow',
-      description: 'Process additional data discovered during execution',
+      name: "DynamicChildWorkflow",
+      description: "Process additional data discovered during execution",
     });
 
-    console.log('Spawn request created:');
+    console.log("Spawn request created:");
     console.log(`  Name: ${request.name}`);
     console.log(`  Description: ${request.description}`);
     console.log(`  Request ID: ${request.requestId}`);
     console.log(`  Status: ${request.status}`);
-    console.log('\nNote: The orchestrator handles actual spawning based on this request.');
+    console.log(
+      "\nNote: The orchestrator handles actual spawning based on this request.",
+    );
   });
 }
 
@@ -343,58 +360,75 @@ class IntrospectiveWorkflow extends Workflow {
     super(name, parent);
   }
 
-  @Step({ trackTiming: true, snapshotState: true, name: 'introspect-position' })
+  @Step({ trackTiming: true, snapshotState: true, name: "introspect-position" })
   async introspectPosition(): Promise<void> {
-    this.logger.info('Using introspection to understand position');
+    this.logger.info("Using introspection to understand position");
 
     // Create context for this step
-    const stepNode = createMockNode('introspect-position', undefined, 'running');
+    const stepNode = createMockNode(
+      "introspect-position",
+      undefined,
+      "running",
+    );
 
     await executeInMockContext(stepNode, async () => {
       const nodeInfo = await handleInspectCurrentNode();
-      this.introspectionLog.push({ tool: 'inspect_current_node', result: nodeInfo });
+      this.introspectionLog.push({
+        tool: "inspect_current_node",
+        result: nodeInfo,
+      });
       this.logger.info(`Position: ${nodeInfo.name} at depth ${nodeInfo.depth}`);
     });
   }
 
-  @Step({ trackTiming: true, snapshotState: true, name: 'analyze-hierarchy' })
+  @Step({ trackTiming: true, snapshotState: true, name: "analyze-hierarchy" })
   async analyzeHierarchy(): Promise<void> {
-    this.logger.info('Analyzing workflow hierarchy');
+    this.logger.info("Analyzing workflow hierarchy");
 
     // Create a mock hierarchy for demo
-    const root = createMockNode('Root');
-    const parent = createMockNode('Parent', root);
-    const current = createMockNode('Current', parent);
+    const root = createMockNode("Root");
+    const parent = createMockNode("Parent", root);
+    const current = createMockNode("Current", parent);
     root.children.push(parent);
     parent.children.push(current);
 
     await executeInMockContext(current, async () => {
       const ancestors = await handleReadAncestorChain({ maxDepth: 5 });
-      this.introspectionLog.push({ tool: 'read_ancestor_chain', result: ancestors });
+      this.introspectionLog.push({
+        tool: "read_ancestor_chain",
+        result: ancestors,
+      });
       this.logger.info(`Found ${ancestors.ancestors.length} ancestors`);
     });
   }
 
-  @Step({ trackTiming: true, snapshotState: true, name: 'check-cache' })
+  @Step({ trackTiming: true, snapshotState: true, name: "check-cache" })
   async checkCache(): Promise<void> {
-    this.logger.info('Checking cache status');
+    this.logger.info("Checking cache status");
 
-    const testHash = 'demo-prompt-hash';
-    const cacheStatus = await handleInspectCacheStatus({ promptHash: testHash });
-    this.introspectionLog.push({ tool: 'inspect_cache_status', result: cacheStatus });
+    const testHash = "demo-prompt-hash";
+    const cacheStatus = await handleInspectCacheStatus({
+      promptHash: testHash,
+    });
+    this.introspectionLog.push({
+      tool: "inspect_cache_status",
+      result: cacheStatus,
+    });
     this.logger.info(`Cache hit: ${cacheStatus.exists}`);
   }
 
   async run(): Promise<void> {
-    this.setStatus('running');
-    this.logger.info('Starting introspective workflow');
+    this.setStatus("running");
+    this.logger.info("Starting introspective workflow");
 
     await this.introspectPosition();
     await this.analyzeHierarchy();
     await this.checkCache();
 
-    this.logger.info(`Total introspection calls: ${this.introspectionLog.length}`);
-    this.setStatus('completed');
+    this.logger.info(
+      `Total introspection calls: ${this.introspectionLog.length}`,
+    );
+    this.setStatus("completed");
   }
 }
 
@@ -406,90 +440,92 @@ class IntrospectiveWorkflow extends Workflow {
  * Run the Introspection Tools example
  */
 export async function runIntrospectionExample(): Promise<void> {
-  printHeader('Example 10: Introspection Tools Demo');
+  printHeader("Example 10: Introspection Tools Demo");
 
   // Overview of available tools
-  printSection('Available Introspection Tools');
+  printSection("Available Introspection Tools");
   {
-    console.log('The INTROSPECTION_TOOLS array contains 6 tools:\n');
+    console.log("The INTROSPECTION_TOOLS array contains 6 tools:\n");
     for (const tool of INTROSPECTION_TOOLS) {
       console.log(`  ${tool.name}`);
       console.log(`    ${tool.description}`);
-      console.log(`    Required: ${tool.input_schema.required?.join(', ') || 'none'}\n`);
+      console.log(
+        `    Required: ${tool.input_schema.required?.join(", ") || "none"}\n`,
+      );
     }
   }
 
   // Part 1: inspect_current_node
-  printSection('Part 1: inspect_current_node');
+  printSection("Part 1: inspect_current_node");
   {
     await demonstrateCurrentNode();
   }
 
   // Part 2: read_ancestor_chain
-  printSection('Part 2: read_ancestor_chain');
+  printSection("Part 2: read_ancestor_chain");
   {
     await demonstrateAncestorChain();
   }
 
   // Part 3: list_siblings_children
-  printSection('Part 3: list_siblings_children');
+  printSection("Part 3: list_siblings_children");
   {
     await demonstrateSiblingsChildren();
   }
 
   // Part 4: inspect_prior_outputs
-  printSection('Part 4: inspect_prior_outputs');
+  printSection("Part 4: inspect_prior_outputs");
   {
     await demonstratePriorOutputs();
   }
 
   // Part 5: inspect_cache_status
-  printSection('Part 5: inspect_cache_status');
+  printSection("Part 5: inspect_cache_status");
   {
     await demonstrateCacheStatus();
   }
 
   // Part 6: request_spawn_workflow
-  printSection('Part 6: request_spawn_workflow');
+  printSection("Part 6: request_spawn_workflow");
   {
     await demonstrateSpawnWorkflow();
   }
 
   // Part 7: Complete Integration
-  printSection('Part 7: Complete Workflow with Introspection');
+  printSection("Part 7: Complete Workflow with Introspection");
   {
-    console.log('Workflow using multiple introspection tools:\n');
+    console.log("Workflow using multiple introspection tools:\n");
 
-    const workflow = new IntrospectiveWorkflow('IntrospectiveWorkflow');
+    const workflow = new IntrospectiveWorkflow("IntrospectiveWorkflow");
     const debugger_ = new WorkflowTreeDebugger(workflow);
 
     await workflow.run();
 
-    console.log('\nIntrospection log:');
+    console.log("\nIntrospection log:");
     for (const entry of workflow.introspectionLog) {
       console.log(`  Tool: ${entry.tool}`);
-      if (typeof entry.result === 'object' && entry.result !== null) {
+      if (typeof entry.result === "object" && entry.result !== null) {
         const summary =
-          'exists' in entry.result
+          "exists" in entry.result
             ? `exists: ${entry.result.exists}`
-            : 'name' in entry.result
+            : "name" in entry.result
               ? `name: ${(entry.result as { name: string }).name}`
-              : 'ancestors' in entry.result
+              : "ancestors" in entry.result
                 ? `${(entry.result as { ancestors: unknown[] }).ancestors.length} ancestors`
                 : JSON.stringify(entry.result).slice(0, 50);
         console.log(`  Result: ${summary}`);
       }
-      console.log('');
+      console.log("");
     }
 
-    console.log('Tree:');
+    console.log("Tree:");
     console.log(debugger_.toTreeString());
   }
 
   // Part 8: Agent Integration Pattern
-  printSection('Part 8: Agent Integration Pattern');
+  printSection("Part 8: Agent Integration Pattern");
   {
-    console.log('Pattern for agents using introspection tools:\n');
+    console.log("Pattern for agents using introspection tools:\n");
 
     console.log(`// Agent configuration with introspection tools
 const introspectionAgent = createAgent({
@@ -512,36 +548,47 @@ const explorePrompt = createPrompt({
 });
 
 // Agent uses tools autonomously to gather context
-const analysis = await introspectionAgent.prompt(explorePrompt);
+const response = await introspectionAgent.prompt(explorePrompt);
+
+// Handle AgentResponse return type
+if (response.status === 'error') {
+  console.error(\`[\${response.error.code}] Analysis failed: \${response.error.message}\`);
+  throw new Error(response.error.message);
+}
+
+// Type narrowing: response.data is the schema type when status is 'success'
+const analysis = response.data;
+console.log('Position:', analysis.position);
+console.log('Depth:', analysis.depth);
 `);
 
-    console.log('\nThe agent can:');
-    console.log('  1. Call inspect_current_node to understand its position');
-    console.log('  2. Call read_ancestor_chain to understand hierarchy');
-    console.log('  3. Call list_siblings_children to see nearby nodes');
-    console.log('  4. Call inspect_prior_outputs to review prior work');
-    console.log('  5. Call inspect_cache_status to check for cached results');
-    console.log('  6. Call request_spawn_workflow to request child workflows');
+    console.log("\nThe agent can:");
+    console.log("  1. Call inspect_current_node to understand its position");
+    console.log("  2. Call read_ancestor_chain to understand hierarchy");
+    console.log("  3. Call list_siblings_children to see nearby nodes");
+    console.log("  4. Call inspect_prior_outputs to review prior work");
+    console.log("  5. Call inspect_cache_status to check for cached results");
+    console.log("  6. Call request_spawn_workflow to request child workflows");
   }
 
   // Summary
-  printSection('Summary');
+  printSection("Summary");
   {
-    console.log('Introspection tools enable agents to:');
-    console.log('  - Understand their position in the workflow hierarchy');
-    console.log('  - Access context from parent and sibling workflows');
-    console.log('  - Review outputs from prior execution steps');
-    console.log('  - Check cache status before expensive operations');
-    console.log('  - Request dynamic workflow spawning\n');
+    console.log("Introspection tools enable agents to:");
+    console.log("  - Understand their position in the workflow hierarchy");
+    console.log("  - Access context from parent and sibling workflows");
+    console.log("  - Review outputs from prior execution steps");
+    console.log("  - Check cache status before expensive operations");
+    console.log("  - Request dynamic workflow spawning\n");
 
-    console.log('All tools are:');
-    console.log('  - Read-only (except request_spawn_workflow)');
-    console.log('  - Security-filtered (sensitive data removed)');
-    console.log('  - Context-aware (use getExecutionContext())');
-    console.log('  - Result-limited (prevent overwhelming output)');
+    console.log("All tools are:");
+    console.log("  - Read-only (except request_spawn_workflow)");
+    console.log("  - Security-filtered (sensitive data removed)");
+    console.log("  - Context-aware (use getExecutionContext())");
+    console.log("  - Result-limited (prevent overwhelming output)");
   }
 
-  console.log('\n=== Example 10 Complete ===');
+  console.log("\n=== Example 10 Complete ===");
 }
 
 // Allow direct execution
