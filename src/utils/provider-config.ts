@@ -49,7 +49,11 @@
 
 // Type imports from providers module
 // CRITICAL: Use .js extension (TypeScript requirement for ESM)
-import type { GlobalProviderConfig, ProviderId } from '../types/providers.js';
+import type {
+  GlobalProviderConfig,
+  ProviderId,
+  ProviderOptions
+} from '../types/providers.js';
 
 // ============================================================================
 // Module-Private Variable Storage
@@ -245,21 +249,115 @@ export function resetGlobalConfig(): void {
 /**
  * Resolve provider configuration with cascade
  *
- * **TO BE IMPLEMENTED IN P1.M2.T1.S4**
+ * **P1.M2.T1.S4 - Configuration Cascade Utility**
  *
- * This function will implement the configuration cascade:
- * Global → Agent → Prompt priority.
+ * This function implements the PRD 7.7 configuration cascade:
+ * Global config → Agent config → Prompt config (highest priority).
  *
- * @param agentProvider - Agent-level provider override
- * @param agentOptions - Agent-level options override
- * @returns Resolved provider and options
+ * ## Provider Resolution
+ *
+ * The provider is resolved using nullish coalescing (`??`), which means
+ * the first non-null/undefined value wins:
+ *
+ * ```ts
+ * const provider = promptProvider ?? agentProvider ?? globalConfig.defaultProvider;
+ * ```
+ *
+ * Priority (highest to lowest):
+ * 1. Prompt-level provider override
+ * 2. Agent-level provider override
+ * 3. Global default provider
+ *
+ * ## Options Merge
+ *
+ * Options are merged using object spread with "last write wins" semantics:
+ *
+ * ```ts
+ * const options = {
+ *   ...globalConfig.providerDefaults?.[provider],
+ *   ...agentOptions,
+ *   ...promptOptions
+ * };
+ * ```
+ *
+ * Priority (highest to lowest):
+ * 1. Prompt-level options (override everything)
+ * 2. Agent-level options (override global defaults)
+ * 3. Global provider-specific defaults (base layer)
+ *
+ * ## Immutability
+ *
+ * This function creates a new options object and does not mutate any
+ * input parameters. All object spreads create shallow copies.
+ *
+ * @param globalConfig - Global provider configuration from configureProviders()
+ * @param agentProvider - Agent-level provider override (optional)
+ * @param agentOptions - Agent-level options override (optional)
+ * @param promptProvider - Prompt-level provider override (optional)
+ * @param promptOptions - Prompt-level options override (optional)
+ * @returns Resolved provider and merged options
  *
  * @example
  * ```ts
- * const { provider, options } = resolveProviderConfig('opencode', { timeout: 5000 });
+ * import { resolveProviderConfig, getGlobalProviderConfig } from 'groundswell';
+ *
+ * // Setup global config
+ * configureProviders({
+ *   defaultProvider: 'anthropic',
+ *   providerDefaults: {
+ *     anthropic: { timeout: 30000, apiKey: 'sk-global' },
+ *     opencode: { endpoint: 'http://localhost:8080' }
+ *   }
+ * });
+ *
+ * // Agent configured with opencode override
+ * const agentProvider = 'opencode';
+ * const agentOptions = { timeout: 10000 };
+ *
+ * // Prompt with anthropic override
+ * const promptProvider = 'anthropic';
+ * const promptOptions = { temperature: 0.5 };
+ *
+ * const global = getGlobalProviderConfig();
+ * const { provider, options } = resolveProviderConfig(
+ *   global,
+ *   agentProvider,
+ *   agentOptions,
+ *   promptProvider,
+ *   promptOptions
+ * );
+ *
+ * console.log(provider); // 'anthropic' (prompt wins)
+ * console.log(options);
+ * // { timeout: 30000, apiKey: 'sk-global', temperature: 0.5 }
+ * // timeout from anthropic global defaults (agent's timeout was for opencode)
+ * // apiKey from anthropic global defaults
+ * // temperature from prompt options
  * ```
  */
-// export function resolveProviderConfig(
-//   agentProvider?: ProviderId,
-//   agentOptions?: ProviderOptions
-// ): { provider: ProviderId; options: ProviderOptions } { ... }
+export function resolveProviderConfig(
+  globalConfig: GlobalProviderConfig,
+  agentProvider?: ProviderId,
+  agentOptions?: ProviderOptions,
+  promptProvider?: ProviderId,
+  promptOptions?: ProviderOptions
+): { provider: ProviderId; options: ProviderOptions } {
+  // Step 1: Resolve provider using nullish coalescing
+  // ?? operator: first non-null/undefined value wins
+  const provider = promptProvider ?? agentProvider ?? globalConfig.defaultProvider;
+
+  // Step 2: Get global defaults for the resolved provider
+  // Optional chaining: returns undefined if providerDefaults or provider key doesn't exist
+  const globalDefaults = globalConfig.providerDefaults?.[provider];
+
+  // Step 3: Merge options using object spread
+  // Later objects override earlier objects for the same keys
+  const options: ProviderOptions = {
+    ...(globalDefaults ?? {}),      // Global defaults (base layer)
+    ...(agentOptions ?? {}),         // Agent overrides (middle layer)
+    ...(promptOptions ?? {})         // Prompt overrides (top layer)
+  };
+
+  // Step 4: Return resolved configuration tuple
+  return { provider, options };
+}

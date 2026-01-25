@@ -115,14 +115,14 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Milestone 1.2: Global Provider Configuration",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Implement global provider configuration system with cascade logic (global → agent → prompt)",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Task: Implement Provider Configuration Module",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Create provider-config.ts with configureProviders() and configuration cascade utilities",
               "subtasks": [
                 {
@@ -162,7 +162,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S4",
                   "title": "Implement resolveProviderConfig() cascade utility",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S3"
