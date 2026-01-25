@@ -6,6 +6,7 @@ import type {
 } from '../types/index.js';
 import { Observable } from '../utils/observable.js';
 import type { Workflow } from '../core/workflow.js';
+import { writeFile, readFile } from 'fs/promises';
 
 /**
  * Status symbols for tree visualization
@@ -32,13 +33,52 @@ export class WorkflowTreeDebugger implements WorkflowObserver {
   /** Node lookup map for quick access */
   private nodeMap: Map<string, WorkflowNode> = new Map();
 
+  /** Event history for persistence (only when persistEvents is true) */
+  private eventHistory: WorkflowEvent[] = [];
+
+  /** Whether to persist events to memory */
+  private persistEvents: boolean = false;
+
+  /** Maximum event history size (optional, for memory management) */
+  private maxEventHistorySize?: number;
+
   /**
    * Create a tree debugger attached to a workflow
    * @param workflow The root workflow to debug
+   * @param options Configuration options
+   * @param options.persistEvents Whether to accumulate event history (default: false)
+   * @param options.maxEventHistorySize Maximum number of events to keep (optional, FIFO eviction)
+   *
+   * @example
+   * ```typescript
+   * // Without persistence (default)
+   * const debugger = new WorkflowTreeDebugger(workflow);
+   *
+   * // With persistence enabled
+   * const debugger = new WorkflowTreeDebugger(workflow, { persistEvents: true });
+   *
+   * // With persistence and size limit
+   * const debugger = new WorkflowTreeDebugger(workflow, {
+   *   persistEvents: true,
+   *   maxEventHistorySize: 10000,
+   * });
+   * ```
    */
-  constructor(workflow: Workflow) {
+  constructor(
+    workflow: Workflow,
+    options?: { persistEvents?: boolean; maxEventHistorySize?: number }
+  ) {
     this.root = workflow.getNode();
     this.events = new Observable<WorkflowEvent>();
+
+    // Extract options with defaults
+    this.persistEvents = options?.persistEvents ?? false;
+    this.maxEventHistorySize = options?.maxEventHistorySize;
+
+    // Initialize event history if persistence enabled
+    if (this.persistEvents) {
+      this.eventHistory = [];
+    }
 
     // Build initial node map
     this.buildNodeMap(this.root);
@@ -89,7 +129,25 @@ export class WorkflowTreeDebugger implements WorkflowObserver {
     // Events are forwarded through the event stream
   }
 
+  /**
+   * Handle workflow events from observer interface
+   * Captures events for history if persistence enabled, handles structural updates, forwards to stream
+   *
+   * @param event - The workflow event to handle
+   */
   onEvent(event: WorkflowEvent): void {
+    // Capture event for history if persistence enabled
+    if (this.persistEvents) {
+      // Handle max size limit (FIFO eviction)
+      if (
+        this.maxEventHistorySize &&
+        this.eventHistory.length >= this.maxEventHistorySize
+      ) {
+        this.eventHistory.shift(); // Remove oldest event
+      }
+      this.eventHistory.push(event);
+    }
+
     // Handle structural events with incremental updates
     switch (event.type) {
       case 'childAttached':
@@ -250,6 +308,372 @@ export class WorkflowTreeDebugger implements WorkflowObserver {
 
     for (const child of node.children) {
       this.collectStats(child, stats);
+    }
+  }
+
+  // ============================================================
+  // Event Persistence API
+  // ============================================================
+
+  /**
+   * Get the accumulated event history
+   * Returns a copy to prevent external modification
+   *
+   * @returns Copy of event history array, or empty array if persistence disabled
+   *
+   * @example
+   * ```typescript
+   * const debugger = new WorkflowTreeDebugger(workflow, { persistEvents: true });
+   * await workflow.run();
+   * const events = debugger.getEventHistory();
+   * console.log(`Captured ${events.length} events`);
+   * ```
+   */
+  getEventHistory(): WorkflowEvent[] {
+    if (!this.persistEvents) {
+      return [];
+    }
+    // Return copy to prevent external modification
+    return [...this.eventHistory];
+  }
+
+  /**
+   * Serialize a WorkflowEvent to JSON-safe format
+   * Extracts only primitive fields to avoid circular references in WorkflowNode objects
+   *
+   * **Strategy:**
+   * - Extract nodeId and nodeName from WorkflowNode references
+   * - Skip WorkflowNode.parent, WorkflowNode.children (circular refs)
+   * - Skip WorkflowError.original (could be circular)
+   * - Add timestamp for chronological ordering
+   *
+   * **Circular Reference Handling:**
+   * - WorkflowNode has bidirectional links (parent ↔ children)
+   * - WorkflowNode.events[] contains WorkflowEvents that reference WorkflowNodes
+   * - JSON.stringify would throw TypeError without selective extraction
+   *
+   * @param event - The workflow event to serialize
+   * @returns JSON-safe object with primitive fields only
+   *
+   * @example
+   * ```typescript
+   * const event: WorkflowEvent = {
+   *   type: 'stateSnapshot',
+   *   node: { id: 'wf-123', name: 'MyWorkflow', ... }
+   * };
+   * const serialized = serializeEvent(event);
+   * // { type: 'stateSnapshot', timestamp: 1234567890, nodeId: 'wf-123', nodeName: 'MyWorkflow', stateSnapshot: {...} }
+   * ```
+   */
+  private serializeEvent(event: WorkflowEvent): unknown {
+    const timestamp = Date.now();
+
+    switch (event.type) {
+      // Core events
+      case 'childAttached':
+        return {
+          type: event.type,
+          timestamp,
+          parentId: event.parentId,
+          childId: event.child.id,
+          childName: event.child.name,
+          childStatus: event.child.status,
+        };
+
+      case 'childDetached':
+        return {
+          type: event.type,
+          timestamp,
+          parentId: event.parentId,
+          childId: event.childId,
+        };
+
+      case 'stateSnapshot':
+        return {
+          type: event.type,
+          timestamp,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+          stateSnapshot: event.node.stateSnapshot,
+        };
+
+      case 'stepStart':
+        return {
+          type: event.type,
+          timestamp,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+          step: event.step,
+        };
+
+      case 'stepEnd':
+        return {
+          type: event.type,
+          timestamp,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+          step: event.step,
+          duration: event.duration,
+        };
+
+      case 'error':
+        return {
+          type: event.type,
+          timestamp,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+          error: {
+            message: event.error.message,
+            workflowId: event.error.workflowId,
+            state: event.error.state,
+            logs: event.error.logs,
+            stack: event.error.stack,
+            // Skip 'original' field - could be circular
+          },
+        };
+
+      case 'taskStart':
+      case 'taskEnd':
+        return {
+          type: event.type,
+          timestamp,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+          task: event.task,
+        };
+
+      case 'treeUpdated':
+        return {
+          type: event.type,
+          timestamp,
+          rootId: event.root.id,
+          rootName: event.root.name,
+        };
+
+      // Agent/Prompt events
+      case 'agentPromptStart':
+        return {
+          type: event.type,
+          timestamp,
+          agentId: event.agentId,
+          agentName: event.agentName,
+          promptId: event.promptId,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+        };
+
+      case 'agentPromptEnd':
+        return {
+          type: event.type,
+          timestamp,
+          agentId: event.agentId,
+          agentName: event.agentName,
+          promptId: event.promptId,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+          duration: event.duration,
+          tokenUsage: event.tokenUsage,
+        };
+
+      // Tool events
+      case 'toolInvocation':
+        return {
+          type: event.type,
+          timestamp,
+          toolName: event.toolName,
+          input: event.input,
+          output: event.output,
+          duration: event.duration,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+        };
+
+      // MCP events
+      case 'mcpEvent':
+        return {
+          type: event.type,
+          timestamp,
+          serverName: event.serverName,
+          event: event.event,
+          payload: event.payload,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+        };
+
+      // Reflection events
+      case 'reflectionStart':
+        return {
+          type: event.type,
+          timestamp,
+          level: event.level,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+        };
+
+      case 'reflectionEnd':
+        return {
+          type: event.type,
+          timestamp,
+          level: event.level,
+          success: event.success,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+        };
+
+      // Cache events
+      case 'cacheHit':
+      case 'cacheMiss':
+        return {
+          type: event.type,
+          timestamp,
+          key: event.key,
+          nodeId: event.node.id,
+          nodeName: event.node.name,
+        };
+
+      default:
+        // Should not happen with TypeScript discriminated union
+        // But handle gracefully for unknown event types
+        return {
+          type: (event as { type: string }).type,
+          timestamp,
+          rawData: JSON.stringify(event),
+        };
+    }
+  }
+
+  /**
+   * Save event history to a JSON file
+   * Serializes events to avoid circular references and writes to disk
+   *
+   * **Serialization Strategy:**
+   * - Uses serializeEvent() to extract primitive fields only
+   * - Avoids circular references in WorkflowNode objects
+   * - Adds timestamp for chronological ordering
+   *
+   * **Error Handling:**
+   * - Throws descriptive errors for file system issues
+   * - Does not modify internal event history on failure
+   *
+   * @param path - File path to write event history
+   * @throws {Error} If file cannot be written (permission denied, disk full, etc.)
+   * @throws {Error} If event persistence is not enabled
+   *
+   * @example
+   * ```typescript
+   * const debugger = new WorkflowTreeDebugger(workflow, { persistEvents: true });
+   * await workflow.run();
+   * await debugger.saveEventHistory('./workflow-execution.json');
+   * ```
+   */
+  async saveEventHistory(path: string): Promise<void> {
+    if (!this.persistEvents) {
+      throw new Error('Event persistence is not enabled. Initialize with { persistEvents: true }');
+    }
+
+    try {
+      // Serialize all events
+      const serialized = this.eventHistory.map((event) =>
+        this.serializeEvent(event)
+      );
+
+      // Convert to JSON string
+      const json = JSON.stringify(serialized, null, 2);
+
+      // Write to file
+      await writeFile(path, json, 'utf-8');
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+
+      // Enhance error messages with context
+      if (err.code === 'ENOENT') {
+        throw new Error(
+          `Cannot save event history: Directory does not exist: ${path}`
+        );
+      }
+
+      if (err.code === 'EACCES') {
+        throw new Error(
+          `Cannot save event history: Permission denied: ${path}`
+        );
+      }
+
+      if (err.code === 'ENOSPC') {
+        throw new Error(
+          `Cannot save event history: No space left on device`
+        );
+      }
+
+      // Re-throw with context
+      throw new Error(
+        `Failed to save event history to ${path}: ${err.message}`
+      );
+    }
+  }
+
+  /**
+   * Load event history from a JSON file
+   * Static method that can be called without instantiating WorkflowTreeDebugger
+   *
+   * **Error Handling:**
+   * - Throws descriptive errors for file system issues
+   * - Throws descriptive errors for invalid JSON
+   *
+   * @param path - File path to read event history from
+   * @returns Parsed event array (unknown[] - caller should validate structure)
+   * @throws {Error} If file does not exist
+   * @throws {Error} If file cannot be read (permission denied, etc.)
+   * @throws {Error} If file contains invalid JSON
+   *
+   * @example
+   * ```typescript
+   * const events = await WorkflowTreeDebugger.loadEventHistory('./workflow-execution.json');
+   *
+   * // Use with WorkflowEventReplayer
+   * const replayer = new WorkflowEventReplayer();
+   * const tree = replayer.replay(events as WorkflowEvent[]);
+   * ```
+   */
+  static async loadEventHistory(path: string): Promise<unknown[]> {
+    try {
+      // Read file
+      const content = await readFile(path, 'utf-8');
+
+      // Parse JSON
+      const parsed = JSON.parse(content);
+
+      // Validate it's an array
+      if (!Array.isArray(parsed)) {
+        throw new Error(
+          `Invalid event history file: Expected array, got ${typeof parsed}`
+        );
+      }
+
+      return parsed;
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+
+      // Handle file not found
+      if (err.code === 'ENOENT') {
+        throw new Error(`Event history file not found: ${path}`);
+      }
+
+      // Handle permission denied
+      if (err.code === 'EACCES') {
+        throw new Error(`Permission denied reading file: ${path}`);
+      }
+
+      // Handle invalid JSON
+      if (err instanceof SyntaxError) {
+        throw new Error(
+          `Invalid JSON in event history file: ${path}\n${err.message}`
+        );
+      }
+
+      // Re-throw with context
+      throw new Error(
+        `Failed to load event history from ${path}: ${err.message}`
+      );
     }
   }
 }
