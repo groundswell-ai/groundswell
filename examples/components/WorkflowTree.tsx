@@ -25,6 +25,8 @@ export interface WorkflowTreeProps {
   onToggle?: (nodeId: string) => void;
   /** Currently selected node ID for keyboard navigation */
   selectedId?: string | null;
+  /** Selection callback when node is selected (for future extensibility) */
+  onSelect?: (nodeId: string) => void;
 }
 
 /**
@@ -54,6 +56,7 @@ export const WorkflowTree: React.FC<WorkflowTreeProps> = ({
   expandedIds,
   onToggle,
   selectedId,
+  onSelect,
 }) => {
   return (
     <WorkflowTreeNode
@@ -62,6 +65,7 @@ export const WorkflowTree: React.FC<WorkflowTreeProps> = ({
       expandedIds={expandedIds}
       onToggle={onToggle}
       selectedId={selectedId}
+      onSelect={onSelect}
     />
   );
 };

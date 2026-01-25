@@ -15,3 +15,6 @@ export type { WorkflowTreeProps } from './WorkflowTree.js';
 
 export { WorkflowTreeDebuggerUI } from './WorkflowTreeDebuggerUI.js';
 export type { WorkflowTreeDebuggerUIProps } from './WorkflowTreeDebuggerUI.js';
+
+export { NodeDetailsPanel } from './NodeDetailsPanel.js';
+export type { NodeDetailsPanelProps } from './NodeDetailsPanel.js';

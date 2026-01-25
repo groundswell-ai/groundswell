@@ -31,6 +31,7 @@ import type { WorkflowNode } from '../../src/types/workflow.js';
 import type { WorkflowEvent } from '../../src/types/events.js';
 import type { WorkflowTreeDebugger } from '../../src/debugger/tree-debugger.js';
 import { WorkflowTree } from './WorkflowTree.js';
+import { NodeDetailsPanel } from './NodeDetailsPanel.js';
 
 /**
  * Configuration for smart default expansion
@@ -262,6 +263,11 @@ export const WorkflowTreeDebuggerUI: React.FC<WorkflowTreeDebuggerUIProps> = ({
     return () => subscription.unsubscribe();
   }, [treeDebugger]);
 
+  // Get selected node for details panel
+  const selectedNode = useMemo(() => {
+    return selectedId ? findNodeById(tree, selectedId) : null;
+  }, [selectedId, tree]);
+
   return (
     <Box flexDirection="column" padding={1}>
       <Box marginBottom={1}>
@@ -279,11 +285,28 @@ export const WorkflowTreeDebuggerUI: React.FC<WorkflowTreeDebuggerUIProps> = ({
         Enter/Space: Toggle | ↑/↓: Navigate | *: Expand all | /: Collapse all
       </Text>
       <Newline />
-      <WorkflowTree
-        node={tree}
-        expandedIds={expandedIds}
-        selectedId={selectedId}
-      />
+
+      {/* Split-pane layout */}
+      <Box flexDirection="row">
+        {/* Left pane: Tree view (60%) */}
+        <Box width="60%" paddingRight={1}>
+          <WorkflowTree
+            node={tree}
+            expandedIds={expandedIds}
+            selectedId={selectedId}
+          />
+        </Box>
+
+        {/* Separator */}
+        <Box width={1}>
+          <Text dimColor>│</Text>
+        </Box>
+
+        {/* Right pane: Node details (40%) */}
+        <Box width="39%" paddingLeft={1}>
+          <NodeDetailsPanel node={selectedNode} />
+        </Box>
+      </Box>
     </Box>
   );
 };
