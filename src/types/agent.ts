@@ -101,61 +101,239 @@ export type AgentResponseStatus = 'success' | 'error' | 'partial';
 
 /**
  * Response wrapper for agent execution results
- * Provides consistent structure with status, data, error, and metadata
  *
- * @template T - The type of data returned on success
+ * ## PRD 6.4 Response Requirements
+ *
+ * All AgentResponse instances MUST satisfy:
+ *
+ * 1. **Strict JSON** (PRD 6.4.1): Must be parseable by `JSON.parse()`
+ * 2. **No Prose Wrapping** (PRD 6.4.2): No markdown code blocks or text
+ * 3. **Consistent Structure** (PRD 6.4.3): Must conform to this interface
+ * 4. **Null over Undefined** (PRD 6.4.4): Use `null` for absent values
+ * 5. **Error Responses** (PRD 6.4.5): Failed operations return valid JSON
+ *
+ * ## Type Narrowing
+ *
+ * The `status` field is a discriminant. Use type guards to narrow types:
+ * - `isSuccess(response)` → `SuccessResponse<T>` (data is T, error is null)
+ * - `isError(response)` → `ErrorResponse` (data is null, error exists)
+ * - `isPartial(response)` → `PartialResponse<T>` (data is T, error is null)
+ *
+ * @template T - The type of data returned on success (unknown by default)
+ * @see {@link SuccessResponse}, {@link ErrorResponse}, {@link PartialResponse}
+ *
+ * @example <caption>Success response (PRD 6.5)</caption>
+ * ```ts
+ * const response: AgentResponse<{ result: string; artifacts: string[] }> = {
+ *   status: 'success',
+ *   data: { result: 'Task completed', artifacts: ['file1.ts', 'file2.ts'] },
+ *   error: null,
+ *   metadata: { agentId: 'agent-abc123', timestamp: 1706140800000, duration: 1523 }
+ * };
+ * ```
+ *
+ * @example <caption>Error response (PRD 6.5)</caption>
+ * ```ts
+ * const response: AgentResponse<null> = {
+ *   status: 'error',
+ *   data: null,
+ *   error: {
+ *     code: 'EXECUTION_FAILED',
+ *     message: 'Failed to compile TypeScript files',
+ *     details: { failedFiles: ['src/index.ts'] },
+ *     recoverable: true
+ *   },
+ *   metadata: { agentId: 'agent-abc123', timestamp: 1706140800000 }
+ * };
+ * ```
+ *
+ * @example <caption>Partial response (PRD 6.5)</caption>
+ * ```ts
+ * const response: AgentResponse<{ completedSteps: number; totalSteps: number }> = {
+ *   status: 'partial',
+ *   data: { completedSteps: 3, totalSteps: 5 },
+ *   error: null,
+ *   metadata: { agentId: 'agent-abc123', timestamp: 1706140800000 }
+ * };
+ * ```
  */
 export interface AgentResponse<T = unknown> {
-  /** Response status - use as discriminant for type narrowing */
+  /**
+   * Response status - use as discriminant for type narrowing
+   *
+   * The status field determines the shape of data and error:
+   * - 'success': data is T, error is null
+   * - 'error': data is null, error is AgentErrorDetails
+   * - 'partial': data is T, error is null
+   */
   status: AgentResponseStatus;
 
-  /** Response data - null for error responses */
+  /**
+   * Response data - null for error responses (per PRD 6.4.5)
+   *
+   * Contains the result data for success and partial responses.
+   * Per PRD 6.4.4: Use null instead of undefined for absent values.
+   */
   data: T | null;
 
-  /** Error details - null for success/partial responses */
+  /**
+   * Error details - null for success/partial responses
+   *
+   * Contains error information for error responses.
+   * Per PRD 6.4.4: Use null instead of undefined for absent values.
+   */
   error: AgentErrorDetails | null;
 
-  /** Response metadata */
+  /**
+   * Response metadata including agent, timestamp, and execution details
+   *
+   * Always present regardless of response status.
+   */
   metadata: AgentResponseMetadata;
 }
 
 /**
  * Error details for agent error responses
+ *
+ * Per PRD 6.2: Error responses include machine-readable codes,
+ * human-readable messages, and a recoverable flag for retry logic.
+ *
+ * The `code` field uses SCREAMING_SNAKE_CASE convention and should
+ * be one of the standard codes from {@link AGENT_ERROR_CODES}.
+ *
+ * @see {@link AGENT_ERROR_CODES} for standard error codes
+ * @see {@link createErrorResponse} for factory function
+ *
+ * @example <caption>Error response (PRD 6.5)</caption>
+ * ```ts
+ * const error: AgentErrorDetails = {
+ *   code: 'EXECUTION_FAILED',
+ *   message: 'Failed to compile TypeScript files',
+ *   details: {
+ *     failedFiles: ['src/index.ts'],
+ *     compilerErrors: ['TS2307: Cannot find module \\'foo\\'']
+ *   },
+ *   recoverable: true
+ * };
+ * ```
  */
 export interface AgentErrorDetails {
-  /** Machine-readable error code (SCREAMING_SNAKE_CASE) */
+  /**
+   * Machine-readable error code (SCREAMING_SNAKE_CASE convention)
+   *
+   * Use standard codes from {@link AGENT_ERROR_CODES} when applicable.
+   * Custom codes should follow the same naming convention.
+   */
   code: string;
 
-  /** Human-readable error description */
+  /** Human-readable error description suitable for display or logging */
   message: string;
 
-  /** Additional error context */
+  /**
+   * Additional error context - null if no details available
+   *
+   * May include field names, values, stack traces, or other diagnostic info.
+   * Per PRD 6.4.4: Use null instead of undefined for absent values.
+   */
   details?: Record<string, unknown> | null;
 
-  /** Whether the error is recoverable (can retry) */
+  /**
+   * Whether the error is recoverable (can retry)
+   *
+   * Set to true for transient errors (rate limits, network issues).
+   * Set to false for permanent errors (validation, invalid format).
+   *
+   * Per PRD 6.2: This is a hint for parent workflow retry logic.
+   */
   recoverable: boolean;
 }
 
 /**
  * Metadata for agent responses
+ *
+ * Per PRD 6.3: Response metadata includes agent identification,
+ * timing information, and optional correlation/tracing data.
+ *
+ * The timestamp is a Unix timestamp in milliseconds (not seconds).
+ * Use Date.now() or similar to generate valid timestamps.
+ *
+ * @see {@link TokenUsage} for token usage structure
+ *
+ * @example <caption>Metadata from PRD 6.5</caption>
+ * ```ts
+ * const metadata: AgentResponseMetadata = {
+ *   agentId: 'agent-abc123',
+ *   timestamp: 1706140800000,
+ *   duration: 1523
+ * };
+ * ```
+ *
+ * @example <caption>Full metadata with optional fields</caption>
+ * ```ts
+ * const metadata: AgentResponseMetadata = {
+ *   agentId: 'agent-abc123',
+ *   timestamp: Date.now(),
+ *   duration: 1523,
+ *   requestId: 'req-abc123',
+ *   usage: { inputTokens: 100, outputTokens: 50, cacheReadTokens: 0, cacheWriteTokens: 25 },
+ *   toolCalls: 3
+ * };
+ * ```
  */
 export interface AgentResponseMetadata {
-  /** Agent identifier (required) */
+  /**
+   * Agent identifier (required)
+   *
+   * Uniquely identifies the agent or workflow that generated this response.
+   * Should be stable across multiple invocations of the same agent.
+   */
   agentId: string;
 
-  /** Unix timestamp in milliseconds (required) */
+  /**
+   * Unix timestamp in milliseconds (required)
+   *
+   * The time when the response was generated, as a Unix timestamp in
+   * milliseconds since the epoch (January 1, 1970). Use Date.now() to
+   * generate current timestamps.
+   *
+   * @example
+   * ```ts
+   * timestamp: Date.now()  // Current time in milliseconds
+   * timestamp: 1706140800000  // Fixed timestamp
+   * ```
+   */
   timestamp: number;
 
-  /** Execution duration in milliseconds (optional) */
+  /**
+   * Execution duration in milliseconds (optional)
+   *
+   * The time taken to execute the agent prompt, from start to completion.
+   * Useful for performance monitoring and debugging.
+   */
   duration?: number | null;
 
-  /** Request correlation ID (optional) */
+  /**
+   * Request correlation ID (optional)
+   *
+   * Used for tracing requests across distributed systems. Correlates
+   * this response with the original request and any downstream calls.
+   */
   requestId?: string | null;
 
-  /** Token usage from the API (optional, for backward compatibility) */
+  /**
+   * Token usage from the API (optional, for backward compatibility)
+   *
+   * Breakdown of token usage including input, output, and cache tokens.
+   * Only present when the API returns token usage information.
+   */
   usage?: TokenUsage;
 
-  /** Number of tool invocations (optional, for backward compatibility) */
+  /**
+   * Number of tool invocations (optional, for backward compatibility)
+   *
+   * The count of tool/function calls made during agent execution.
+   * Useful for tracking agent behavior and cost analysis.
+   */
   toolCalls?: number;
 }
 
@@ -165,16 +343,71 @@ export interface AgentResponseMetadata {
 
 /**
  * Success response type - data is T (not null), error is null
+ *
+ * Use this type with type guards for type-safe access to response data.
+ * When a response has status 'success', data is guaranteed to be T (not null).
+ *
+ * Per PRD 6.4.3: Consistent Structure - all success responses conform
+ * to the AgentResponse interface with status 'success'.
+ *
+ * @template T - The type of data returned on success
+ * @see {@link isSuccess} for the type guard that narrows to this type
+ *
+ * @example
+ * ```ts
+ * // Type narrowing with type guard
+ * if (isSuccess(response)) {
+ *   console.log(response.data); // TypeScript knows data is T
+ *   console.log(response.error); // TypeScript knows error is null
+ * }
+ * ```
  */
 export type SuccessResponse<T> = AgentResponse<T> & { status: 'success' };
 
 /**
  * Error response type - data is null, error is AgentErrorDetails (not null)
+ *
+ * Use this type with type guards for type-safe access to error details.
+ * When a response has status 'error', error is guaranteed to be AgentErrorDetails (not null).
+ *
+ * Per PRD 6.4.5: Error Responses - failed operations must still return
+ * valid JSON with status 'error' and populated error field.
+ *
+ * @see {@link isError} for the type guard that narrows to this type
+ * @see {@link AgentErrorDetails} for error details structure
+ *
+ * @example
+ * ```ts
+ * // Type narrowing with type guard
+ * if (isError(response)) {
+ *   console.log(response.error.code); // TypeScript knows error exists
+ *   console.log(response.data); // TypeScript knows data is null
+ * }
+ * ```
  */
 export type ErrorResponse = AgentResponse<null> & { status: 'error' };
 
 /**
  * Partial response type - data is T, error is null
+ *
+ * Used for streaming or incremental results where the agent has not
+ * yet completed the full request. Partial responses contain intermediate
+ * progress data that may be updated in subsequent responses.
+ *
+ * Per PRD 6.4.3: Consistent Structure - all partial responses conform
+ * to the AgentResponse interface with status 'partial'.
+ *
+ * @template T - The type of partial data returned
+ * @see {@link isPartial} for the type guard that narrows to this type
+ *
+ * @example
+ * ```ts
+ * // Type narrowing with type guard
+ * if (isPartial(response)) {
+ *   console.log('Progress:', response.data.completedSteps);
+ *   // TypeScript knows data is T and error is null
+ * }
+ * ```
  */
 export type PartialResponse<T> = AgentResponse<T> & { status: 'partial' };
 
@@ -184,13 +417,66 @@ export type PartialResponse<T> = AgentResponse<T> & { status: 'partial' };
 
 /**
  * Standard error codes for agent responses
- * Use SCREAMING_SNAKE_CASE convention
+ *
+ * All error codes use SCREAMING_SNAKE_CASE convention.
+ *
+ * Per PRD 6.6: Use `INVALID_RESPONSE_FORMAT` for responses that
+ * don't conform to the AgentResponse schema. Validation failures
+ * should be treated as errors with this code.
+ *
+ * @see {@link AgentErrorDetails} for error details structure
+ * @see {@link createErrorResponse} for factory function
+ *
+ * @example
+ * ```ts
+ * import { AGENT_ERROR_CODES, createErrorResponse } from 'groundswell';
+ *
+ * const error = createErrorResponse(
+ *   AGENT_ERROR_CODES.VALIDATION_FAILED,
+ *   'Invalid input',
+ *   { field: 'email', value: 'not-an-email' }
+ * );
+ * ```
  */
 export const AGENT_ERROR_CODES = {
+  /**
+   * Response not valid JSON or doesn't match AgentResponse schema
+   *
+   * Per PRD 6.6: Invalid responses must be treated as errors with this code.
+   * Use when response validation fails during parsing or schema checking.
+   */
   INVALID_RESPONSE_FORMAT: 'INVALID_RESPONSE_FORMAT',
+
+  /**
+   * Input validation failed
+   *
+   * Use when the provided inputs fail validation checks (e.g., wrong type,
+   * missing required fields, out-of-range values).
+   */
   VALIDATION_FAILED: 'VALIDATION_FAILED',
+
+  /**
+   * Agent execution failed
+   *
+   * Use when the agent execution fails for reasons unrelated to validation
+   * or API requests (e.g., compilation errors, runtime exceptions).
+   */
   EXECUTION_FAILED: 'EXECUTION_FAILED',
+
+  /**
+   * API request to LLM provider failed
+   *
+   * Use when the HTTP request to the LLM provider fails (e.g., network errors,
+   * timeout, rate limiting, provider-side errors).
+   */
   API_REQUEST_FAILED: 'API_REQUEST_FAILED',
+
+  /**
+   * Tool execution failed
+   *
+   * Use when a tool/function invocation fails during agent execution
+   * (e.g., tool not found, tool returned error, tool timeout).
+   */
   TOOL_EXECUTION_FAILED: 'TOOL_EXECUTION_FAILED',
 } as const;
 
@@ -201,15 +487,41 @@ export const AGENT_ERROR_CODES = {
 /**
  * Creates a success response with data and metadata.
  *
- * @param data - The response data
- * @param metadata - Response metadata including agentId and timestamp
- * @returns A success AgentResponse
+ * ## PRD 6.4 Compliance
  *
- * @example
+ * The returned response satisfies all PRD 6.4 requirements:
+ * - Strict JSON parseable by `JSON.parse()` (PRD 6.4.1)
+ * - No prose wrapping - pure JSON structure (PRD 6.4.2)
+ * - Consistent with AgentResponse interface (PRD 6.4.3)
+ * - Uses null instead of undefined (PRD 6.4.4)
+ *
+ * @template T - The type of the response data
+ * @param data - The response data to return
+ * @param metadata - Response metadata including agentId and timestamp
+ * @returns A success AgentResponse with status 'success', provided data, null error
+ *
+ * @example <caption>Basic success response (PRD 6.5)</caption>
  * ```ts
  * const response = createSuccessResponse(
- *   { result: 'success' },
- *   { agentId: 'agent-123', timestamp: Date.now() }
+ *   { result: 'Task completed', artifacts: ['file1.ts', 'file2.ts'] },
+ *   { agentId: 'agent-abc123', timestamp: 1706140800000, duration: 1523 }
+ * );
+ *
+ * // Guaranteed to be valid JSON (PRD 6.4.1)
+ * const jsonString = JSON.stringify(response);
+ * const parsed = JSON.parse(jsonString); // Always valid
+ * ```
+ *
+ * @example <caption>Success response with execution metadata</caption>
+ * ```ts
+ * const response = createSuccessResponse(
+ *   { items: [1, 2, 3] },
+ *   {
+ *     agentId: 'agent-123',
+ *     timestamp: Date.now(),
+ *     duration: 1523,
+ *     requestId: 'req-abc123'
+ *   }
  * );
  * ```
  */
@@ -228,18 +540,42 @@ export function createSuccessResponse<T>(
 /**
  * Creates an error response with error details.
  *
+ * ## PRD 6.4 Compliance
+ *
+ * Per PRD 6.4.5: Failed operations must still return valid JSON with
+ * status 'error' and populated error field. This function ensures all
+ * error responses conform to the AgentResponse schema.
+ *
+ * The error code should use SCREAMING_SNAKE_CASE convention and ideally
+ * be one of the standard codes from {@link AGENT_ERROR_CODES}.
+ *
  * @param code - Machine-readable error code (SCREAMING_SNAKE_CASE)
  * @param message - Human-readable error message
- * @param details - Optional additional error context
+ * @param details - Optional additional error context (use null instead of undefined per PRD 6.4.4)
  * @param recoverable - Whether the error is recoverable (default: false)
- * @returns An error AgentResponse with null data
+ * @returns An error AgentResponse with null data, populated error field
  *
- * @example
+ * @example <caption>Error response (PRD 6.5)</caption>
  * ```ts
  * const response = createErrorResponse(
- *   'INVALID_RESPONSE_FORMAT',
- *   'Failed to parse response',
- *   { field: 'value' },
+ *   'EXECUTION_FAILED',
+ *   'Failed to compile TypeScript files',
+ *   {
+ *     failedFiles: ['src/index.ts'],
+ *     compilerErrors: ['TS2307: Cannot find module \\'foo\\'']
+ *   },
+ *   true
+ * );
+ * ```
+ *
+ * @example <caption>Using standard error codes</caption>
+ * ```ts
+ * import { AGENT_ERROR_CODES, createErrorResponse } from 'groundswell';
+ *
+ * const response = createErrorResponse(
+ *   AGENT_ERROR_CODES.VALIDATION_FAILED,
+ *   'Invalid input',
+ *   { field: 'email', value: 'not-an-email' },
  *   false
  * );
  * ```
@@ -269,14 +605,40 @@ export function createErrorResponse(
 /**
  * Creates a partial response for streaming/incremental results.
  *
- * @param data - The partial response data
- * @returns A partial AgentResponse
+ * ## PRD 6.4 Compliance
  *
- * @example
+ * Per PRD 6.4.3: Consistent Structure - partial responses conform to
+ * the AgentResponse interface with status 'partial'.
+ *
+ * Partial responses are used for streaming or incremental results where
+ * the agent has not yet completed the full request. They contain intermediate
+ * progress data that may be updated in subsequent responses.
+ *
+ * @template T - The type of the partial response data
+ * @param data - The partial response data with progress information
+ * @returns A partial AgentResponse with status 'partial', data, null error
+ *
+ * @example <caption>Partial response (PRD 6.5)</caption>
  * ```ts
  * const response = createPartialResponse({
  *   completedSteps: 3,
- *   totalSteps: 5
+ *   totalSteps: 5,
+ *   intermediateResult: { progress: 'processing file2.ts' }
+ * });
+ *
+ * // Later, send another partial response with updated progress
+ * const updatedResponse = createPartialResponse({
+ *   completedSteps: 4,
+ *   totalSteps: 5,
+ *   intermediateResult: { progress: 'processing file3.ts' }
+ * });
+ * ```
+ *
+ * @example <caption>Streaming data chunks</caption>
+ * ```ts
+ * const chunk = createPartialResponse({
+ *   chunk: 'Hello',
+ *   isComplete: false
  * });
  * ```
  */
