@@ -113,6 +113,8 @@ describe('AnthropicProvider', () => {
 
     it('should have execute() method with correct signature', async () => {
       const provider = new AnthropicProvider();
+      // Initialize provider first (required for execute)
+      await provider.initialize();
       const mockToolExecutor = async () => ({ content: '', isError: false });
 
       // Should return Promise<AgentResponse<T>>
@@ -126,6 +128,8 @@ describe('AnthropicProvider', () => {
 
     it('should have registerMCPs() method with correct signature', async () => {
       const provider = new AnthropicProvider();
+      // Initialize provider first (required for registerMCPs)
+      await provider.initialize();
 
       // Should return Promise<Tool[]>
       const result = provider.registerMCPs([]);

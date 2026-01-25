@@ -51,6 +51,7 @@ import {
   createErrorResponse,
 } from "../types/agent.js";
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
+import { MCPHandler } from "../core/mcp-handler.js";
 import { parseModelSpec } from "../utils/model-spec.js";
 
 export class AnthropicProvider implements Provider {
@@ -98,6 +99,26 @@ export class AnthropicProvider implements Provider {
    * @internal
    */
   private sdk: typeof import("@anthropic-ai/claude-agent-sdk") | null = null;
+
+  /**
+   * MCP handler for server registration and tool management
+   *
+   * Manages MCP server connections and converts tools to SDK format.
+   * Created on first use and reused for subsequent registrations.
+   *
+   * @internal
+   */
+  private mcpHandler: MCPHandler = new MCPHandler();
+
+  /**
+   * SDK MCP server configuration for use in execute()
+   *
+   * Stores the converted SDK server config from registerMCPs().
+   * Used in sdkOptions.mcpServers during execute() calls.
+   *
+   * @internal
+   */
+  private mcpServerConfig: import("@anthropic-ai/claude-agent-sdk").McpServerConfig | null = null;
 
   /**
    * Initialize the Anthropic provider
@@ -170,6 +191,9 @@ export class AnthropicProvider implements Provider {
     // CRITICAL: ProviderRegistry manages initialization state externally
     this.sdk = null;
 
+    // Clear MCP server configuration (from P2.M1.T1.S7)
+    this.mcpServerConfig = null;
+
     // GOTCHA: No return value needed - Promise<void> is implicit
     // GOTCHA: No throws possible from null check and assignment
   }
@@ -221,8 +245,13 @@ export class AnthropicProvider implements Provider {
           allowedTools: request.options.tools.map((t) => t.name),
         }),
 
-      // MCP servers (placeholder for P2.M1.T1.S7)
-      // mcpServers: undefined,
+      // MCP servers integration (from P2.M1.T1.S7)
+      // Include registered MCP servers if available
+      ...(this.mcpServerConfig && {
+        mcpServers: {
+          "groundswell-mcp": this.mcpServerConfig,
+        },
+      }),
 
       // Hooks (placeholder for P2.M1.T2.S1)
       // hooks: undefined,
@@ -318,14 +347,68 @@ export class AnthropicProvider implements Provider {
   /**
    * Register MCP servers and return available tools
    *
+   * Registers MCP servers with the internal MCPHandler and returns
+   * discovered tools in MCP format. Also converts tools to SDK format
+   * and stores the configuration for use in execute().
+   *
    * @param servers - Array of MCP server configurations
-   * @returns Array of discovered tools
+   * @returns Array of discovered tools in MCP format
    * @remarks
    * Implemented in P2.M1.T1.S7
+   *
+   * @example
+   * ```ts
+   * const provider = new AnthropicProvider();
+   * await provider.initialize();
+   *
+   * const tools = await provider.registerMCPs([
+   *   {
+   *     name: 'filesystem',
+   *     transport: 'inprocess',
+   *     tools: [
+   *       {
+   *         name: 'read_file',
+   *         description: 'Read a file',
+   *         input_schema: {
+   *           type: 'object',
+   *           properties: { path: { type: 'string' } },
+   *           required: ['path']
+   *         }
+   *       }
+   *     ]
+   *   }
+   * ]);
+   *
+   * console.log(tools); // [{ name: 'filesystem__read_file', ... }]
+   * ```
    */
   async registerMCPs(servers: MCPServer[]): Promise<Tool[]> {
-    // Implemented in P2.M1.T1.S7
-    return [];
+    // PATTERN: SDK initialization check (follow execute() pattern at lines 197-199)
+    // CRITICAL: Validate SDK is loaded before attempting to use it
+    if (!this.sdk) {
+      throw new Error("SDK not initialized. Call initialize() first.");
+    }
+
+    // Register each server with the MCPHandler
+    // MCPHandler will:
+    // - Validate server name uniqueness (throws if duplicate)
+    // - Register tools with fullName pattern: serverName__toolName
+    // - Create tool executors based on transport type
+    for (const server of servers) {
+      this.mcpHandler.registerServer(server);
+    }
+
+    // Convert to SDK format and store for execute() method
+    // toAgentSDKServer() returns McpServerConfig | null
+    const sdkConfig = this.mcpHandler.toAgentSDKServer();
+    if (sdkConfig) {
+      this.mcpServerConfig = sdkConfig;
+    }
+
+    // Return discovered tools in MCP format (NOT SDK format)
+    // Tools have: { name, description, input_schema }
+    // Tool names are prefixed: serverName__toolName
+    return this.mcpHandler.getTools();
   }
 
   /**

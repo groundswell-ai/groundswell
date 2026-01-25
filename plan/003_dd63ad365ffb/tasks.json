@@ -319,7 +319,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S7",
                   "title": "Implement registerMCPs() method",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T1.S1"
