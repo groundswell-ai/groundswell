@@ -488,6 +488,497 @@ describe('WorkflowEventReplayer', () => {
       expect(() => replayer.replay(events)).not.toThrow();
     });
   });
+
+  describe('stateSnapshot event handling', () => {
+    it('should update node.stateSnapshot with event data', () => {
+      const rootId = 'root';
+      const stateSnapshot = { count: 42, status: 'running' };
+
+      const root = createMockNode(rootId, null);
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        {
+          type: 'stateSnapshot',
+          node: { ...root, stateSnapshot }
+        }
+      ];
+
+      const tree = replayer.replay(events);
+
+      expect(tree.stateSnapshot).toEqual(stateSnapshot);
+    });
+
+    it('should overwrite stateSnapshot with latest value (last write wins)', () => {
+      const rootId = 'root';
+      const root = createMockNode(rootId, null);
+
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        {
+          type: 'stateSnapshot',
+          node: { ...root, stateSnapshot: { count: 1 } }
+        },
+        {
+          type: 'stateSnapshot',
+          node: { ...root, stateSnapshot: { count: 2 } }
+        },
+        {
+          type: 'stateSnapshot',
+          node: { ...root, stateSnapshot: { count: 3 } }
+        }
+      ];
+
+      const tree = replayer.replay(events);
+
+      expect(tree.stateSnapshot).toEqual({ count: 3 });
+    });
+
+    it('should handle null stateSnapshot correctly', () => {
+      const rootId = 'root';
+      const root = createMockNode(rootId, null);
+
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        {
+          type: 'stateSnapshot',
+          node: { ...root, stateSnapshot: { count: 42 } }
+        },
+        {
+          type: 'stateSnapshot',
+          node: { ...root, stateSnapshot: null }
+        }
+      ];
+
+      const tree = replayer.replay(events);
+
+      expect(tree.stateSnapshot).toBeNull();
+    });
+
+    it('should log warning for missing node in stateSnapshot', () => {
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: createMockNode('root', null)
+        },
+        {
+          type: 'stateSnapshot',
+          node: createMockNode('non-existent', null)
+        }
+      ];
+
+      replayer.replay(events);
+
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('non-existent')
+      );
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('not found in nodeMap')
+      );
+    });
+  });
+
+  describe('error event handling', () => {
+    it('should append error to node.events array', () => {
+      const rootId = 'root';
+      const root = createMockNode(rootId, null);
+
+      const errorEvent: WorkflowEvent = {
+        type: 'error',
+        node: root,
+        error: {
+          message: 'Test error',
+          original: null,
+          workflowId: rootId,
+          state: { count: 42 },
+          logs: []
+        }
+      };
+
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        errorEvent
+      ];
+
+      const tree = replayer.replay(events);
+
+      expect(tree.events).toHaveLength(1);
+      expect(tree.events[0]).toBe(errorEvent);
+    });
+
+    it('should accumulate multiple errors (not overwrite)', () => {
+      const rootId = 'root';
+      const root = createMockNode(rootId, null);
+
+      const error1: WorkflowEvent = {
+        type: 'error',
+        node: root,
+        error: {
+          message: 'Error 1',
+          original: null,
+          workflowId: rootId,
+          state: {},
+          logs: []
+        }
+      };
+
+      const error2: WorkflowEvent = {
+        type: 'error',
+        node: root,
+        error: {
+          message: 'Error 2',
+          original: null,
+          workflowId: rootId,
+          state: {},
+          logs: []
+        }
+      };
+
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        error1,
+        error2
+      ];
+
+      const tree = replayer.replay(events);
+
+      expect(tree.events).toHaveLength(2);
+      expect(tree.events[0]).toBe(error1);
+      expect(tree.events[1]).toBe(error2);
+    });
+
+    it('should log warning for missing node in error event', () => {
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: createMockNode('root', null)
+        },
+        {
+          type: 'error',
+          node: createMockNode('non-existent', null),
+          error: {
+            message: 'Test error',
+            original: null,
+            workflowId: 'non-existent',
+            state: {},
+            logs: []
+          }
+        }
+      ];
+
+      replayer.replay(events);
+
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('non-existent')
+      );
+    });
+  });
+
+  describe('stepStart event handling', () => {
+    it('should append stepStart event to node.events array', () => {
+      const stepId = 'step-1';
+      const root = createMockNode('root', null);
+      const step = createMockNode(stepId, null);
+
+      const stepStartEvent: WorkflowEvent = {
+        type: 'stepStart',
+        node: step,
+        step: 'processData'
+      };
+
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        {
+          type: 'childAttached',
+          parentId: 'root',
+          child: step
+        },
+        stepStartEvent
+      ];
+
+      const tree = replayer.replay(events);
+      const stepNode = tree.children[0];
+
+      expect(stepNode.events).toHaveLength(1);
+      expect(stepNode.events[0]).toBe(stepStartEvent);
+    });
+
+    it('should handle missing step node gracefully (silent return)', () => {
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: createMockNode('root', null)
+        },
+        {
+          type: 'stepStart',
+          node: createMockNode('non-existent-step', null),
+          step: 'processData'
+        }
+      ];
+
+      // Should not throw - step node may be added later via childAttached
+      expect(() => replayer.replay(events)).not.toThrow();
+
+      // Should NOT log warning for missing step nodes (they're added separately)
+      expect(console.warn).not.toHaveBeenCalledWith(
+        expect.stringContaining('non-existent-step')
+      );
+    });
+  });
+
+  describe('stepEnd event handling', () => {
+    it('should append stepEnd event with duration to node.events array', () => {
+      const stepId = 'step-1';
+      const root = createMockNode('root', null);
+      const step = createMockNode(stepId, null);
+
+      const stepEndEvent: WorkflowEvent = {
+        type: 'stepEnd',
+        node: step,
+        step: 'processData',
+        duration: 1500
+      };
+
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        {
+          type: 'childAttached',
+          parentId: 'root',
+          child: step
+        },
+        stepEndEvent
+      ];
+
+      const tree = replayer.replay(events);
+      const stepNode = tree.children[0];
+
+      expect(stepNode.events).toHaveLength(1);
+      expect(stepNode.events[0]).toBe(stepEndEvent);
+      if (stepNode.events[0].type === 'stepEnd') {
+        expect(stepNode.events[0].duration).toBe(1500);
+      }
+    });
+
+    it('should handle missing step node gracefully (silent return)', () => {
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: createMockNode('root', null)
+        },
+        {
+          type: 'stepEnd',
+          node: createMockNode('non-existent-step', null),
+          step: 'processData',
+          duration: 1000
+        }
+      ];
+
+      // Should not throw - step node may be added later via childAttached
+      expect(() => replayer.replay(events)).not.toThrow();
+    });
+  });
+
+  describe('taskStart event handling', () => {
+    it('should append taskStart event to node.events array', () => {
+      const rootId = 'root';
+      const root = createMockNode(rootId, null);
+
+      const taskStartEvent: WorkflowEvent = {
+        type: 'taskStart',
+        node: root,
+        task: 'cleanup'
+      };
+
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        taskStartEvent
+      ];
+
+      const tree = replayer.replay(events);
+
+      expect(tree.events).toHaveLength(1);
+      expect(tree.events[0]).toBe(taskStartEvent);
+    });
+
+    it('should log warning for missing node in taskStart event', () => {
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: createMockNode('root', null)
+        },
+        {
+          type: 'taskStart',
+          node: createMockNode('non-existent', null),
+          task: 'cleanup'
+        }
+      ];
+
+      replayer.replay(events);
+
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('non-existent')
+      );
+    });
+  });
+
+  describe('taskEnd event handling', () => {
+    it('should append taskEnd event to node.events array', () => {
+      const rootId = 'root';
+      const root = createMockNode(rootId, null);
+
+      const taskEndEvent: WorkflowEvent = {
+        type: 'taskEnd',
+        node: root,
+        task: 'cleanup'
+      };
+
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        taskEndEvent
+      ];
+
+      const tree = replayer.replay(events);
+
+      expect(tree.events).toHaveLength(1);
+      expect(tree.events[0]).toBe(taskEndEvent);
+    });
+
+    it('should log warning for missing node in taskEnd event', () => {
+      const events: WorkflowEvent[] = [
+        {
+          type: 'treeUpdated',
+          root: createMockNode('root', null)
+        },
+        {
+          type: 'taskEnd',
+          node: createMockNode('non-existent', null),
+          task: 'cleanup'
+        }
+      ];
+
+      replayer.replay(events);
+
+      expect(console.warn).toHaveBeenCalledWith(
+        expect.stringContaining('non-existent')
+      );
+    });
+  });
+
+  describe('replay() with state events', () => {
+    it('should replay complete event stream with structural and state events', () => {
+      const rootId = 'root';
+      const childId = 'child';
+      const root = createMockNode(rootId, null);
+      const child = createMockNode(childId, null);
+
+      const stateSnapshot = { count: 42, status: 'running' };
+
+      const events: WorkflowEvent[] = [
+        // Structural events
+        {
+          type: 'treeUpdated',
+          root: root
+        },
+        {
+          type: 'childAttached',
+          parentId: rootId,
+          child: child
+        },
+        // State events
+        {
+          type: 'stateSnapshot',
+          node: { ...root, stateSnapshot }
+        },
+        {
+          type: 'error',
+          node: child,
+          error: {
+            message: 'Test error',
+            original: null,
+            workflowId: childId,
+            state: {},
+            logs: []
+          }
+        },
+        {
+          type: 'stepStart',
+          node: child,
+          step: 'processData'
+        },
+        {
+          type: 'stepEnd',
+          node: child,
+          step: 'processData',
+          duration: 1200
+        },
+        {
+          type: 'taskStart',
+          node: root,
+          task: 'cleanup'
+        },
+        {
+          type: 'taskEnd',
+          node: root,
+          task: 'cleanup'
+        }
+      ];
+
+      const tree = replayer.replay(events);
+
+      // Verify tree structure
+      expect(tree.children).toHaveLength(1);
+      expect(tree.children[0].id).toBe(childId);
+
+      // Verify state snapshot
+      expect(tree.stateSnapshot).toEqual(stateSnapshot);
+
+      // Verify error accumulated
+      const childNode = tree.children[0];
+      const errorEvents = childNode.events.filter(e => e.type === 'error');
+      expect(errorEvents).toHaveLength(1);
+
+      // Verify step events tracked
+      const stepStartEvents = childNode.events.filter(e => e.type === 'stepStart');
+      const stepEndEvents = childNode.events.filter(e => e.type === 'stepEnd');
+      expect(stepStartEvents).toHaveLength(1);
+      expect(stepEndEvents).toHaveLength(1);
+      if (stepEndEvents[0].type === 'stepEnd') {
+        expect(stepEndEvents[0].duration).toBe(1200);
+      }
+
+      // Verify task events tracked
+      const taskStartEvents = tree.events.filter(e => e.type === 'taskStart');
+      const taskEndEvents = tree.events.filter(e => e.type === 'taskEnd');
+      expect(taskStartEvents).toHaveLength(1);
+      expect(taskEndEvents).toHaveLength(1);
+    });
+  });
 });
 
 /**

@@ -49,14 +49,18 @@ export class WorkflowEventReplayer {
    * - Logs errors and continues processing on failure
    * - Throws only if root cannot be established
    *
-   * **Phase 1 - Structural Events** (this PRp):
+   * **Phase 1 - Structural Events** (implemented in P2.M1.T1.S2):
    * - `childAttached`: Add new child node to parent's children array
    * - `childDetached`: Remove child and all descendants from tree
    * - `treeUpdated`: Update root reference to new tree
    *
-   * **Phase 2 - State Events** (future PRP P2.M1.T1.S3):
+   * **Phase 2 - State Events** (implemented in P2.M1.T1.S3):
    * - `stateSnapshot`: Update node's stateSnapshot field
    * - `error`: Record error information on node
+   * - `stepStart`: Track step execution start
+   * - `stepEnd`: Track step execution completion with duration
+   * - `taskStart`: Track task execution start
+   * - `taskEnd`: Track task execution completion
    *
    * **Phase 3 - Metadata Events** (logged but don't modify tree):
    * - `agentPromptStart/End`, `toolInvocation`, `mcpEvent`, etc.
@@ -92,6 +96,7 @@ export class WorkflowEventReplayer {
     for (const event of events) {
       try {
         switch (event.type) {
+          // Structural events (P2.M1.T1.S2)
           case 'childAttached':
             this.handleChildAttached(event);
             break;
@@ -104,8 +109,33 @@ export class WorkflowEventReplayer {
             this.handleTreeUpdated(event);
             break;
 
+          // State events (P2.M1.T1.S3)
+          case 'stateSnapshot':
+            this.handleStateSnapshot(event);
+            break;
+
+          case 'error':
+            this.handleErrorEvent(event);
+            break;
+
+          case 'stepStart':
+            this.handleStepStart(event);
+            break;
+
+          case 'stepEnd':
+            this.handleStepEnd(event);
+            break;
+
+          case 'taskStart':
+            this.handleTaskStart(event);
+            break;
+
+          case 'taskEnd':
+            this.handleTaskEnd(event);
+            break;
+
           default:
-            // Non-structural events - skip for now (handled in P2.M1.T1.S3)
+            // Other metadata events - skip for now
             break;
         }
       } catch (error) {
@@ -293,25 +323,48 @@ export class WorkflowEventReplayer {
    *
    * **Strategy:**
    * 1. Find node via nodeMap.get(event.node.id)
-   * 2. Update node.stateSnapshot = event.node.stateSnapshot
+   * 2. Extract event.node.stateSnapshot (not the entire node!)
+   * 3. Assign to node.stateSnapshot (direct assignment, last write wins)
    *
    * **Invariants:**
    * - Node must exist in nodeMap
    * - stateSnapshot can be null (no snapshot captured)
    *
+   * **Error Handling:**
+   * - Logs warning if node not found (graceful degradation)
+   * - Does not throw for missing nodes
+   *
+   * **Null Handling:**
+   * - Allows null stateSnapshot values (valid state)
+   * - Don't throw error for null snapshots
+   *
+   * **Gotcha:** Event contains full node, but we only extract stateSnapshot field
+   * to avoid circular reference issues.
+   *
    * @param event - StateSnapshotEvent with updated node
-   * @throws {Error} If node not found in nodeMap
    *
    * @example
    * ```typescript
    * // Event structure
    * { type: 'stateSnapshot', node: { id: 'workflow-123', stateSnapshot: { count: 42 }, ... } }
-   * // Result: node.stateSnapshot is updated with new snapshot
+   * // Result: node.stateSnapshot = { count: 42 }
    * ```
    */
   private handleStateSnapshot(event: Extract<WorkflowEvent, { type: 'stateSnapshot' }>): void {
-    // Implementation in P2.M1.T1.S3
-    throw new Error('Not implemented: stateSnapshot handler');
+    // Find node in map
+    const node = this.nodeMap.get(event.node.id);
+    if (!node) {
+      // Graceful degradation - log warning and continue
+      console.warn(
+        `Node '${event.node.id}' not found in nodeMap during stateSnapshot event. ` +
+        `This may indicate out-of-order events or missing structural events.`
+      );
+      return;
+    }
+
+    // Extract just the snapshot data, not the entire node
+    // Gotcha: event.node contains full node, but we only need stateSnapshot
+    node.stateSnapshot = event.node.stateSnapshot;
   }
 
   /**
@@ -319,27 +372,231 @@ export class WorkflowEventReplayer {
    *
    * **Strategy:**
    * 1. Find node via nodeMap.get(event.node.id)
-   * 2. Append event.error to node's error collection
-   *    (Implementation note: WorkflowNode doesn't have errors[] field,
-   *     so this may require adding the field or storing errors in events array)
+   * 2. Append event to node.events array (accumulation pattern)
    *
    * **Invariants:**
    * - Node must exist in nodeMap
    * - Error includes rich context (state, logs, stack)
    *
+   * **Error Handling:**
+   * - Logs warning if node not found (graceful degradation)
+   * - Does not throw for missing nodes
+   *
+   * **Accumulation Pattern:**
+   * - Multiple errors are accumulated (not overwritten)
+   * - All errors preserved in node.events[] array
+   * - To find all errors: node.events.filter(e => e.type === 'error')
+   *
+   * **Gotcha:** WorkflowNode has no dedicated errors[] field.
+   * All errors are stored in the events[] array.
+   *
    * @param event - ErrorEvent with error details
-   * @throws {Error} If node not found in nodeMap
    *
    * @example
    * ```typescript
    * // Event structure
    * { type: 'error', node: {...}, error: { message: 'Failed', state: {...}, logs: [...] } }
-   * // Result: Error is recorded for debugging
+   * // Result: Error event appended to node.events[]
    * ```
    */
   private handleErrorEvent(event: Extract<WorkflowEvent, { type: 'error' }>): void {
-    // Implementation in P2.M1.T1.S3
-    throw new Error('Not implemented: error handler');
+    // Find node in map
+    const node = this.nodeMap.get(event.node.id);
+    if (!node) {
+      // Graceful degradation - log warning and continue
+      console.warn(
+        `Node '${event.node.id}' not found in nodeMap during error event. ` +
+        `This may indicate out-of-order events or missing structural events.`
+      );
+      return;
+    }
+
+    // Accumulate error in events array (append-only pattern)
+    // Gotcha: No dedicated errors[] field - use node.events[]
+    node.events.push(event);
+  }
+
+  /**
+   * Handle stepStart event - track step execution start.
+   *
+   * **Strategy:**
+   * 1. Find node via nodeMap.get(event.node.id)
+   * 2. Append event to node.events array for tracking
+   *
+   * **Invariants:**
+   * - Step nodes are created via @Step decorator
+   * - Step node may not exist yet if childAttached event hasn't been processed
+   *
+   * **Error Handling:**
+   * - Returns silently if step node not found (childAttached will add it later)
+   * - Does not log warning (step nodes are expected to be added separately)
+   *
+   * **Use Case:**
+   * - Tracks step execution for debugging and performance analysis
+   * - Metadata only - doesn't modify tree structure
+   *
+   * @param event - StepStartEvent with step name
+   *
+   * @example
+   * ```typescript
+   * // Event structure
+   * { type: 'stepStart', node: { id: 'step-123', ... }, step: 'processData' }
+   * // Result: Event appended to node.events[]
+   * ```
+   */
+  private handleStepStart(event: Extract<WorkflowEvent, { type: 'stepStart' }>): void {
+    // Find node in map
+    const node = this.nodeMap.get(event.node.id);
+    if (!node) {
+      // Step node may not exist yet - childAttached will add it later
+      // Don't log warning (expected for step nodes)
+      return;
+    }
+
+    // Track step start in events array
+    node.events.push(event);
+  }
+
+  /**
+   * Handle stepEnd event - track step execution completion with duration.
+   *
+   * **Strategy:**
+   * 1. Find node via nodeMap.get(event.node.id)
+   * 2. Append event to node.events array for tracking
+   * 3. Duration info is in event.duration field
+   *
+   * **Invariants:**
+   * - Step nodes are created via @Step decorator
+   * - Step node may not exist yet if childAttached event hasn't been processed
+   *
+   * **Error Handling:**
+   * - Returns silently if step node not found (childAttached will add it later)
+   * - Does not log warning (step nodes are expected to be added separately)
+   *
+   * **Use Case:**
+   * - Tracks step execution time for performance analysis
+   * - Metadata only - doesn't modify tree structure
+   *
+   * **Timing Info:**
+   * - Duration is in milliseconds
+   * - Access via event.duration field
+   *
+   * @param event - StepEndEvent with step name and duration
+   *
+   * @example
+   * ```typescript
+   * // Event structure
+   * { type: 'stepEnd', node: { id: 'step-123', ... }, step: 'processData', duration: 1500 }
+   * // Result: Event appended to node.events[], duration accessible
+   * ```
+   */
+  private handleStepEnd(event: Extract<WorkflowEvent, { type: 'stepEnd' }>): void {
+    // Find node in map
+    const node = this.nodeMap.get(event.node.id);
+    if (!node) {
+      // Step node may not exist yet - childAttached will add it later
+      // Don't log warning (expected for step nodes)
+      return;
+    }
+
+    // Track step end with duration in events array
+    node.events.push(event);
+  }
+
+  /**
+   * Handle taskStart event - track task execution start.
+   *
+   * **Strategy:**
+   * 1. Find node via nodeMap.get(event.node.id)
+   * 2. Append event to node.events array for tracking
+   *
+   * **Invariants:**
+   * - Task events reference parent node (not a separate task node)
+   * - Parent node should exist in nodeMap
+   *
+   * **Error Handling:**
+   * - Logs warning if node not found (graceful degradation)
+   * - Does not throw for missing nodes
+   *
+   * **Use Case:**
+   * - Tracks task execution for debugging
+   * - Metadata only - doesn't modify tree structure
+   *
+   * **Difference from Steps:**
+   * - Tasks don't create separate nodes
+   * - Task events reference parent node
+   * - No duration tracking in task events
+   *
+   * @param event - TaskStartEvent with task name
+   *
+   * @example
+   * ```typescript
+   * // Event structure
+   * { type: 'taskStart', node: { id: 'workflow-123', ... }, task: 'cleanup' }
+   * // Result: Event appended to node.events[]
+   * ```
+   */
+  private handleTaskStart(event: Extract<WorkflowEvent, { type: 'taskStart' }>): void {
+    // Find node in map
+    const node = this.nodeMap.get(event.node.id);
+    if (!node) {
+      // Graceful degradation - log warning and continue
+      console.warn(
+        `Node '${event.node.id}' not found in nodeMap during taskStart event. ` +
+        `This may indicate out-of-order events or missing structural events.`
+      );
+      return;
+    }
+
+    // Track task start in events array
+    node.events.push(event);
+  }
+
+  /**
+   * Handle taskEnd event - track task execution completion.
+   *
+   * **Strategy:**
+   * 1. Find node via nodeMap.get(event.node.id)
+   * 2. Append event to node.events array for tracking
+   *
+   * **Invariants:**
+   * - Task events reference parent node (not a separate task node)
+   * - Parent node should exist in nodeMap
+   *
+   * **Error Handling:**
+   * - Logs warning if node not found (graceful degradation)
+   * - Does not throw for missing nodes
+   *
+   * **Use Case:**
+   * - Tracks task execution for debugging
+   * - Metadata only - doesn't modify tree structure
+   *
+   * **Gotcha:** taskEnd event does NOT have a duration field (unlike stepEnd)
+   *
+   * @param event - TaskEndEvent with task name
+   *
+   * @example
+   * ```typescript
+   * // Event structure
+   * { type: 'taskEnd', node: { id: 'workflow-123', ... }, task: 'cleanup' }
+   * // Result: Event appended to node.events[]
+   * ```
+   */
+  private handleTaskEnd(event: Extract<WorkflowEvent, { type: 'taskEnd' }>): void {
+    // Find node in map
+    const node = this.nodeMap.get(event.node.id);
+    if (!node) {
+      // Graceful degradation - log warning and continue
+      console.warn(
+        `Node '${event.node.id}' not found in nodeMap during taskEnd event. ` +
+        `This may indicate out-of-order events or missing structural events.`
+      );
+      return;
+    }
+
+    // Track task end in events array
+    // Gotcha: No duration field in taskEnd event
+    node.events.push(event);
   }
 
   /**
