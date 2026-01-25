@@ -43,44 +43,33 @@ export class WorkflowEventReplayer {
   /**
    * Replay a sequence of workflow events to reconstruct the workflow tree.
    *
-   * Processes events chronologically to build an in-memory representation
-   * of the workflow tree at the point of the last event.
+   * **Event Processing Strategy:**
+   * - Processes events sequentially in order
+   * - Uses try-catch per event to isolate errors
+   * - Logs errors and continues processing on failure
+   * - Throws only if root cannot be established
    *
-   * **Event Handling Strategy:**
-   *
-   * **Phase 1 - Structural Events** (modify tree structure):
+   * **Phase 1 - Structural Events** (this PRp):
    * - `childAttached`: Add new child node to parent's children array
    * - `childDetached`: Remove child and all descendants from tree
    * - `treeUpdated`: Update root reference to new tree
    *
-   * **Phase 1 - State Events** (update node properties):
+   * **Phase 2 - State Events** (future PRP P2.M1.T1.S3):
    * - `stateSnapshot`: Update node's stateSnapshot field
-   * - `error`: Add error information to node
+   * - `error`: Record error information on node
    *
-   * **Phase 2 - Metadata Events** (logged but don't modify tree):
-   * - `agentPromptStart/End`: Track agent prompt lifecycle
-   * - `toolInvocation`: Track tool executions
-   * - `mcpEvent`: Track MCP server events
-   * - `reflectionStart/End`: Track reflection operations
-   * - `cacheHit/Miss`: Track cache operations
-   * - `taskStart/End`: Track task execution
-   * - `stepStart/End`: Track step execution
+   * **Phase 3 - Metadata Events** (logged but don't modify tree):
+   * - `agentPromptStart/End`, `toolInvocation`, `mcpEvent`, etc.
    *
    * **Tree Invariants Maintained:**
    * - Single-parent rule: Each node has at most one parent
    * - Bidirectional references: parent.children and child.parent are consistent
    * - No circular references: Tree is a Directed Acyclic Graph (DAG)
    *
-   * **Performance:**
-   * - Uses Map<string, WorkflowNode> for O(1) node lookups
-   * - Processes events sequentially (O(n) where n = event count)
-   * - Incremental tree updates (O(k) for subtree operations)
-   *
    * @param events - Array of workflow events in chronological order
    * @returns Root node of the reconstructed workflow tree
    * @throws {Error} If events array is empty
    * @throws {Error} If root cannot be established from events
-   * @throws {Error} If event references missing parent node
    *
    * @example
    * ```typescript
@@ -90,8 +79,47 @@ export class WorkflowEventReplayer {
    * ```
    */
   replay(events: WorkflowEvent[]): WorkflowNode {
-    // Phase 1: Return stub (implementation in P2.M1.T1.S2)
-    throw new Error('Not implemented: Event replay logic will be added in P2.M1.T1.S2');
+    // Validate input
+    if (!events || events.length === 0) {
+      throw new Error('Events array is empty or null');
+    }
+
+    // Initialize state
+    this.nodeMap.clear();
+    this.root = null;
+
+    // Process events sequentially
+    for (const event of events) {
+      try {
+        switch (event.type) {
+          case 'childAttached':
+            this.handleChildAttached(event);
+            break;
+
+          case 'childDetached':
+            this.handleChildDetached(event);
+            break;
+
+          case 'treeUpdated':
+            this.handleTreeUpdated(event);
+            break;
+
+          default:
+            // Non-structural events - skip for now (handled in P2.M1.T1.S3)
+            break;
+        }
+      } catch (error) {
+        // Log error but continue processing subsequent events
+        console.error(`Error processing event type '${event.type}':`, error);
+      }
+    }
+
+    // Verify root was established
+    if (!this.root) {
+      throw new Error('No root node established from event stream');
+    }
+
+    return this.root;
   }
 
   /**
@@ -100,14 +128,19 @@ export class WorkflowEventReplayer {
    * **Strategy:**
    * 1. Deep clone event.child to avoid mutating original
    * 2. Find parent node via nodeMap.get(event.parentId)
-   * 3. Set child.parent = parent
-   * 4. Add child to parent.children array
-   * 5. Add child and all descendants to nodeMap via buildNodeMap()
+   * 3. Validate: parent exists, single-parent rule, no circular references
+   * 4. Set child.parent = parent
+   * 5. Add child to parent.children array
+   * 6. Add child and all descendants to nodeMap via buildNodeMap()
+   * 7. Establish root if this is the first attachment
    *
    * **Invariants:**
    * - Parent must exist in nodeMap (throw if not)
    * - Child must not already have a different parent (single-parent rule)
    * - No circular references (child must not be ancestor of parent)
+   * - Bidirectional links: child.parent = parent AND parent.children includes child
+   *
+   * **Deep Cloning:** Uses structuredClone() for safe deep copy
    *
    * @param event - ChildAttachedEvent with parentId and child node
    * @throws {Error} If parent node not found
@@ -122,8 +155,40 @@ export class WorkflowEventReplayer {
    * ```
    */
   private handleChildAttached(event: Extract<WorkflowEvent, { type: 'childAttached' }>): void {
-    // Implementation in P2.M1.T1.S2
-    throw new Error('Not implemented: childAttached handler');
+    // Deep clone child to prevent mutation of event data
+    const child = structuredClone(event.child);
+
+    // Find parent
+    const parent = this.nodeMap.get(event.parentId);
+    if (!parent) {
+      throw new Error(`Parent node '${event.parentId}' not found in nodeMap during childAttached event`);
+    }
+
+    // Validation 1: Check if child already has a different parent (single-parent rule)
+    if (child.parent !== null && child.parent !== parent) {
+      throw new Error(
+        `Child '${child.name}' already has a parent. A node can only have one parent.`
+      );
+    }
+
+    // Validation 2: Check for circular references
+    if (this.isNodeDescendantOf(parent, child)) {
+      throw new Error(
+        `Cannot attach '${child.name}' as child of '${parent.name}' - would create circular reference`
+      );
+    }
+
+    // Set bidirectional parent-child links
+    child.parent = parent;
+    parent.children.push(child);
+
+    // Add child and all descendants to nodeMap
+    this.buildNodeMap(child);
+
+    // Establish root if this is the first attachment and parent has no parent
+    if (this.root === null && parent.parent === null) {
+      this.root = parent;
+    }
   }
 
   /**
@@ -132,20 +197,20 @@ export class WorkflowEventReplayer {
    * **Strategy:**
    * 1. Find child node via nodeMap.get(event.childId)
    * 2. Find parent node via nodeMap.get(event.parentId)
-   * 3. Remove child from parent.children array
-   * 4. Remove child and all descendants from nodeMap via removeSubtreeNodes()
+   * 3. Validate: parent and child exist, child is direct child of parent
+   * 4. Remove child from parent.children array
    * 5. Clear child.parent reference
+   * 6. Remove child and all descendants from nodeMap via removeSubtreeNodes()
    *
    * **Invariants:**
    * - Both parent and child must exist in nodeMap
    * - Child must be a direct child of parent (not just any descendant)
    *
-   * **Performance:**
-   * - O(k) where k = number of nodes in subtree (BFS traversal)
+   * **Error Handling:**
+   * - Logs warning and returns early if parent or child not found
+   * - Does not throw for missing nodes (replay continues)
    *
    * @param event - ChildDetachedEvent with parentId and childId
-   * @throws {Error} If parent or child node not found
-   * @throws {Error} If child is not a direct child of parent
    *
    * @example
    * ```typescript
@@ -155,8 +220,37 @@ export class WorkflowEventReplayer {
    * ```
    */
   private handleChildDetached(event: Extract<WorkflowEvent, { type: 'childDetached' }>): void {
-    // Implementation in P2.M1.T1.S2
-    throw new Error('Not implemented: childDetached handler');
+    // Find parent and child
+    const parent = this.nodeMap.get(event.parentId);
+    const child = this.nodeMap.get(event.childId);
+
+    if (!parent) {
+      console.warn(`Parent node '${event.parentId}' not found in nodeMap during childDetached event`);
+      return;
+    }
+
+    if (!child) {
+      console.warn(`Child node '${event.childId}' not found in nodeMap during childDetached event`);
+      return;
+    }
+
+    // Validate child is direct child of parent
+    const index = parent.children.indexOf(child);
+    if (index === -1) {
+      console.warn(
+        `Child '${child.name}' is not a direct child of parent '${parent.name}' during childDetached event`
+      );
+      return;
+    }
+
+    // Remove from parent's children array
+    parent.children.splice(index, 1);
+
+    // Clear child's parent reference
+    child.parent = null;
+
+    // Remove child and all descendants from nodeMap
+    this.removeSubtreeNodes(event.childId);
   }
 
   /**
@@ -165,7 +259,8 @@ export class WorkflowEventReplayer {
    * **Strategy:**
    * 1. Verify event.root is a valid WorkflowNode
    * 2. Update this.root = event.root
-   * 3. Rebuild nodeMap from new root via buildNodeMap()
+   * 3. Clear nodeMap
+   * 4. Rebuild nodeMap from new root via buildNodeMap()
    *
    * **Use Case:**
    * - Represents a complete tree replacement (not incremental update)
@@ -182,8 +277,15 @@ export class WorkflowEventReplayer {
    * ```
    */
   private handleTreeUpdated(event: Extract<WorkflowEvent, { type: 'treeUpdated' }>): void {
-    // Implementation in P2.M1.T1.S2
-    throw new Error('Not implemented: treeUpdated handler');
+    if (!event.root) {
+      throw new Error('treeUpdated event has null or undefined root');
+    }
+
+    this.root = event.root;
+
+    // Clear and rebuild nodeMap from new root
+    this.nodeMap.clear();
+    this.buildNodeMap(event.root);
   }
 
   /**
@@ -260,8 +362,10 @@ export class WorkflowEventReplayer {
    * ```
    */
   private buildNodeMap(node: WorkflowNode): void {
-    // Implementation in P2.M1.T1.S2
-    throw new Error('Not implemented: buildNodeMap');
+    this.nodeMap.set(node.id, node);
+    for (const child of node.children) {
+      this.buildNodeMap(child);
+    }
   }
 
   /**
@@ -284,7 +388,69 @@ export class WorkflowEventReplayer {
    * ```
    */
   private removeSubtreeNodes(nodeId: string): void {
-    // Implementation in P2.M1.T1.S2
-    throw new Error('Not implemented: removeSubtreeNodes');
+    const node = this.nodeMap.get(nodeId);
+    if (!node) return;  // Already removed or never existed
+
+    // BFS traversal to collect all descendant IDs
+    const toRemove: string[] = [];
+    const queue: WorkflowNode[] = [node];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      toRemove.push(current.id);
+      // Add children to queue for BFS traversal
+      queue.push(...current.children);
+    }
+
+    // Batch delete all collected keys (atomic update)
+    for (const id of toRemove) {
+      this.nodeMap.delete(id);
+    }
+  }
+
+  /**
+   * Check if node is descendant of potential ancestor.
+   * Uses cycle detection to prevent infinite loops during traversal.
+   *
+   * **Strategy:**
+   * - Traverse parent chain upward from node
+   * - Track visited nodes to detect cycles
+   * - Return true if ancestor found in parent chain
+   *
+   * **Complexity:** O(d) where d = depth of hierarchy
+   *
+   * @param node - Node to start traversal from
+   * @param potentialAncestor - Potential ancestor to search for
+   * @returns true if ancestor found in parent chain
+   * @throws {Error} If circular reference detected
+   *
+   * @example
+   * ```typescript
+   * // Check if attaching would create cycle
+   * if (this.isNodeDescendantOf(parent, child)) {
+   *   throw new Error('Would create circular reference');
+   * }
+   * ```
+   */
+  private isNodeDescendantOf(node: WorkflowNode, potentialAncestor: WorkflowNode): boolean {
+    const visited = new Set<WorkflowNode>();
+    let current: WorkflowNode | null = node.parent;
+
+    while (current !== null) {
+      // Cycle detection
+      if (visited.has(current)) {
+        throw new Error('Circular parent-child relationship detected');
+      }
+      visited.add(current);
+
+      // Check if we found the ancestor
+      if (current === potentialAncestor) {
+        return true;
+      }
+
+      current = current.parent;
+    }
+
+    return false;
   }
 }

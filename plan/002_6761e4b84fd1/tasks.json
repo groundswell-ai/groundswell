@@ -370,7 +370,7 @@
               "type": "Task",
               "id": "P2.M1.T1",
               "title": "Design WorkflowEventReplayer class",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Create class that can rebuild WorkflowNode tree from event history",
               "subtasks": [
                 {
@@ -386,7 +386,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S2",
                   "title": "Implement replay logic for tree structure events",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T1.S1"
@@ -397,7 +397,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S3",
                   "title": "Implement replay logic for node state events",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T1.S2"
