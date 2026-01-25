@@ -363,7 +363,7 @@
           "type": "Milestone",
           "id": "P2.M1",
           "title": "Milestone 2.1: Event Replay System",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Implement time-travel debugging by replaying event streams to reconstruct workflow tree state",
           "tasks": [
             {
@@ -410,7 +410,7 @@
               "type": "Task",
               "id": "P2.M1.T2",
               "title": "Add event persistence and replay API",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Enable saving event streams to disk and loading them for replay",
               "subtasks": [
                 {
@@ -428,7 +428,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T2.S2",
                   "title": "Integrate WorkflowEventReplayer with debugger",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T2.S1"
@@ -457,7 +457,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S1",
                   "title": "Research Ink library and create hello-world prototype",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per plan/002_6761e4b84fd1/architecture/OBSERVABILITY_PATTERNS_RESEARCH.md, Ink is React for CLI. Current ASCII rendering in toTreeString() works but lacks interactivity.\n2. INPUT: Ink documentation (https://ink.think.io/). Current WorkflowTreeDebugger.\n3. LOGIC: Install Ink: npm install ink. Create examples/ink-debugger-hello.tsx. Build simple component: <Box><Text>Hello Workflow</Text></Box>. Test with tsx. Verify Ink works with Node.js >=18.\n4. OUTPUT: Working Ink prototype and evaluation notes on performance, bundle size, compatibility."

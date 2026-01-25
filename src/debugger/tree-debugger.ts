@@ -7,6 +7,7 @@ import type {
 import { Observable } from '../utils/observable.js';
 import type { Workflow } from '../core/workflow.js';
 import { writeFile, readFile } from 'fs/promises';
+import { WorkflowEventReplayer } from './event-replayer.js';
 
 /**
  * Status symbols for tree visualization
@@ -673,6 +674,67 @@ export class WorkflowTreeDebugger implements WorkflowObserver {
       // Re-throw with context
       throw new Error(
         `Failed to load event history from ${path}: ${err.message}`
+      );
+    }
+  }
+
+  /**
+   * Replay workflow execution from saved event history file.
+   *
+   * This is a convenience method that combines loadEventHistory and
+   * WorkflowEventReplayer.replay() for one-call restoration of workflow trees.
+   *
+   * **Use Case**: Time-travel debugging - reconstruct workflow tree from saved events
+   * to inspect execution after completion without requiring the live workflow instance.
+   *
+   * **Workflow**:
+   * 1. Load events from file using loadEventHistory()
+   * 2. Create WorkflowEventReplayer instance
+   * 3. Replay events and return reconstructed tree
+   *
+   * **Error Handling**:
+   * - Throws descriptive errors for file operations (delegated to loadEventHistory)
+   * - Wraps replay errors with file path context
+   *
+   * **Returns**: Read-only WorkflowNode tree (no live workflow attached)
+   *
+   * @param path - File path to saved event history JSON file
+   * @returns Reconstructed workflow tree root node
+   * @throws {Error} If file cannot be read or parsed
+   * @throws {Error} If events cannot be replayed (empty events, no root established)
+   *
+   * @example
+   * ```typescript
+   * // Save event history during execution
+   * const debugger = new WorkflowTreeDebugger(workflow, { persistEvents: true });
+   * await workflow.run();
+   * await debugger.saveEventHistory('./workflow-events.json');
+   *
+   * // Later, replay the events to reconstruct the tree
+   * const tree = await WorkflowTreeDebugger.replay('./workflow-events.json');
+   * console.log(`Restored tree with ${tree.children.length} children`);
+   *
+   * // Use debugger instance to inspect the reconstructed tree
+   * const debugInstance = new WorkflowTreeDebugger({ getNode: () => tree });
+   * console.log(debugInstance.toTreeString(tree));
+   * console.log(debugInstance.getStats());
+   * ```
+   */
+  static async replay(path: string): Promise<WorkflowNode> {
+    // Load events from file using existing static method
+    const events = await WorkflowTreeDebugger.loadEventHistory(path);
+
+    // Create replayer instance
+    const replayer = new WorkflowEventReplayer();
+
+    // Replay events with type assertion (loadEventHistory returns unknown[])
+    // GOTCHA: Wrap in try-catch to enhance error messages with file path context
+    try {
+      return replayer.replay(events as WorkflowEvent[]);
+    } catch (error) {
+      const err = error as Error;
+      throw new Error(
+        `Failed to replay events from ${path}: ${err.message}`
       );
     }
   }
