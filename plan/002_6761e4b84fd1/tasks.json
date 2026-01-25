@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Phase 1: Agent Response Standardization",
-      "status": "Researching",
+      "status": "Complete",
       "description": "Implement PRD requirement: 'All agent responses MUST be valid JSON' conforming to the AgentResponse interface. This is the ONLY critical gap identified in the PRD analysis.",
       "milestones": [
         {
@@ -267,7 +267,7 @@
           "type": "Milestone",
           "id": "P1.M4",
           "title": "Milestone 1.4: Build Verification & Release",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Verify build, run all tests, and prepare for release",
           "tasks": [
             {
@@ -332,14 +332,14 @@
               "type": "Task",
               "id": "P1.M4.T3",
               "title": "Verify example scripts run successfully",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Test all example workflows to ensure they work with AgentResponse",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T3.S1",
                   "title": "Run example scripts and verify output",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M4.T2.S1"
@@ -377,7 +377,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S1",
                   "title": "Define replayer interface and event handling strategy",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per plan/002_6761e4b84fd1/architecture/OBSERVABILITY_PATTERNS_RESEARCH.md, event replay enables time-travel debugging. 15+ event types exist in src/types/events.ts.\n2. INPUT: WorkflowEvent type from src/types/events.ts. WorkflowNode structure from src/types/workflow.ts.\n3. LOGIC: Create new file src/debugger/event-replayer.ts. Define class WorkflowEventReplayer with method replay(events: WorkflowEvent[]): WorkflowNode. Strategy: Iterate events chronologically, mutate in-memory tree. Handle childAttached (attach node), childDetached (remove subtree), stateSnapshot (update node), error (add to node.errors). Use Map<string, WorkflowNode> for O(1) lookups.\n4. OUTPUT: WorkflowEventReplayer class skeleton with replay() method signature and documentation of event handling strategy."
