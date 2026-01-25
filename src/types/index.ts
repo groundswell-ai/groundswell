@@ -23,6 +23,9 @@ export type {
   TokenUsage,
 } from './sdk-primitives.js';
 
+// Provider types
+export type { ProviderId, ProviderCapabilities } from './providers.js';
+
 // Agent types
 export type {
   AgentConfig,

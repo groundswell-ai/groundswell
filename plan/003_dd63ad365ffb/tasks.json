@@ -25,7 +25,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S1",
                   "title": "Define ProviderId type and ProviderCapabilities interface",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From external_dependencies.md - ProviderId should be 'anthropic' | 'opencode'. ProviderCapabilities has boolean flags: mcp, skills, lsp, streaming, sessions, extendedThinking.\n2. INPUT: None - this is foundational type definition.\n3. LOGIC: Create src/types/providers.ts with ProviderId union type and ProviderCapabilities interface matching PRD Section 7.4.\n4. OUTPUT: Export ProviderId and ProviderCapabilities for use in all provider-related code."
@@ -36,7 +36,9 @@
                   "title": "Define ProviderOptions and ProviderRequest interfaces",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S1"],
+                  "dependencies": [
+                    "P1.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From external_dependencies.md - Agent SDK Options includes endpoint, apiKey, sessionId, timeout, headers. ProviderRequest wraps prompt and execution options.\n2. INPUT: ProviderId and ProviderCapabilities from S1.\n3. LOGIC: Implement ProviderOptions interface (endpoint?, apiKey?, sessionId?, timeout?, headers?) and ProviderRequest interface (prompt: string, options: ProviderExecutionOptions). Match PRD Section 7.5.\n4. OUTPUT: Export ProviderOptions and ProviderRequest for use in Provider interface."
                 },
                 {
@@ -45,7 +47,10 @@
                   "title": "Define Provider interface with core methods",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T1.S1", "P1.M1.T1.S2"],
+                  "dependencies": [
+                    "P1.M1.T1.S1",
+                    "P1.M1.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md - Existing Agent class wraps Anthropic SDK. Provider interface must abstract this pattern.\n2. INPUT: ProviderId, ProviderCapabilities, ProviderOptions, ProviderRequest from previous subtasks.\n3. LOGIC: Implement Provider interface per PRD Section 7.3: readonly id, readonly capabilities, initialize(), terminate(), execute<T>(), registerMCPs(), loadSkills(), normalizeModel(). Use generics for type-safe execute().\n4. OUTPUT: Complete Provider interface export. This is the contract all providers must implement."
                 },
                 {
@@ -54,7 +59,9 @@
                   "title": "Define ToolExecutionRequest, ToolExecutionResult, and ProviderHookEvents",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S2"],
+                  "dependencies": [
+                    "P1.M1.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md - Existing MCPHandler.executeTool() pattern uses serverName__toolName format. ToolExecutionRequest/Result abstract this.\n2. INPUT: ProviderOptions from S2.\n3. LOGIC: Implement ToolExecutionRequest (name: string, input: unknown), ToolExecutionResult (content: string|unknown, isError: boolean), and ProviderHookEvents (onToolStart?, onToolEnd?, onSessionStart?, onSessionEnd?, onStream?). Match PRD Sections 7.10-7.11.\n4. OUTPUT: Export all three interfaces for use in provider implementations."
                 },
                 {
@@ -63,7 +70,10 @@
                   "title": "Define ProviderResult, ModelSpec, and GlobalProviderConfig",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S1", "P1.M1.T1.S3"],
+                  "dependencies": [
+                    "P1.M1.T1.S1",
+                    "P1.M1.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.8 - ModelSpec supports provider/model format. GlobalProviderConfig enables cascade configuration.\n2. INPUT: ProviderId from S1, Provider interface from S3.\n3. LOGIC: Implement ProviderResult<T> (status: AgentResponseStatus, data: T|nil, error: AgentErrorDetails|nil, metadata: AgentResponseMetadata), ModelSpec (provider: ProviderId, model: string, raw: string), GlobalProviderConfig (defaultProvider: ProviderId, providerDefaults?: Partial<Record<ProviderId, ProviderOptions>>). Match PRD Sections 6, 7.6-7.8.\n4. OUTPUT: Export ProviderResult, ModelSpec, GlobalProviderConfig. These complete the provider type system."
                 }
               ]
@@ -81,7 +91,9 @@
                   "title": "Implement parseModelSpec() function",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T1.S5"],
+                  "dependencies": [
+                    "P1.M1.T1.S5"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From decisions.md Decision 6 - Model specification parsing follows PRD spec with provider/model format support.\n2. INPUT: model: string from user/agent config, defaultProvider?: ProviderId (default 'anthropic').\n3. LOGIC: Parse model string. If contains '/', split on first '/'. Validate provider is 'anthropic' or 'opencode'. Return ModelSpec {provider, model, raw}. If no '/', use defaultProvider. Throw error on unknown provider.\n4. OUTPUT: ModelSpec object for use in provider initialization and model resolution."
                 },
                 {
@@ -90,7 +102,9 @@
                   "title": "Implement formatModelForProvider() function",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T2.S1"],
+                  "dependencies": [
+                    "P1.M1.T2.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.8 - formatModelForProvider() converts models between providers (if compatible).\n2. INPUT: spec: ModelSpec from parseModelSpec(), targetProvider: ProviderId.\n3. LOGIC: If spec.provider === targetProvider, return spec.model (model name only). If different providers, throw error (cross-provider translation not supported without mapping table). Consider adding model mapping in future if needed.\n4. OUTPUT: Formatted model string for target provider."
                 }
               ]
@@ -117,7 +131,9 @@
                   "title": "Implement global provider configuration storage",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S5"],
+                  "dependencies": [
+                    "P1.M1.T1.S5"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From implementation_patterns.md - Use module-level private variable for global config (not export).\n2. INPUT: GlobalProviderConfig from P1.M1.T1.S5.\n3. LOGIC: Create module-private variable let globalConfig: GlobalProviderConfig | null = null. This stores the singleton global configuration. Initialize with defaultProvider: 'anthropic' if not set.\n4. OUTPUT: Global config storage for configureProviders() to mutate."
                 },
                 {
@@ -126,7 +142,9 @@
                   "title": "Implement configureProviders() function",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M2.T1.S1"],
+                  "dependencies": [
+                    "P1.M2.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.6 - configureProviders() is called once at app startup to set defaults.\n2. INPUT: config: GlobalProviderConfig.\n3. LOGIC: Validate config.defaultProvider is 'anthropic' or 'opencode'. Validate config.providerDefaults keys are valid ProviderIds. Store in globalConfig variable. Throw on invalid provider.\n4. OUTPUT: Sets global configuration. No return value (void)."
                 },
                 {
@@ -135,7 +153,9 @@
                   "title": "Implement getGlobalProviderConfig() accessor",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M2.T1.S2"],
+                  "dependencies": [
+                    "P1.M2.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From implementation_patterns.md - Use accessor function to encapsulate global state.\n2. INPUT: None.\n3. LOGIC: Return globalConfig if set, otherwise return default {defaultProvider: 'anthropic', providerDefaults: {}}. Never returns null.\n4. OUTPUT: GlobalProviderConfig for use by Agent and provider initialization."
                 },
                 {
@@ -144,7 +164,9 @@
                   "title": "Implement resolveProviderConfig() cascade utility",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M2.T1.S3"],
+                  "dependencies": [
+                    "P1.M2.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.7 - Configuration cascade: global → agent → prompt. First defined value wins.\n2. INPUT: globalConfig: GlobalProviderConfig, agentProvider?: ProviderId, agentOptions?: ProviderOptions, promptProvider?: ProviderId, promptOptions?: ProviderOptions.\n3. LOGIC: Resolve provider using promptProvider ?? agentProvider ?? globalConfig.defaultProvider. Resolve options using {...globalConfig.providerDefaults?.[resolvedProvider], ...agentOptions, ...promptOptions}. Use object spread for merge (prompt overrides agent overrides global).\n4. OUTPUT: {provider: ProviderId, options: ProviderOptions} for Agent to use."
                 }
               ]
@@ -171,7 +193,9 @@
                   "title": "Implement ProviderRegistry singleton class structure",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S3"],
+                  "dependencies": [
+                    "P1.M1.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From decisions.md Decision 7 - Use singleton registry pattern with getInstance().\n2. INPUT: Provider interface from P1.M1.T1.S3.\n3. LOGIC: Create class ProviderRegistry with private static instance: ProviderRegistry. Private constructor. Static getInstance() method that creates instance if null, then returns it. Private providers: Map<ProviderId, Provider>. Implement register(provider: Provider), get(id: ProviderId), has(id: ProviderId): boolean.\n4. OUTPUT: ProviderRegistry class for managing provider lifecycle."
                 },
                 {
@@ -180,7 +204,10 @@
                   "title": "Implement provider initialization in registry",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M3.T1.S1", "P1.M2.T1.S3"],
+                  "dependencies": [
+                    "P1.M3.T1.S1",
+                    "P1.M2.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md - Agent currently initializes SDK directly. Registry will centralize this.\n2. INPUT: GlobalProviderConfig from getGlobalProviderConfig().\n3. LOGIC: Add async initializeAll(config: GlobalProviderConfig) method. For each registered provider, get providerOptions from config.providerDefaults?.[providerId]. Call provider.initialize(providerOptions). Track initialization status. Throw if any provider fails to initialize.\n4. OUTPUT: Providers ready for use. Registry returns initialized provider instances."
                 },
                 {
@@ -189,7 +216,9 @@
                   "title": "Implement provider termination and cleanup",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M3.T1.S2"],
+                  "dependencies": [
+                    "P1.M3.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From implementation_patterns.md - Proper cleanup prevents resource leaks.\n2. INPUT: None.\n3. LOGIC: Add async terminateAll() method. For each registered provider, call provider.terminate(). Clear providers map. Handle errors (log but continue terminating others).\n4. OUTPUT: Clean shutdown of all providers."
                 }
               ]
@@ -225,7 +254,9 @@
                   "title": "Implement AnthropicProvider class structure and capabilities",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S3"],
+                  "dependencies": [
+                    "P1.M1.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From external_dependencies.md - Anthropic SDK v0.1.77 installed. Capabilities: mcp=true (via MCPHandler), skills=true (system prompt), lsp=true (MCP plugins), streaming=true, sessions=false (stateless), extendedThinking=true (maxThinkingTokens).\n2. INPUT: Provider interface from P1.M1.T1.S3.\n3. LOGIC: Create class AnthropicProvider implements Provider. Set readonly id = 'anthropic'. Define readonly capabilities: ProviderCapabilities with above values. Add private sdk: typeof import('@anthropic-ai/claude-agent-sdk') for lazy loading.\n4. OUTPUT: AnthropicProvider class matching Provider interface."
                 },
                 {
@@ -234,7 +265,9 @@
                   "title": "Implement initialize() method",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M1.T1.S1"],
+                  "dependencies": [
+                    "P2.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md - Agent class already wraps SDK initialization. AnthropicProvider will extract this pattern.\n2. INPUT: options?: ProviderOptions (apiKey?, endpoint?, timeout?, headers?).\n3. LOGIC: Import @anthropic-ai/claude-agent-sdk dynamically (import()). Store SDK module in private field. If options.apiKey provided, store for SDK calls. If options.endpoint provided, store for custom API endpoint. Set initialized flag. Validate SDK import succeeded.\n4. OUTPUT: Provider ready to execute requests."
                 },
                 {
@@ -243,7 +276,9 @@
                   "title": "Implement terminate() method",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M1.T1.S2"],
+                  "dependencies": [
+                    "P2.M1.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Anthropic SDK doesn't require explicit cleanup (stateless).\n2. INPUT: None.\n3. LOGIC: Clear SDK module reference. Reset initialized flag. No-op for SDK (no connections to close).\n4. OUTPUT: Provider terminated."
                 },
                 {
@@ -252,7 +287,9 @@
                   "title": "Implement normalizeModel() method",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M1.T1.S1"],
+                  "dependencies": [
+                    "P2.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.8 - normalizeModel() converts model string to ModelSpec.\n2. INPUT: model: string.\n3. LOGIC: Delegate to parseModelSpec(model, 'anthropic'). Validate that resulting provider is 'anthropic' or no provider specified (defaults to anthropic). Return ModelSpec.\n4. OUTPUT: ModelSpec with provider='anthropic'."
                 },
                 {
@@ -261,7 +298,10 @@
                   "title": "Implement execute() method - query construction",
                   "status": "Planned",
                   "story_points": 3,
-                  "dependencies": ["P2.M1.T1.S2", "P1.M1.T1.S4"],
+                  "dependencies": [
+                    "P2.M1.T1.S2",
+                    "P1.M1.T1.S4"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md /src/core/agent.ts - Existing query pattern: query({prompt, options: {model, systemPrompt, mcpServers, hooks, outputFormat}}). Iterate messages, collect result.\n2. INPUT: request: ProviderRequest (prompt, model, systemPrompt?, tools?, hooks?), toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>, hooks?: ProviderHookEvents.\n3. LOGIC: Construct SDK Options object. Map model to request.model. Map systemPrompt. Map tools to allowedTools array. Convert MCPHandler servers to mcpServers format using createSdkMcpServer. Convert ProviderHookEvents to SDK hooks format. Call query({prompt: request.prompt, options: sdkOptions}). Return AsyncGenerator.\n4. OUTPUT: ProviderResult<T> with status, data, error, metadata."
                 },
                 {
@@ -270,7 +310,9 @@
                   "title": "Implement execute() method - message iteration",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M1.T1.S5"],
+                  "dependencies": [
+                    "P2.M1.T1.S5"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From external_dependencies.md - Query is AsyncGenerator<SDKMessage>. Must iterate to collect result. Track tool calls via PreToolUse/PostToolUse hooks.\n2. INPUT: Query async generator from S5.\n3. LOGIC: For await (message of query). If message.type === 'assistant', count tool uses. If message.type === 'result', capture resultMessage with structured_output, usage, duration_ms. Extract status from message.subtype ('success' => 'success', 'error_*' => 'error'). Build AgentResponse from result.\n4. OUTPUT: ProviderResult with AgentResponse format (status, data, error, metadata with duration, usage)."
                 },
                 {
@@ -279,7 +321,9 @@
                   "title": "Implement registerMCPs() method",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M1.T1.S1"],
+                  "dependencies": [
+                    "P2.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md - MCPHandler.toAgentSDKServer() converts to SDK format. Provider needs Tool[] array.\n2. INPUT: servers: MCPServer[] (from MCPHandler).\n3. LOGIC: Import createSdkMcpServer and tool from SDK. For each MCPServer, convert its Tool[] to SDK tool format. For each tool, call tool(name, description, zodRawShape, handler). Build SDK server config. Store servers for use in execute(). Return converted Tool[] array.\n4. OUTPUT: Tool[] in SDK format for Agent to use."
                 },
                 {
@@ -288,7 +332,9 @@
                   "title": "Implement loadSkills() method",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M1.T1.S1"],
+                  "dependencies": [
+                    "P2.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Anthropic SDK uses system prompt for skills, not native skills API.\n2. INPUT: skills: Skill[].\n3. LOGIC: Convert skills to system prompt format. Store in private skillsPrompt field. Will be injected into systemPrompt during execute(). Anthropic SDK doesn't have native skills like OpenCode.\n4. OUTPUT: Skills loaded (converted to system prompt)."
                 }
               ]
@@ -306,7 +352,9 @@
                   "title": "Implement buildAgentSDKHooks() adapter function",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T1.S4"],
+                  "dependencies": [
+                    "P1.M1.T1.S4"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From external_dependencies.md - Agent SDK hooks use HookEvent ('PreToolUse', 'PostToolUse', etc.) with HookCallback signature. ProviderHookEvents has different signature.\n2. INPUT: hooks?: ProviderHookEvents ({onToolStart?, onToolEnd?, onSessionStart?, onSessionEnd?}).\n3. LOGIC: Create Partial<Record<HookEvent, HookCallbackMatcher[]>> object. Map onToolStart → PreToolUse. Map onToolEnd → PostToolUse. Map onSessionStart → SessionStart. Map onSessionEnd → SessionEnd. Adapt signatures: ProviderHookEvents receives (tool, result?, duration?) while SDK HookCallback receives (input, toolUseID, options). Build adapter wrappers.\n4. OUTPUT: SDK-compatible hooks object for query() options."
                 }
               ]
@@ -333,7 +381,9 @@
                   "title": "Implement session storage in AnthropicProvider",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M1.T1.S2"],
+                  "dependencies": [
+                    "P2.M1.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From decisions.md Decision 2 - Session abstraction provides consistent API across providers. Anthropic SDK uses continue: true for state.\n2. INPUT: None.\n3. LOGIC: Add private sessions: Map<sessionId, SessionState> to AnthropicProvider. SessionState contains history: SDKUserMessage[], lastResult: SDKResultMessage. Implement createSession(sessionId) that creates new session state. Implement getSession(sessionId) that returns state or undefined.\n4. OUTPUT: Session management infrastructure."
                 },
                 {
@@ -342,7 +392,10 @@
                   "title": "Modify execute() to support sessions",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M2.T1.S1", "P2.M1.T1.S6"],
+                  "dependencies": [
+                    "P2.M2.T1.S1",
+                    "P2.M1.T1.S6"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From external_dependencies.md - SDK supports continue: true option to resume session. Session abstraction wraps this.\n2. INPUT: ProviderRequest with optional sessionId.\n3. LOGIC: If request.sessionId provided, get session state. Build streamInput from session history. Call query with options.continue = true and streamInput. After execution, append new user message and assistant response to session history. Return result.\n4. OUTPUT: Session-based execution maintaining conversation history."
                 }
               ]
@@ -387,7 +440,9 @@
                   "title": "Document OpenCode SDK API",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P3.M1.T1.S1"],
+                  "dependencies": [
+                    "P3.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7 - OpenCode supports 75+ providers, native sessions, extended thinking, LSP tool. Need actual API signatures.\n2. INPUT: Package name from S1.\n3. LOGIC: If package found, install locally and inspect TypeScript definitions. Document main exports: execute(), createSession(), model format, tool registration, hooks. Match to Provider interface requirements. If package not found, document alternative SDK choice.\n4. OUTPUT: Complete API documentation in architecture/external_dependencies.md with code examples."
                 },
                 {
@@ -396,7 +451,9 @@
                   "title": "Determine implementation strategy",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M1.T1.S2"],
+                  "dependencies": [
+                    "P3.M1.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From decisions.md Decision 1 - Three options: A) Package exists, implement per docs; B) Private package, contact maintainers; C) Doesn't exist, use alternative.\n2. INPUT: API docs from S2.\n3. LOGIC: If package exists publicly → Strategy A, proceed to P3.M2. If package is private → Strategy B, contact maintainers for access/instructions. If package doesn't exist → Strategy C, choose alternative (LangChain.js recommended) and adjust PRD.\n4. OUTPUT: Document decision in architecture/decisions.md. If Strategy C, create new task branch for alternative SDK integration."
                 }
               ]
@@ -423,7 +480,9 @@
                   "title": "Implement OpenCodeProvider class structure",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M1.T1.S3"],
+                  "dependencies": [
+                    "P3.M1.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.4 - OpenCode capabilities: mcp=true, skills=true, lsp=true, streaming=true, sessions=true (native), extendedThinking=true.\n2. INPUT: Provider interface, verified OpenCode SDK from P3.M1.\n3. LOGIC: Create class OpenCodeProvider implements Provider. Set readonly id = 'opencode'. Define readonly capabilities with all flags true (sessions=true is key difference from Anthropic). Import OpenCode SDK module.\n4. OUTPUT: OpenCodeProvider class matching Provider interface."
                 },
                 {
@@ -432,7 +491,9 @@
                   "title": "Implement initialize() and terminate() methods",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M2.T1.S1"],
+                  "dependencies": [
+                    "P3.M2.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: OpenCode SDK likely has explicit initialization with endpoint/API key configuration.\n2. INPUT: options?: ProviderOptions (endpoint?, apiKey?, sessionId?, timeout?, headers?).\n3. LOGIC: Call OpenCode SDK initialization with provided options. Store SDK instance. Configure default provider if SDK supports it (e.g., 'openai/gpt-4' format). terminate() should close any open sessions/clear state.\n4. OUTPUT: Provider ready for use."
                 },
                 {
@@ -441,7 +502,9 @@
                   "title": "Implement execute() with multi-provider support",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P3.M2.T1.S2"],
+                  "dependencies": [
+                    "P3.M2.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.1 - OpenCode supports 75+ providers via provider/model format (e.g., 'openai/gpt-4', 'ollama/llama3').\n2. INPUT: request: ProviderRequest with model field (may include provider prefix), toolExecutor, hooks.\n3. LOGIC: Parse model using parseModelSpec(). If model has provider prefix (e.g., 'openai/gpt-4'), use that provider. Otherwise use default. Call OpenCode SDK execute() with model and prompt. Delegate tool execution to toolExecutor parameter. Convert ProviderHookEvents to OpenCode hooks format.\n4. OUTPUT: ProviderResult with AgentResponse format."
                 },
                 {
@@ -450,7 +513,9 @@
                   "title": "Implement registerMCPs() and loadSkills() methods",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M2.T1.S2"],
+                  "dependencies": [
+                    "P3.M2.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.4 - OpenCode has native MCP and skills support.\n2. INPUT: servers: MCPServer[] or skills: Skill[].\n3. LOGIC: Convert MCPServer[] to OpenCode MCP format (may differ from Anthropic). Call SDK's MCP registration method. For skills, convert to OpenCode /skills format and load via SDK.\n4. OUTPUT: Tools and skills registered with OpenCode SDK."
                 },
                 {
@@ -459,7 +524,9 @@
                   "title": "Implement normalizeModel() with provider validation",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M2.T1.S2"],
+                  "dependencies": [
+                    "P3.M2.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: OpenCode validates model strings against supported providers.\n2. INPUT: model: string.\n3. LOGIC: Parse model using parseModelSpec(). If provider prefix exists, validate provider is in OpenCode's supported list (75+ providers). If no prefix, treat as default. Return ModelSpec.\n4. OUTPUT: ModelSpec validated for OpenCode."
                 }
               ]
@@ -477,7 +544,9 @@
                   "title": "Implement buildOpenCodeHooks() adapter function",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P3.M2.T1.S2"],
+                  "dependencies": [
+                    "P3.M2.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: OpenCode SDK likely has different hook signature than Anthropic. Need to adapt ProviderHookEvents to OpenCode format.\n2. INPUT: hooks?: ProviderHookEvents.\n3. LOGIC: Inspect OpenCode SDK hook signature. Create adapter that maps onToolStart → OpenCode toolStart hook, onToolEnd → toolEnd, etc. Handle signature differences (parameters, return values). Build OpenCode hooks object.\n4. OUTPUT: OpenCode-compatible hooks for SDK execute() call."
                 }
               ]
@@ -513,7 +582,9 @@
                   "title": "Add provider field to AgentConfig",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S1"],
+                  "dependencies": [
+                    "P1.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.9 - AgentConfig needs provider?: ProviderId and providerOptions?: ProviderOptions fields.\n2. INPUT: AgentConfig interface from /src/types/agent.ts, ProviderId from P1.M1.T1.S1.\n3. LOGIC: Extend AgentConfig interface. Add optional provider?: ProviderId field. Add optional providerOptions?: ProviderOptions field. Add optional model?: string field (supports provider/model format). Add JSDoc comments explaining configuration cascade.\n4. OUTPUT: Updated AgentConfig interface with provider support."
                 },
                 {
@@ -522,7 +593,9 @@
                   "title": "Update Agent constructor to accept provider config",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P4.M1.T1.S1"],
+                  "dependencies": [
+                    "P4.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From /src/core/agent.ts - Agent constructor currently takes name, model?, tools?, hooks?, mcps?, systemPrompt?.\n2. INPUT: AgentConfig with new provider fields.\n3. LOGIC: Update Agent constructor signature to accept full AgentConfig object (or individual params for backward compatibility). Store provider config in private fields. Resolve effective provider using resolveProviderConfig() from P1.M2.T1.S4.\n4. OUTPUT: Agent accepts provider configuration."
                 }
               ]
@@ -549,7 +622,10 @@
                   "title": "Get provider instance in Agent constructor",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P4.M1.T1.S2", "P1.M3.T1.S2"],
+                  "dependencies": [
+                    "P4.M1.T1.S2",
+                    "P1.M3.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From system_context.md - Agent currently uses SDK directly. Need to get provider from registry.\n2. INPUT: Resolved provider from resolveProviderConfig(), ProviderRegistry from P1.M3.\n3. LOGIC: In Agent constructor, call ProviderRegistry.getInstance().get(effectiveProvider). If provider not found, throw error ('Provider not registered'). Store provider instance in private field this.provider.\n4. OUTPUT: Agent has provider reference for execution."
                 },
                 {
@@ -558,7 +634,9 @@
                   "title": "Create tool executor for provider delegation",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P4.M2.T1.S1"],
+                  "dependencies": [
+                    "P4.M2.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.10 - Providers delegate tool execution back to agent via toolExecutor callback.\n2. INPUT: Agent's existing MCPHandler and tool execution logic.\n3. LOGIC: Create async toolExecutor(req: ToolExecutionRequest): Promise<ToolExecutionResult> method in Agent. Parse tool name (serverName__toolName format). Delegate to this.mcpHandler.executeTool(fullName, req.input). Wrap result in ToolExecutionResult format.\n4. OUTPUT: Tool executor function to pass to provider.execute()."
                 },
                 {
@@ -567,7 +645,10 @@
                   "title": "Refactor Agent.prompt() to use provider.execute()",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P4.M2.T1.S2", "P2.M1.T1.S6"],
+                  "dependencies": [
+                    "P4.M2.T1.S2",
+                    "P2.M1.T1.S6"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From /src/core/agent.ts - Agent.prompt() currently calls query() directly. Need to switch to provider.execute().\n2. INPUT: prompt: string, options?: PromptOptions (may override provider/model), toolExecutor from S2.\n3. LOGIC: Build ProviderRequest {prompt, model, systemPrompt, tools, hooks}. Resolve any prompt-level provider overrides using resolveProviderConfig(). Call this.provider.execute(request, this.toolExecutor, hooks). Handle ProviderResult, convert to AgentResponse. Apply caching logic (check LRU cache).\n4. OUTPUT: Agent.prompt() executes via provider abstraction."
                 },
                 {
@@ -576,7 +657,9 @@
                   "title": "Refactor Agent.stream() to use provider streaming",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P4.M2.T1.S3"],
+                  "dependencies": [
+                    "P4.M2.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Agent.stream() returns AsyncStream. Provider may return streaming response differently.\n2. INPUT: prompt, options, toolExecutor.\n3. LOGIC: Build ProviderRequest with streaming flag if supported. Call provider.execute() which may return streaming AsyncGenerator. Wrap in AsyncStream interface. Emit events for each chunk if provider supports.\n4. OUTPUT: Agent.stream() works via provider."
                 }
               ]
@@ -603,7 +686,9 @@
                   "title": "Extend PromptOptions with provider overrides",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P4.M1.T1.S1"],
+                  "dependencies": [
+                    "P4.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.7 - Configuration cascade includes prompt-level overrides.\n2. INPUT: PromptOptions interface.\n3. LOGIC: Extend PromptOptions to accept optional provider?: ProviderId, providerOptions?: ProviderOptions, model?: string. Add JSDoc explaining these override agent-level config.\n4. OUTPUT: PromptOptions supports provider overrides."
                 },
                 {
@@ -612,7 +697,10 @@
                   "title": "Resolve provider with prompt overrides",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P4.M3.T1.S1", "P4.M2.T1.S1"],
+                  "dependencies": [
+                    "P4.M3.T1.S1",
+                    "P4.M2.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Configuration cascade: global → agent → prompt. First defined value wins.\n2. INPUT: Global config from getGlobalProviderConfig(), agent config from this.config, prompt options from prompt() call.\n3. LOGIC: Call resolveProviderConfig(globalConfig, this.config.provider, this.config.providerOptions, promptOptions.provider, promptOptions.providerOptions). Get resulting provider and options. If different provider than agent's default, get new provider instance from registry.\n4. OUTPUT: Correct provider used for execution."
                 }
               ]
@@ -648,7 +736,9 @@
                   "title": "Test parseModelSpec() function",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T2.S1"],
+                  "dependencies": [
+                    "P1.M1.T2.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From /tests - Using Vitest framework. Tests use describe/it/expect pattern.\n2. INPUT: parseModelSpec function from P1.M1.T2.S1.\n3. LOGIC: Write tests in /tests/providers/model-spec.test.ts. Test cases: plain model (uses default provider), provider/model format (anthropic/claude-sonnet-4), invalid provider (throws error), default provider parameter. Use expect().toStrictEqual() for ModelSpec comparison.\n4. OUTPUT: Passing tests for model specification parsing."
                 },
                 {
@@ -657,7 +747,9 @@
                   "title": "Test configuration cascade logic",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M2.T1.S4"],
+                  "dependencies": [
+                    "P1.M2.T1.S4"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Configuration cascade is critical for correct provider resolution.\n2. INPUT: resolveProviderConfig from P1.M2.T1.S4.\n3. LOGIC: Write tests in /tests/providers/provider-config.test.ts. Test cases: global default only, agent override, prompt override (highest priority), options merge (prompt overrides agent overrides global). Mock GlobalProviderConfig.\n4. OUTPUT: Passing tests for configuration cascade."
                 }
               ]
@@ -675,7 +767,9 @@
                   "title": "Test ProviderRegistry singleton and registration",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M3.T1.S1"],
+                  "dependencies": [
+                    "P1.M3.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Singleton pattern should have single instance across calls.\n2. INPUT: ProviderRegistry from P1.M3.T1.S1.\n3. LOGIC: Write tests in /tests/providers/provider-registry.test.ts. Test getInstance() returns same instance. Test register() adds provider. Test get() retrieves provider. Test has() checks existence. Use mock Provider implementation.\n4. OUTPUT: Passing tests for registry functionality."
                 },
                 {
@@ -684,7 +778,9 @@
                   "title": "Test provider initialization and termination",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M3.T1.S3"],
+                  "dependencies": [
+                    "P1.M3.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Registry must initialize all registered providers on startup.\n2. INPUT: ProviderRegistry with initializeAll() and terminateAll().\n3. LOGIC: Test initializeAll() calls provider.initialize() for each provider. Test terminateAll() calls provider.terminate(). Test error handling (one provider fails doesn't stop others). Mock providers with vi.fn().\n4. OUTPUT: Passing tests for lifecycle management."
                 }
               ]
@@ -702,7 +798,9 @@
                   "title": "Test AnthropicProvider initialization",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M1.T1.S2"],
+                  "dependencies": [
+                    "P2.M1.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Must mock @anthropic-ai/claude-agent-sdk import to avoid actual API calls.\n2. INPUT: AnthropicProvider from P2.M1.T1.\n3. LOGIC: Write tests in /tests/providers/anthropic/anthropic-provider.test.ts. Mock SDK with vi.mock(). Test initialize() stores API key. Test terminate() clears SDK. Test capabilities are correct. Test normalizeModel() validates Anthropic models.\n4. OUTPUT: Passing tests for Anthropic provider."
                 },
                 {
@@ -711,7 +809,9 @@
                   "title": "Test AnthropicProvider execute() method",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M1.T1.S6"],
+                  "dependencies": [
+                    "P2.M1.T1.S6"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Must mock query() AsyncGenerator to return test messages.\n2. INPUT: AnthropicProvider with mocked SDK.\n3. LOGIC: Mock query() to return SDKResultMessage. Test execute() builds correct SDK Options. Test tool execution delegation. Test message iteration captures result. Test ProviderResult format matches AgentResponse. Test error handling (SDK errors converted to AgentResponse with status='error').\n4. OUTPUT: Passing tests for execution flow."
                 }
               ]
@@ -738,7 +838,9 @@
                   "title": "Test Agent with Anthropic provider",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P4.M2.T1.S3"],
+                  "dependencies": [
+                    "P4.M2.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Integration tests verify Agent → Provider → SDK flow works end-to-end.\n2. INPUT: Agent with provider configured, mocked Anthropic SDK.\n3. LOGIC: Write tests in /tests/integration/provider-agent.test.ts. Configure global provider with configureProviders(). Create Agent with Anthropic provider. Call agent.prompt() and verify provider.execute() called. Verify tool executor called correctly. Verify caching works. Test prompt-level provider override.\n4. OUTPUT: Passing integration tests."
                 },
                 {
@@ -747,7 +849,9 @@
                   "title": "Test provider switching",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P5.M2.T1.S1"],
+                  "dependencies": [
+                    "P5.M2.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Users should be able to switch providers via configuration.\n2. INPUT: Agent with configurable provider.\n3. LOGIC: Test creating Agent with provider='anthropic'. Test creating Agent with provider='opencode' (if available). Test prompt-level override switches provider for single call. Verify correct provider used in each case.\n4. OUTPUT: Tests verify provider switching works."
                 }
               ]
@@ -774,7 +878,9 @@
                   "title": "Document provider system overview",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P4.M3.T1.S2"],
+                  "dependencies": [
+                    "P4.M3.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From implementation_patterns.md - Use JSDoc and executable examples in documentation.\n2. INPUT: Complete provider system implementation.\n3. LOGIC: Create /docs/providers.md. Write overview explaining multi-provider architecture, benefits, and supported providers. Include architecture diagram. Explain configuration cascade. Document default provider behavior.\n4. OUTPUT: Comprehensive provider system overview documentation."
                 },
                 {
@@ -783,7 +889,9 @@
                   "title": "Document API reference",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P5.M3.T1.S1"],
+                  "dependencies": [
+                    "P5.M3.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: API reference should cover all public interfaces and functions.\n2. INPUT: All provider types and functions.\n3. LOGIC: Document configureProviders(), Provider interface, ProviderId, ProviderCapabilities, ProviderOptions, ModelSpec, parseModelSpec(), formatModelForProvider(). Include JSDoc-style parameter descriptions, return types, and examples.\n4. OUTPUT: Complete API reference documentation."
                 },
                 {
@@ -792,7 +900,9 @@
                   "title": "Document usage examples",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P5.M3.T1.S2"],
+                  "dependencies": [
+                    "P5.M3.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From PRD Section 7.13 - Usage examples demonstrate global config, agent config, and prompt overrides.\n2. INPUT: Provider system API.\n3. LOGIC: Write executable examples: Basic usage with default Anthropic provider, Global configuration with configureProviders(), Agent with explicit provider, Prompt-level provider override, Multi-provider scenario (switch between Anthropic and OpenCode), Model specification with provider/model format.\n4. OUTPUT: Usage examples in docs/providers.md and /examples/providers/ directory."
                 }
               ]
