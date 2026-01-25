@@ -901,4 +901,266 @@ describe('ProviderRegistry', () => {
       expect(provider.initialize).toHaveBeenCalledTimes(1);
     });
   });
+
+  // ============================================================================
+  // Provider Termination Tests (P1.M3.T1.S3)
+  // ============================================================================
+
+  describe('terminateAll()', () => {
+    it('should terminate all registered providers', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      await registry.terminateAll();
+
+      expect(anthropic.terminate).toHaveBeenCalledTimes(1);
+      expect(opencode.terminate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should call terminate() on each provider', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+
+      registry.register(provider);
+
+      await registry.terminateAll();
+
+      expect(provider.terminate).toHaveBeenCalledWith();
+      expect(provider.terminate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should continue on error - one provider failure should not prevent others', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      // Make anthropic fail
+      const anthropicError = new Error('Anthropic terminate failed');
+      anthropic.terminate = vi.fn().mockRejectedValue(anthropicError);
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      // Should not throw despite failure
+      await expect(registry.terminateAll()).resolves.not.toThrow();
+
+      // Both terminate() should be called despite failure
+      expect(anthropic.terminate).toHaveBeenCalledTimes(1);
+      expect(opencode.terminate).toHaveBeenCalledTimes(1);
+    });
+
+    it('should clear providers map after termination', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      expect(registry.has('anthropic')).toBe(true);
+      expect(registry.has('opencode')).toBe(true);
+
+      await registry.terminateAll();
+
+      expect(registry.has('anthropic')).toBe(false);
+      expect(registry.has('opencode')).toBe(false);
+    });
+
+    it('should clear states map after termination', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+
+      registry.register(anthropic);
+      await registry.initializeProvider('anthropic');
+
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.INITIALIZED);
+      expect(registry.getAllStatuses().size).toBe(1);
+
+      await registry.terminateAll();
+
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.UNINITIALIZED);
+      expect(registry.getAllStatuses().size).toBe(0);
+    });
+
+    it('should handle empty registry gracefully', async () => {
+      const registry = ProviderRegistry.getInstance();
+
+      // Should not throw on empty registry
+      await expect(registry.terminateAll()).resolves.not.toThrow();
+    });
+
+    it('should use Promise.allSettled for parallel termination', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      // Track timing to verify parallel execution
+      let anthropicStartTime = 0;
+      let opencodeStartTime = 0;
+
+      anthropic.terminate = vi.fn().mockImplementation(async () => {
+        anthropicStartTime = Date.now();
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
+      opencode.terminate = vi.fn().mockImplementation(async () => {
+        opencodeStartTime = Date.now();
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      const overallStart = Date.now();
+      await registry.terminateAll();
+      const overallDuration = Date.now() - overallStart;
+
+      // Both should have started at roughly the same time (parallel)
+      expect(Math.abs(anthropicStartTime - opencodeStartTime)).toBeLessThan(20);
+
+      // Total time should be close to single provider time (not sum of both)
+      expect(overallDuration).toBeLessThan(120); // 50ms + overhead, not 100ms
+    });
+
+    it('should log errors for failed terminations', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const terminateError = new Error('Termination failed');
+      provider.terminate = vi.fn().mockRejectedValue(terminateError);
+
+      registry.register(provider);
+
+      await registry.terminateAll();
+
+      // Verify error was logged with provider ID
+      expect(errorSpy).toHaveBeenCalledWith(
+        "Failed to terminate provider 'anthropic':",
+        terminateError
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it('should never throw - always resolves successfully', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      // Make both fail
+      anthropic.terminate = vi.fn().mockRejectedValue(new Error('Anthropic failed'));
+      opencode.terminate = vi.fn().mockRejectedValue(new Error('OpenCode failed'));
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      // Method should resolve without throwing
+      await expect(registry.terminateAll()).resolves.not.toThrow();
+      await expect(registry.terminateAll()).resolves.toBeUndefined();
+
+      // Maps should still be cleared despite failures
+      expect(registry.has('anthropic')).toBe(false);
+      expect(registry.has('opencode')).toBe(false);
+    });
+
+    it('should clear maps after all terminations complete (not before)', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+
+      let providersCleared = false;
+      provider.terminate = vi.fn().mockImplementation(async () => {
+        // During termination, providers should still be accessible
+        expect(registry.has('anthropic')).toBe(true);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        // After terminate, maps might be cleared but check timing
+      });
+
+      registry.register(provider);
+
+      await registry.terminateAll();
+
+      // Only after terminateAll completes should maps be cleared
+      expect(registry.has('anthropic')).toBe(false);
+    });
+
+    it('should allow registry reuse after termination', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider1 = createMockProvider('anthropic');
+
+      registry.register(provider1);
+      expect(registry.has('anthropic')).toBe(true);
+
+      await registry.terminateAll();
+      expect(registry.has('anthropic')).toBe(false);
+
+      // Should be able to register new providers
+      const provider2 = createMockProvider('anthropic');
+      expect(() => {
+        registry.register(provider2);
+      }).not.toThrow();
+
+      expect(registry.has('anthropic')).toBe(true);
+    });
+  });
+
+  describe('Termination Integration Scenarios', () => {
+    it('should handle full lifecycle: register, initialize, terminate', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      // Register
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      // Initialize
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: {
+          anthropic: { apiKey: 'sk-test' }
+        }
+      };
+      await registry.initializeAll(config);
+
+      expect(registry.isReady('anthropic')).toBe(true);
+      expect(registry.isReady('opencode')).toBe(true);
+
+      // Terminate
+      await registry.terminateAll();
+
+      expect(anthropic.terminate).toHaveBeenCalledTimes(1);
+      expect(opencode.terminate).toHaveBeenCalledTimes(1);
+      expect(registry.has('anthropic')).toBe(false);
+      expect(registry.has('opencode')).toBe(false);
+    });
+
+    it('should support re-initialization after termination', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+
+      // First lifecycle
+      registry.register(provider);
+      await registry.initializeProvider('anthropic');
+      await registry.terminateAll();
+
+      expect(provider.initialize).toHaveBeenCalledTimes(1);
+      expect(provider.terminate).toHaveBeenCalledTimes(1);
+
+      // Reset test state to allow re-registration
+      registry._resetInitStateForTesting();
+
+      // Second lifecycle
+      const provider2 = createMockProvider('anthropic');
+      registry.register(provider2);
+      await registry.initializeProvider('anthropic');
+
+      expect(provider2.initialize).toHaveBeenCalledTimes(1);
+      expect(registry.isReady('anthropic')).toBe(true);
+    });
+  });
 });

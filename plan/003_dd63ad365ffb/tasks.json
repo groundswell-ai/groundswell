@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Phase 1: Multi-Provider Foundation",
-      "status": "Planned",
+      "status": "Complete",
       "description": "Implement the core provider abstraction layer and type system. This enables multiple AI provider SDKs (Anthropic, OpenCode) to coexist with a unified interface.",
       "milestones": [
         {
@@ -177,14 +177,14 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Milestone 1.3: Provider Registry",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Implement singleton provider registry for managing provider instances and lifecycle",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Task: Implement Provider Registry",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Create provider-registry.ts with singleton pattern for provider instance management",
               "subtasks": [
                 {
@@ -214,7 +214,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S3",
                   "title": "Implement provider termination and cleanup",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S2"

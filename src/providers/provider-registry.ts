@@ -467,6 +467,69 @@ export class ProviderRegistry {
   }
 
   // ============================================================================
+  // Instance Methods - Provider Termination
+  // ============================================================================
+
+  /**
+   * Terminate all registered providers with error tolerance
+   *
+   * Terminates all providers in parallel, ensuring each gets a chance to
+   * clean up resources even if some fail. Errors are logged but not thrown.
+   * After termination completes, clears the providers and states maps.
+   *
+   * ## Parallel Termination
+   *
+   * All providers terminate concurrently using Promise.allSettled.
+   * This ensures fast shutdown while allowing partial success.
+   *
+   * ## Error Handling
+   *
+   * If a provider's terminate() throws, the error is logged but other
+   * providers continue terminating. The method never throws.
+   *
+   * ## State Cleanup
+   *
+   * After all termination attempts complete, the providers and states
+   * maps are cleared. This releases references and allows re-initialization.
+   *
+   * @example
+   * ```ts
+   * const registry = ProviderRegistry.getInstance();
+   *
+   * // Register and initialize providers
+   * registry.register(anthropicProvider);
+   * registry.register(opencodeProvider);
+   * await registry.initializeAll(config);
+   *
+   * // Later, during shutdown
+   * await registry.terminateAll();
+   *
+   * // All providers terminated, maps cleared
+   * console.log(registry.has('anthropic')); // false
+   * ```
+   */
+  public async terminateAll(): Promise<void> {
+    // PATTERN: Convert Map entries to array for iteration
+    const terminatePromises = Array.from(this.providers.entries()).map(
+      async ([id, provider]) => {
+        try {
+          await provider.terminate();
+        } catch (error) {
+          // PATTERN: Log but continue - don't let one failure block others
+          console.error(`Failed to terminate provider '${id}':`, error);
+        }
+      }
+    );
+
+    // PATTERN: Use Promise.allSettled for partial success tolerance
+    await Promise.allSettled(terminatePromises);
+
+    // PATTERN: Clear maps AFTER termination completes
+    this.providers.clear();
+    this.states.clear();
+  }
+
+  // ============================================================================
   // Testing Utilities - Internal Use Only
   // ============================================================================
 
