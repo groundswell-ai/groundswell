@@ -106,6 +106,7 @@ export { ObservedState, getObservedState } from './decorators/observed-state.js'
 
 // Debugger
 export { WorkflowTreeDebugger } from './debugger/tree-debugger.js';
+export { WorkflowEventReplayer } from './debugger/event-replayer.js';
 
 // Utilities
 export { Observable } from './utils/observable.js';
