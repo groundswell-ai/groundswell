@@ -7,6 +7,7 @@
 
 import type { WorkflowNode } from './workflow.js';
 import type { ReflectionAPI } from './reflection.js';
+import type { AgentResponse } from './agent.js';
 
 // Re-export ReflectionAPI for backward compatibility
 export type { ReflectionAPI } from './reflection.js';
@@ -72,7 +73,7 @@ export interface EventMetrics {
  * Agent interface for context revision (minimal to avoid circular deps)
  */
 export interface AgentLike {
-  prompt<T>(prompt: PromptLike<T>): Promise<T>;
+  prompt<T>(prompt: PromptLike<T>): Promise<AgentResponse<T>>;
 }
 
 /**

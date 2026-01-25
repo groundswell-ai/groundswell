@@ -291,9 +291,20 @@ export class WorkflowContextImpl implements WorkflowContext {
 
     try {
       // Execute the new prompt in context
-      const result = await runInContext(executionContext, () =>
+      const response = await runInContext(executionContext, () =>
         agent.prompt(newPrompt)
       );
+
+      // Handle AgentResponse error
+      if (response.status === 'error') {
+        const { code, message } = response.error!;
+        const error = new Error(`[${code}] ${message}`);
+        error.name = 'AgentPromptError';
+        throw error;
+      }
+
+      // Extract data (type narrowed to T after status check)
+      const result = response.data!;
 
       // Update revision node status
       revisionNode.status = 'completed';
