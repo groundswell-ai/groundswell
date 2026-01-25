@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Milestone 1.1: Core AgentResponse Implementation",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Implement AgentResponse wrapping in Agent class and update type system",
           "tasks": [
             {
@@ -120,14 +120,14 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "Update AgentResponse type definitions and exports",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Ensure AgentResponse types are properly exported and documented for public API.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T3.S1",
                   "title": "Verify AgentResponse types are exported from index.ts",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Public API exports are in src/index.ts per SYSTEM_CONTEXT.md.\n2. INPUT: src/types/agent.ts (AgentResponse definitions). src/index.ts (exports).\n3. LOGIC: Read src/index.ts to verify AgentResponse, AgentResponseStatus, AgentErrorDetails, AgentResponseMetadata are all exported. If missing, add exports.\n4. OUTPUT: All AgentResponse types exported from main index.ts for public consumption."
@@ -136,7 +136,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T3.S2",
                   "title": "Add JSDoc comments to AgentResponse types",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T3.S1"

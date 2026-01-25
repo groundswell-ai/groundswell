@@ -28,6 +28,14 @@ export type {
   AgentConfig,
   PromptOverrides,
   PromptConfig,
+  // AgentResponse types (PRD 6.1-6.5)
+  AgentResponseStatus,
+  AgentResponse,
+  AgentErrorDetails,
+  AgentResponseMetadata,
+  SuccessResponse,
+  ErrorResponse,
+  PartialResponse,
   // WorkflowContext types
   WorkflowContext,
   WorkflowConfig,
@@ -49,6 +57,17 @@ export type {
 export {
   DEFAULT_REFLECTION_CONFIG,
   createReflectionConfig,
+} from './types/index.js';
+
+// Re-export AgentResponse utilities (PRD 6.1-6.5)
+export {
+  AGENT_ERROR_CODES,
+  createSuccessResponse,
+  createErrorResponse,
+  createPartialResponse,
+  isSuccess,
+  isError,
+  isPartial,
 } from './types/index.js';
 
 // Core classes
