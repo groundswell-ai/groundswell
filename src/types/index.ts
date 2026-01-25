@@ -43,6 +43,9 @@ export type {
   GlobalProviderConfig,
 } from './providers.js';
 
+// Provider classes
+export { AnthropicProvider } from '../providers/anthropic-provider.js';
+
 // Agent types
 export type {
   AgentConfig,

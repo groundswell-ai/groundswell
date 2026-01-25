@@ -252,7 +252,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S1",
                   "title": "Implement AnthropicProvider class structure and capabilities",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S3"

@@ -28,6 +28,23 @@ export type {
   AgentConfig,
   PromptOverrides,
   PromptConfig,
+  // Provider types
+  Provider,
+  ProviderId,
+  ProviderCapabilities,
+  ProviderOptions,
+  ProviderExecutionOptions,
+  ProviderRequest,
+  ProviderHookEvents,
+  ToolExecutionRequest,
+  ToolExecutionResult,
+  ModelSpec,
+  ToolExecutor,
+  ProviderResult,
+  ProviderResponseStatus,
+  ProviderErrorDetails,
+  ProviderResponseMetadata,
+  GlobalProviderConfig,
   // AgentResponse types (PRD 6.1-6.5)
   AgentResponseStatus,
   AgentResponse,
@@ -83,7 +100,11 @@ export { Workflow, type WorkflowExecutor } from './core/workflow.js';
 export { WorkflowLogger } from './core/logger.js';
 export { Agent, type PromptResult } from './core/agent.js';
 export { Prompt } from './core/prompt.js';
-export { MCPHandler, type ToolExecutor } from './core/mcp-handler.js';
+export { MCPHandler } from './core/mcp-handler.js';
+
+// Providers
+export { AnthropicProvider } from './providers/anthropic-provider.js';
+export { ProviderRegistry } from './providers/provider-registry.js';
 
 // Context and event tree
 export { EventTreeHandleImpl, createEventTreeHandle } from './core/event-tree.js';
