@@ -61,30 +61,39 @@ const result = await workflow.run();
 
 ### Agent with Prompt
 
+> [!IMPORTANT]
+> Groundswell v2.0: `agent.prompt()` now returns `AgentResponse<T>`.
+> See the [Migration Guide](docs/migration-guide-agent-response.md) if upgrading.
+
 ```typescript
 import { createAgent, createPrompt } from 'groundswell';
 import { z } from 'zod';
 
-const agent = createAgent({
-  name: 'AnalysisAgent',
-  enableCache: true,
-});
+const agent = createAgent({ name: 'AnalysisAgent' });
 
 const prompt = createPrompt({
-  user: 'Analyze this code for bugs',
-  data: { code: 'function foo() { return 42; }' },
+  user: 'Analyze this code',
   responseFormat: z.object({
     bugs: z.array(z.string()),
     severity: z.enum(['low', 'medium', 'high']),
   }),
 });
 
-const result = await agent.prompt(prompt);
-// result is typed as { bugs: string[], severity: 'low' | 'medium' | 'high' }
+const response = await agent.prompt(prompt);
+if (response.status === 'error') {
+  throw new Error(response.error.message);
+}
+console.log(response.data.bugs);
 ```
+
+**Why AgentResponse?**
+- Type-safe validated responses with error handling
+- Observable metadata (tokens, timing, cache hits)
+- Consistent API across all agent operations
 
 ## Documentation
 
+- [Migration Guide](docs/migration-guide-agent-response.md) - Upgrading from v1.x ⚠️
 - [Workflows](docs/workflow.md) - Hierarchical task orchestration
 - [Agents](docs/agent.md) - LLM execution with caching and reflection
 - [Prompts](docs/prompt.md) - Type-safe prompt definitions with Zod
