@@ -76,6 +76,19 @@ import type { GlobalProviderConfig, ProviderId } from '../types/providers.js';
  */
 let globalConfig: GlobalProviderConfig | null = null;
 
+/**
+ * Default global provider configuration
+ *
+ * This constant provides sensible defaults when no configuration
+ * has been set via `configureProviders()`.
+ *
+ * @internal
+ */
+const DEFAULT_CONFIG: GlobalProviderConfig = {
+  defaultProvider: 'anthropic' as ProviderId,
+  providerDefaults: undefined
+};
+
 // ============================================================================
 // Private Validation Helpers
 // ============================================================================
@@ -171,20 +184,63 @@ export function configureProviders(config: GlobalProviderConfig): void {
 /**
  * Get the current global provider configuration
  *
- * **TO BE IMPLEMENTED IN P1.M2.T1.S3**
+ * This function provides controlled access to the module-private
+ * `globalConfig` variable. It guarantees a non-null return by
+ * providing sensible defaults when no configuration has been set.
  *
- * This function will return the module-private `globalConfig` variable.
+ * ## Semantics
  *
- * @returns Current global provider configuration
- * @throws {Error} If providers not configured (globalConfig is null)
+ * - If `configureProviders()` was called: returns the configured value
+ * - If never configured: returns default configuration
+ * - **Never returns null**: Always returns a valid `GlobalProviderConfig`
+ *
+ * ## Usage
+ *
+ * ```ts
+ * import { getGlobalProviderConfig } from 'groundswell';
+ *
+ * // Before configuration - returns defaults
+ * const config1 = getGlobalProviderConfig();
+ * console.log(config1.defaultProvider); // 'anthropic'
+ *
+ * // After configuration
+ * configureProviders({ defaultProvider: 'opencode' });
+ * const config2 = getGlobalProviderConfig();
+ * console.log(config2.defaultProvider); // 'opencode'
+ * ```
+ *
+ * @returns Current global provider configuration (never null)
  *
  * @example
  * ```ts
+ * // Get default configuration
  * const config = getGlobalProviderConfig();
  * console.log(config.defaultProvider); // 'anthropic'
+ *
+ * // Use for provider initialization
+ * const providerOptions = config.providerDefaults?.[config.defaultProvider];
  * ```
  */
-// export function getGlobalProviderConfig(): GlobalProviderConfig { ... }
+export function getGlobalProviderConfig(): GlobalProviderConfig {
+  // Nullish coalescing for defaults
+  // ?? only treats null/undefined as missing
+  // Returns globalConfig if set, otherwise DEFAULT_CONFIG
+  return globalConfig ?? DEFAULT_CONFIG;
+}
+
+/**
+ * Reset global configuration to defaults
+ *
+ * **FOR TESTING PURPOSES ONLY**
+ *
+ * This function clears the global configuration, causing subsequent
+ * calls to `getGlobalProviderConfig()` to return defaults.
+ *
+ * @internal
+ */
+export function resetGlobalConfig(): void {
+  globalConfig = null;
+}
 
 /**
  * Resolve provider configuration with cascade

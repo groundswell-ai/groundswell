@@ -1,11 +1,14 @@
 /**
- * Unit tests for configureProviders()
+ * Unit tests for configureProviders() and getGlobalProviderConfig()
  */
 
-import { describe, it, expect } from 'vitest';
-import { configureProviders } from '../../../utils/provider-config.js';
+import { describe, it, expect, afterEach } from 'vitest';
+import { configureProviders, getGlobalProviderConfig, resetGlobalConfig } from '../../../utils/provider-config.js';
 
-// Note: No special reset needed - ES module scoping provides isolation
+// Reset after each test for isolation
+afterEach(() => {
+  resetGlobalConfig();
+});
 
 describe('configureProviders', () => {
   describe('valid configuration', () => {
@@ -127,6 +130,100 @@ describe('configureProviders', () => {
         expect(message).toMatch(/Invalid.*:.*".*"/);
         expect(message).toContain('Supported providers:');
       }
+    });
+  });
+});
+
+describe('getGlobalProviderConfig', () => {
+  describe('default behavior (not configured)', () => {
+    it('should return default config when never configured', () => {
+      const config = getGlobalProviderConfig();
+
+      expect(config).toEqual({
+        defaultProvider: 'anthropic',
+        providerDefaults: undefined
+      });
+    });
+
+    it('should return default with anthropic as defaultProvider', () => {
+      const config = getGlobalProviderConfig();
+
+      expect(config.defaultProvider).toBe('anthropic');
+    });
+
+    it('should return default with undefined providerDefaults', () => {
+      const config = getGlobalProviderConfig();
+
+      expect(config.providerDefaults).toBeUndefined();
+    });
+
+    it('should be pure (no mutations on repeated calls)', () => {
+      const config1 = getGlobalProviderConfig();
+      const config2 = getGlobalProviderConfig();
+
+      expect(config1).toBe(config2); // Same reference
+      expect(config1).toEqual({
+        defaultProvider: 'anthropic',
+        providerDefaults: undefined
+      });
+    });
+  });
+
+  describe('after configuration', () => {
+    it('should return configured value', () => {
+      configureProviders({
+        defaultProvider: 'opencode',
+        providerDefaults: {
+          anthropic: { apiKey: 'sk-test' }
+        }
+      });
+
+      const config = getGlobalProviderConfig();
+
+      expect(config.defaultProvider).toBe('opencode');
+      expect(config.providerDefaults?.anthropic?.apiKey).toBe('sk-test');
+    });
+
+    it('should preserve configured values across calls', () => {
+      configureProviders({ defaultProvider: 'opencode' });
+
+      const config1 = getGlobalProviderConfig();
+      const config2 = getGlobalProviderConfig();
+
+      expect(config1).toBe(config2); // Same reference
+    });
+  });
+
+  describe('after reset', () => {
+    it('should return defaults after reset', () => {
+      configureProviders({ defaultProvider: 'opencode' });
+      resetGlobalConfig();
+
+      const config = getGlobalProviderConfig();
+
+      expect(config.defaultProvider).toBe('anthropic');
+      expect(config.providerDefaults).toBeUndefined();
+    });
+  });
+
+  describe('return type validation', () => {
+    it('should return valid GlobalProviderConfig structure', () => {
+      const config = getGlobalProviderConfig();
+
+      // Verify structure
+      expect(typeof config.defaultProvider).toBe('string');
+      expect(['anthropic', 'opencode']).toContain(config.defaultProvider);
+      // providerDefaults is optional
+      if (config.providerDefaults) {
+        expect(typeof config.providerDefaults).toBe('object');
+      }
+    });
+
+    it('should never return null or undefined', () => {
+      const config = getGlobalProviderConfig();
+
+      expect(config).not.toBeNull();
+      expect(config).not.toBeUndefined();
     });
   });
 });
