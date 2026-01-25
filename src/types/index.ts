@@ -25,6 +25,7 @@ export type {
 
 // Provider types
 export type {
+  Provider,
   ProviderId,
   ProviderCapabilities,
   ProviderOptions,
@@ -33,6 +34,8 @@ export type {
   ProviderHookEvents,
   ToolExecutionRequest,
   ToolExecutionResult,
+  ModelSpec,
+  ToolExecutor,
 } from './providers.js';
 
 // Agent types
