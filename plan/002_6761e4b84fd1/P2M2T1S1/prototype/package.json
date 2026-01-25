@@ -1,0 +1,20 @@
+{
+  "name": "ink-debugger-prototype",
+  "version": "1.0.0",
+  "description": "Ink Workflow Tree Debugger Prototype",
+  "type": "module",
+  "scripts": {
+    "start": "tsx cli.tsx",
+    "dev": "tsx --watch cli.tsx"
+  },
+  "keywords": ["ink", "workflow", "debugger", "cli"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ink": "^6.6.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

@@ -450,14 +450,14 @@
               "type": "Task",
               "id": "P2.M2.T1",
               "title": "Evaluate Ink and create prototype",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Research Ink library and build basic tree visualization prototype",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T1.S1",
                   "title": "Research Ink library and create hello-world prototype",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Per plan/002_6761e4b84fd1/architecture/OBSERVABILITY_PATTERNS_RESEARCH.md, Ink is React for CLI. Current ASCII rendering in toTreeString() works but lacks interactivity.\n2. INPUT: Ink documentation (https://ink.think.io/). Current WorkflowTreeDebugger.\n3. LOGIC: Install Ink: npm install ink. Create examples/ink-debugger-hello.tsx. Build simple component: <Box><Text>Hello Workflow</Text></Box>. Test with tsx. Verify Ink works with Node.js >=18.\n4. OUTPUT: Working Ink prototype and evaluation notes on performance, bundle size, compatibility."
@@ -466,7 +466,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S2",
                   "title": "Build reactive tree component prototype",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T1.S1"

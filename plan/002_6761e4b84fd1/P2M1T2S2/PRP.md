@@ -5,14 +5,15 @@ description: "Add static replay API to WorkflowTreeDebugger for time-travel debu
 
 ## Goal
 
-**Feature Goal**: Add a static factory method `WorkflowTreeDebugger.replay(path: string)` that loads saved event history from a JSON file and returns a reconstructed workflow tree root node for time-travel debugging.
+**Feature Goal**: Add a static factory method `WorkflowTreeDebugger.replay(path: string)` that loads saved event history from a JSON file, replays events using `WorkflowEventReplayer`, and returns a new `WorkflowTreeDebugger` instance with the reconstructed tree for time-travel debugging.
 
-**Deliverable**: A new static method `WorkflowTreeDebugger.replay(path: string): Promise<WorkflowNode>` on the `WorkflowTreeDebugger` class.
+**Deliverable**: A new static method `WorkflowTreeDebugger.replay(path: string): Promise<WorkflowTreeDebugger>` on the `WorkflowTreeDebugger` class.
 
 **Success Definition**:
 - Calling `WorkflowTreeDebugger.replay('workflow-events.json')` loads events from file and replays them using `WorkflowEventReplayer`
-- Returns a `WorkflowNode` representing the reconstructed workflow tree root
-- The returned tree is read-only (no live workflow attached)
+- Returns a `WorkflowTreeDebugger` instance with reconstructed tree (not just WorkflowNode)
+- The returned debugger is read-only (no live workflow attached, no event accumulation)
+- All debugger visualization methods work on replay instance: `toTreeString()`, `getStats()`, `getNode()`, `toLogString()`
 - All event types are properly replayed (structural, state, and metadata events)
 - Proper error handling with descriptive error messages for file operations and replay failures
 
@@ -25,9 +26,9 @@ description: "Add static replay API to WorkflowTreeDebugger for time-travel debu
 **User Journey**:
 1. Developer creates a `WorkflowTreeDebugger` with `persistEvents: true` during workflow execution
 2. Developer calls `debugger.saveEventHistory('./workflow-events.json')` to save events
-3. Later, developer calls `const tree = await WorkflowTreeDebugger.replay('./workflow-events.json')` to reconstruct the tree
-4. Developer inspects the reconstructed tree structure, node states, and accumulated events
-5. Developer can use `debugger.toTreeString(tree)` and `debugger.getStats(tree)` on the reconstructed node
+3. Later, developer calls `const debugger = await WorkflowTreeDebugger.replay('./workflow-events.json')` to reconstruct the tree
+4. Developer receives a `WorkflowTreeDebugger` instance with the reconstructed tree
+5. Developer can use debugger methods: `debugger.toTreeString()`, `debugger.getStats()`, `debugger.getNode(id)`
 
 **Pain Points Addressed**:
 - No ability to reconstruct workflow tree from saved events
@@ -42,28 +43,32 @@ description: "Add static replay API to WorkflowTreeDebugger for time-travel debu
 
 ## What
 
-Add a static factory method `WorkflowTreeDebugger.replay(path: string): Promise<WorkflowNode>` that:
+Add a static factory method `WorkflowTreeDebugger.replay(path: string): Promise<WorkflowTreeDebugger>` that:
 
-1. Loads event history from the specified JSON file path
-2. Replays the events using `WorkflowEventReplayer`
-3. Returns the reconstructed workflow tree root node
+1. Loads event history from the specified JSON file path using `loadEventHistory()`
+2. Creates a new `WorkflowEventReplayer` instance
+3. Replays the events to get reconstructed `WorkflowNode` tree
+4. Creates a new `WorkflowTreeDebugger` instance without calling constructor (uses `Object.create()`)
+5. Initializes instance properties: `root`, `events`, `nodeMap`, `eventHistory`, `persistEvents`
+6. Returns the debugger instance with full visualization capabilities
 
-The method should:
-- Use existing `WorkflowTreeDebugger.loadEventHistory(path)` to load events
-- Create a new `WorkflowEventReplayer` instance
-- Call `replayer.replay(events)` with the loaded events
-- Return the resulting `WorkflowNode`
+**Key Implementation Detail**: Since the constructor requires a live `Workflow` instance, but replay has no live workflow, use `Object.create(WorkflowTreeDebugger.prototype)` to create an instance without calling the constructor, then manually initialize all required properties.
 
 ### Success Criteria
 
 - [ ] Static method `WorkflowTreeDebugger.replay(path: string)` exists
-- [ ] Method returns `Promise<WorkflowNode>`
+- [ ] Method returns `Promise<WorkflowTreeDebugger>`
 - [ ] Method loads events from file using `loadEventHistory()`
 - [ ] Method creates `WorkflowEventReplayer` and calls `replay()`
+- [ ] Method creates debugger instance using `Object.create()`
+- [ ] Method initializes all instance properties correctly
+- [ ] Method calls `buildNodeMap(root)` to populate node lookup
+- [ ] Returned debugger has `persistEvents = false` (read-only)
+- [ ] Returned debugger supports all visualization methods
 - [ ] Method properly handles errors (file not found, invalid JSON, replay failures)
 - [ ] Method includes comprehensive JSDoc documentation with examples
-- [ ] Method is exported from `src/index.ts`
 - [ ] Tests cover: successful replay, file errors, invalid JSON, empty events, replay errors
+- [ ] Tests verify all debugger methods work on replay instance
 
 ## All Needed Context
 
@@ -125,13 +130,17 @@ _Before writing this PRP, validate: "If someone knew nothing about this codebase
   pattern: createMockNode helper, event creation patterns, tree validation
   gotcha: Tests verify bidirectional links, deep cloning, error accumulation
 
-- docfile: plan/002_6761e4b84fd1/P2M1T2S2/research/10-typescript-static-method-patterns.md
-  why: TypeScript static method best practices including JSDoc patterns
-  section: Static Factory Methods, Async Static Method Patterns, JSDoc Documentation Patterns
+- docfile: plan/002_6761e4b84fd1/P2M1T2S2/research/01-static-factory-patterns.md
+  why: Static factory method patterns for creating replay debugger instances
+  section: Implementation Strategy, Object.create() Pattern, Property Initialization Details
 
-- docfile: plan/002_6761e4b84fd1/P2M1T2S2/research/11-time-travel-debugging-api-patterns.md
-  why: Time-travel debugging API design patterns from production systems
-  section: API Design Patterns, Read-Only State Reconstruction, Best Practices
+- docfile: plan/002_6761e4b84fd1/P2M1T2S2/research/02-time-travel-debugging-integration.md
+  why: Integration details for WorkflowEventReplayer with WorkflowTreeDebugger
+  section: Data Flow, Read-Only Debugger Architecture, Error Handling Strategy
+
+- docfile: plan/002_6761e4b84fd1/P2M1T2S2/research/03-testing-patterns.md
+  why: Test patterns and fixtures for replay() method
+  section: Test Structure, Test Fixtures, Test Cleanup Patterns
 
 - docfile: plan/002_6761e4b84fd1/P2M1T2S1/research/00-time-travel-debugging-quick-ref.md
   why: Time-travel debugging quick reference with patterns and naming conventions
@@ -293,81 +302,138 @@ type WorkflowEvent =
 
 ```yaml
 Task 1: ADD static replay() method to WorkflowTreeDebugger class
-  - LOCATION: src/debugger/tree-debugger.ts (after loadEventHistory method, ~line 678)
-  - IMPLEMENT: static async replay(path: string): Promise<WorkflowNode>
+  - LOCATION: src/debugger/tree-debugger.ts (after loadEventHistory method, ~line 680)
+  - IMPLEMENT: static async replay(path: string): Promise<WorkflowTreeDebugger>
   - SIGNATURE:
     ```typescript
     /**
-     * Replay workflow execution from saved event history file.
+     * Create a debugger instance by replaying events from a saved file.
      *
-     * This is a convenience method that combines loadEventHistory and
-     * WorkflowEventReplayer.replay() for one-call restoration of workflow trees.
+     * **Time-Travel Debugging:**
+     * - Loads events from JSON file using loadEventHistory()
+     * - Replays events using WorkflowEventReplayer
+     * - Returns new debugger with reconstructed tree (read-only, no live workflow)
      *
-     * @param path - File path to saved event history JSON file
-     * @returns Reconstructed workflow tree root node
-     * @throws {Error} If file cannot be read or parsed
-     * @throws {Error} If events cannot be replayed (empty events, no root established)
+     * **Read-Only Nature:**
+     * - The returned debugger is not attached to a live workflow
+     * - Tree is reconstructed from historical event data
+     * - All existing debugger methods work (rendering, stats, node lookup)
+     * - Event history accumulation is disabled (persistEvents = false)
+     *
+     * @param path - Path to saved event JSON file
+     * @returns New WorkflowTreeDebugger instance with reconstructed tree
+     * @throws {Error} If file does not exist (from loadEventHistory)
+     * @throws {Error} If file contains invalid JSON (from loadEventHistory)
+     * @throws {Error} If events array is empty (from WorkflowEventReplayer)
+     * @throws {Error} If root cannot be established (from WorkflowEventReplayer)
      *
      * @example
      * ```typescript
-     * // Save event history during execution
-     * const debugger = new WorkflowTreeDebugger(workflow, { persistEvents: true });
-     * await workflow.run();
-     * await debugger.saveEventHistory('./workflow-events.json');
+     * // Create debugger from saved event file
+     * const debugger = await WorkflowTreeDebugger.replay('./workflow-events.json');
      *
-     * // Later, replay the events to reconstruct the tree
-     * const tree = await WorkflowTreeDebugger.replay('./workflow-events.json');
-     * console.log(`Restored tree with ${tree.children.length} children`);
+     * // Use debugger methods for analysis
+     * console.log(debugger.toTreeString());
+     * console.log(debugger.getStats());
+     *
+     * // Find specific node
+     * const node = debugger.getNode('workflow-123');
      * ```
      */
-    static async replay(path: string): Promise<WorkflowNode>
+    static async replay(path: string): Promise<WorkflowTreeDebugger>
     ```
   - NAMING: snake_case for parameter, PascalCase for method (static method convention)
-  - IMPORTS: Add import for WorkflowEventReplayer at top of file
+  - IMPORTS: Add import for WorkflowEventReplayer at top of file if not present
   - DEPENDENCIES: Uses existing loadEventHistory(), requires WorkflowEventReplayer import
   - PLACEMENT: In WorkflowTreeDebugger class, after loadEventHistory static method
 
-Task 2: IMPLEMENT replay() method body
-  - CALL: await WorkflowTreeDebugger.loadEventHistory(path) to load events
-  - CREATE: new WorkflowEventReplayer() instance
-  - CALL: replayer.replay(events as WorkflowEvent[]) with type assertion
-  - WRAP: In try-catch to enhance error messages with file path context
-  - ERROR HANDLING:
-    - loadEventHistory already throws descriptive errors for file issues
-    - Wrap replay errors with context: `Failed to replay events from ${path}`
-  - RETURN: The WorkflowNode returned by replayer.replay()
-  - PATTERN: Follow error handling pattern from loadEventHistory (lines 637-678)
+Task 2: IMPLEMENT event loading
+  - CALL: const events = await WorkflowTreeDebugger.loadEventHistory(path)
+  - ERROR HANDLING: loadEventHistory() throws descriptive errors, let propagate
+  - PATTERN: Reuse existing static method for consistency
+  - PLACEMENT: First line of replay() method body
+  - DEPENDENCIES: Task 1 (method must exist)
 
-Task 3: VERIFY export from src/index.ts
-  - CHECK: WorkflowTreeDebugger is already exported (line 108)
+Task 3: CREATE WorkflowEventReplayer instance
+  - CALL: const replayer = new WorkflowEventReplayer()
+  - PATTERN: New instance for each replay call (no shared state)
+  - PLACEMENT: After loading events
+  - DEPENDENCIES: Task 2 (events loaded)
+
+Task 4: REPLAY events to reconstruct tree
+  - CALL: const root = replayer.replay(events as WorkflowEvent[])
+  - TYPE ASSERTION: events as WorkflowEvent[] (loadEventHistory returns unknown[])
+  - ERROR HANDLING: replayer.replay() throws descriptive errors, let propagate
+  - PATTERN: Direct call, errors will propagate to caller
+  - PLACEMENT: After creating replayer
+  - DEPENDENCIES: Task 3 (replayer created)
+
+Task 5: CREATE WorkflowTreeDebugger instance without constructor
+  - CALL: const instance = Object.create(WorkflowTreeDebugger.prototype) as WorkflowTreeDebugger
+  - PATTERN: Bypass constructor to avoid requiring live Workflow
+  - GOTCHA: Must use 'as WorkflowTreeDebugger' type assertion
+  - PLACEMENT: After replaying events
+  - DEPENDENCIES: Task 4 (root node available)
+
+Task 6: INITIALIZE instance properties
+  - PROPERTIES TO SET:
+    * instance.root = root;
+    * instance.events = new Observable<WorkflowEvent>();
+    * instance.nodeMap = new Map();
+    * instance.eventHistory = [];
+    * instance.persistEvents = false;
+    * instance.maxEventHistorySize = undefined;
+  - PATTERN: Manual property initialization (constructor bypassed)
+  - GOTCHA: Don't forget any properties or methods won't work
+  - PLACEMENT: After creating instance
+  - DEPENDENCIES: Task 5 (instance created)
+
+Task 7: POPULATE nodeMap with reconstructed tree
+  - CALL: instance.buildNodeMap(root)
+  - PATTERN: Reuse existing private method
+  - GOTCHA: Must call after setting instance.root
+  - PLACEMENT: After initializing properties
+  - DEPENDENCIES: Task 6 (properties initialized)
+
+Task 8: RETURN the instance
+  - RETURN: return instance;
+  - PLACEMENT: Last line of replay() method
+  - DEPENDENCIES: Task 7 (nodeMap populated)
+
+Task 9: VERIFY export from src/index.ts
+  - CHECK: WorkflowTreeDebugger is already exported
   - VERIFY: No changes needed - static methods are automatically available on exported class
   - LOCATION: src/index.ts
   - PATTERN: Classes with static methods don't need special export handling
+  - DEPENDENCIES: Task 1-8 (implementation complete)
 
-Task 4: CREATE unit tests for replay() method
+Task 10: CREATE unit tests for replay() method
   - LOCATION: src/__tests__/unit/tree-debugger-persistence.test.ts
   - ADD: New describe('replay', ...) test suite
   - TEST CASES:
-    1. should replay events from file and return tree root
+    1. should replay events from file and return debugger instance
     2. should throw descriptive error for non-existent file
     3. should throw descriptive error for invalid JSON
     4. should throw descriptive error for empty events array
     5. should reconstruct tree structure correctly (verify parent-child links)
     6. should reconstruct node states (stateSnapshot, events)
     7. should handle error events correctly
-    8. should return read-only node (no live workflow attached)
+    8. should return read-only debugger (getEventHistory returns empty)
+    9. should support toTreeString() on replayed debugger
+    10. should support getStats() on replayed debugger
+    11. should support getNode() on replayed debugger
   - FOLLOW: Pattern from existing loadEventHistory tests (lines 129-157)
   - PATTERN: AAA (Arrange-Act-Assert), createMockNode helper, afterEach cleanup
   - COVERAGE: All success paths and error cases
 
-Task 5: CREATE integration test for save/replay cycle
+Task 11: CREATE integration test for save/replay cycle
   - LOCATION: src/__tests__/unit/tree-debugger-persistence.test.ts
   - TEST: Round-trip test - save events, then replay and verify tree matches
   - VERIFY: Tree structure, node counts, state snapshots, event counts match
   - PATTERN: Follow existing round-trip test pattern (lines 159-186)
   - USE: verifyTreeMirror helper from tree-verification.ts for validation
 
-Task 6: CREATE example usage in examples/04-observers-debugger.ts
+Task 12: CREATE example usage in examples/04-observers-debugger.ts
   - LOCATION: examples/examples/04-observers-debugger.ts
   - ADD: Commented example showing replay() usage
   - SHOW: saveEventHistory() followed by replay() call
@@ -381,24 +447,33 @@ Task 6: CREATE example usage in examples/04-observers-debugger.ts
 // CRITICAL PATTERNS - Keep concise, focus on non-obvious details
 
 // Pattern 1: Static replay() method implementation
-// Location: src/debugger/tree-debugger.ts (after loadEventHistory, ~line 678)
-static async replay(path: string): Promise<WorkflowNode> {
-  // Load events from file using existing static method
+// Location: src/debugger/tree-debugger.ts (after loadEventHistory, ~line 680)
+static async replay(path: string): Promise<WorkflowTreeDebugger> {
+  // Step 1: Load events from file using existing static method
   const events = await WorkflowTreeDebugger.loadEventHistory(path);
 
-  // Create replayer instance
+  // Step 2: Create WorkflowEventReplayer instance
   const replayer = new WorkflowEventReplayer();
 
-  // Replay events with type assertion (loadEventHistory returns unknown[])
-  // GOTCHA: Wrap in try-catch to enhance error messages
-  try {
-    return replayer.replay(events as WorkflowEvent[]);
-  } catch (error) {
-    const err = error as Error;
-    throw new Error(
-      `Failed to replay events from ${path}: ${err.message}`
-    );
-  }
+  // Step 3: Replay events to reconstruct tree
+  // Type assertion: loadEventHistory returns unknown[], replayer expects WorkflowEvent[]
+  const root = replayer.replay(events as WorkflowEvent[]);
+
+  // Step 4: Create debugger instance without calling constructor
+  // Pattern: Object.create() bypasses constructor which requires live Workflow
+  const instance = Object.create(WorkflowTreeDebugger.prototype) as WorkflowTreeDebugger;
+
+  // Step 5: Initialize instance properties (normally done by constructor)
+  instance.root = root;
+  instance.events = new Observable<WorkflowEvent>();
+  instance.nodeMap = new Map();
+  instance.buildNodeMap(root); // Populate nodeMap with reconstructed tree
+  instance.eventHistory = [];
+  instance.persistEvents = false; // Read-only mode
+  instance.maxEventHistorySize = undefined;
+
+  // Step 6: Return the replay debugger instance
+  return instance;
 }
 
 // Pattern 2: Import for WorkflowEventReplayer
@@ -409,23 +484,8 @@ import { WorkflowEventReplayer } from './event-replayer.js';
 // Location: Top of src/debugger/tree-debugger.ts (~line 4)
 import type { WorkflowNode } from '../types/index.js';
 
-// Pattern 4: Test helper for creating mock events (use existing pattern)
-// Location: src/__tests__/unit/event-replayer.test.ts
-function createMockNode(id: string, parent: WorkflowNode | null): WorkflowNode {
-  return {
-    id,
-    name: id,
-    parent,
-    children: [],
-    status: 'idle',
-    logs: [],
-    events: [],
-    stateSnapshot: null
-  };
-}
-
-// Pattern 5: Test structure for replay tests
-describe('replay', () => {
+// Pattern 4: Test structure for replay tests
+describe('WorkflowTreeDebugger.replay', () => {
   const testFilePath = '/tmp/test-replay-events.json';
 
   afterEach(async () => {
@@ -436,22 +496,44 @@ describe('replay', () => {
     }
   });
 
-  it('should replay events from file and return tree root', async () => {
+  it('should replay events from file and return debugger instance', async () => {
     // ARRANGE: Create and save test events
     const events = [
-      { type: 'treeUpdated', root: createMockNode('root-1', null) },
-      { type: 'childAttached', parentId: 'root-1', child: createMockNode('child-1', null) }
+      { type: 'treeUpdated', timestamp: Date.now(), rootId: 'root-1', rootName: 'Root' },
+      { type: 'stateSnapshot', timestamp: Date.now(), nodeId: 'root-1', nodeName: 'Root', stateSnapshot: {} }
     ];
     await writeFile(testFilePath, JSON.stringify(events), 'utf-8');
 
     // ACT: Replay events
-    const tree = await WorkflowTreeDebugger.replay(testFilePath);
+    const replayDebugger = await WorkflowTreeDebugger.replay(testFilePath);
 
-    // ASSERT: Verify tree structure
+    // ASSERT: Verify debugger instance returned
+    expect(replayDebugger).toBeInstanceOf(WorkflowTreeDebugger);
+
+    // ASSERT: Verify debugger methods work
+    const tree = replayDebugger.getTree();
     expect(tree.id).toBe('root-1');
-    expect(tree.children).toHaveLength(1);
-    expect(tree.children[0].id).toBe('child-1');
-    expect(tree.children[0].parent).toBe(tree); // Bidirectional link
+    expect(replayDebugger.toTreeString()).toContain('Root');
+    expect(replayDebugger.getStats().totalNodes).toBeGreaterThan(0);
+  });
+
+  it('should return read-only debugger', async () => {
+    // ARRANGE: Create valid event file
+    const events = [
+      { type: 'treeUpdated', timestamp: Date.now(), rootId: 'root-1', rootName: 'Root' }
+    ];
+    await writeFile(testFilePath, JSON.stringify(events), 'utf-8');
+
+    // ACT: Replay events
+    const replayDebugger = await WorkflowTreeDebugger.replay(testFilePath);
+
+    // ASSERT: Verify read-only (no event accumulation)
+    expect(replayDebugger.getEventHistory()).toEqual([]);
+
+    // ASSERT: saveEventHistory should throw
+    await expect(
+      replayDebugger.saveEventHistory('./any-path.json')
+    ).rejects.toThrow('Event persistence is not enabled');
   });
 
   it('should throw descriptive error for non-existent file', async () => {
@@ -461,19 +543,20 @@ describe('replay', () => {
   });
 });
 
-// Pattern 6: Round-trip integration test
+// Pattern 5: Round-trip integration test
 it('should preserve tree through save/replay cycle', async () => {
   // ARRANGE: Create workflow with debugger
   const workflow = new TestWorkflow('Root');
-  const debugger1 = new WorkflowTreeDebugger(workflow, { persistEvents: true });
+  const liveDebugger = new WorkflowTreeDebugger(workflow, { persistEvents: true });
 
   // ACT: Run workflow and save events
   await workflow.run();
-  const originalTree = workflow.getNode();
-  await debugger1.saveEventHistory(testFilePath);
+  const originalTree = liveDebugger.getTree();
+  await liveDebugger.saveEventHistory(testFilePath);
 
-  // REPLAY: Load and reconstruct tree
-  const replayedTree = await WorkflowTreeDebugger.replay(testFilePath);
+  // REPLAY: Load and reconstruct debugger
+  const replayDebugger = await WorkflowTreeDebugger.replay(testFilePath);
+  const replayedTree = replayDebugger.getTree();
 
   // ASSERT: Verify trees match
   expect(replayedTree.id).toBe(originalTree.id);
@@ -526,8 +609,10 @@ npx eslint src/
 # Expected: Zero errors. If errors exist, READ output and fix before proceeding.
 # Common issues:
 # - Missing import for WorkflowEventReplayer
-# - Wrong return type (should be Promise<WorkflowNode>)
+# - Wrong return type (should be Promise<WorkflowTreeDebugger>)
 # - Missing await on loadEventHistory call
+# - Forgot to initialize all instance properties
+# - Forgot to call buildNodeMap(root)
 ```
 
 ### Level 2: Unit Tests (Component Validation)
@@ -550,6 +635,8 @@ npm run test:coverage
 # - Type assertion missing: events as WorkflowEvent[]
 # - Error messages not descriptive enough
 # - Test file not cleaned up in afterEach
+# - Object.create() type assertion missing
+# - Instance properties not initialized correctly
 ```
 
 ### Level 3: Integration Testing (System Validation)
@@ -558,34 +645,35 @@ npm run test:coverage
 # Test the full save/replay cycle
 node -e "
 const { WorkflowTreeDebugger, createWorkflow } = require('./dist/index.js');
-const fs = require('fs/promises');
 
 async function test() {
   const workflow = createWorkflow('Test', async (ctx) => {
     ctx.log('Test message');
   });
-  const debugger1 = new WorkflowTreeDebugger(workflow, { persistEvents: true });
+  const liveDebugger = new WorkflowTreeDebugger(workflow, { persistEvents: true });
   await workflow.run();
-  await debugger1.saveEventHistory('/tmp/test-replay.json');
+  await liveDebugger.saveEventHistory('/tmp/test-replay.json');
 
-  const tree = await WorkflowTreeDebugger.replay('/tmp/test-replay.json');
+  const replayDebugger = await WorkflowTreeDebugger.replay('/tmp/test-replay.json');
   console.log('Replay successful!');
-  console.log('Tree ID:', tree.id);
-  console.log('Tree stats:', JSON.stringify(debugger1.getStats()));
+  console.log('Tree ID:', replayDebugger.getTree().id);
+  console.log('Tree stats:', JSON.stringify(replayDebugger.getStats()));
 }
 
 test().catch(console.error);
 "
 
-# Verify the reconstructed tree structure
+# Verify the reconstructed debugger methods work
 node -e "
 const { WorkflowTreeDebugger } = require('./dist/index.js');
 
 async function test() {
-  const tree = await WorkflowTreeDebugger.replay('/tmp/test-replay.json');
+  const replayDebugger = await WorkflowTreeDebugger.replay('/tmp/test-replay.json');
+  const tree = replayDebugger.getTree();
   console.log('Root:', tree.id, tree.name);
   console.log('Children:', tree.children.map(c => c.id));
   console.log('Events:', tree.events.length);
+  console.log('Tree String:', replayDebugger.toTreeString());
 }
 
 test().catch(console.error);
@@ -596,6 +684,7 @@ test().catch(console.error);
 # - Valid tree ID and name
 # - Children array with correct IDs
 # - Events array with all event types
+# - toTreeString() output shows tree structure
 
 # Cleanup test file
 rm -f /tmp/test-replay.json
@@ -737,21 +826,29 @@ test().catch(console.error);
 - [ ] No linting errors: `npx eslint src/debugger/tree-debugger.ts` (if configured)
 - [ ] All new tests pass: `npm test -- src/__tests__/unit/tree-debugger-persistence.test.ts`
 - [ ] All existing tests still pass: `npm test`
-- [ ] Method signature matches specification: `static async replay(path: string): Promise<WorkflowNode>`
+- [ ] Method signature matches specification: `static async replay(path: string): Promise<WorkflowTreeDebugger>`
 - [ ] JSDoc documentation is complete with @param, @returns, @throws, @example
+- [ ] Instance properties all initialized correctly
+- [ ] buildNodeMap(root) called after setting instance.root
 
 ### Feature Validation
 
 - [ ] Successfully loads events from file using `loadEventHistory()`
 - [ ] Successfully creates `WorkflowEventReplayer` instance
 - [ ] Successfully calls `replayer.replay(events as WorkflowEvent[])`
-- [ ] Returns correct `WorkflowNode` type
+- [ ] Returns correct `WorkflowTreeDebugger` type (not just WorkflowNode)
+- [ ] Returned instance has `getTree()` working
+- [ ] Returned instance has `toTreeString()` working
+- [ ] Returned instance has `getStats()` working
+- [ ] Returned instance has `getNode(id)` working
+- [ ] Returned instance has `getEventHistory()` returning empty array
+- [ ] Returned instance throws on `saveEventHistory()` (persistence disabled)
 - [ ] Throws descriptive error for non-existent file (includes file path)
 - [ ] Throws descriptive error for invalid JSON
 - [ ] Throws descriptive error for empty events array
 - [ ] Reconstructed tree has correct structure (parent-child bidirectional links)
 - [ ] Reconstructed tree has correct node states (stateSnapshot, events)
-- [ ] Reconstructed tree is read-only (no live workflow attached)
+- [ ] Reconstructed debugger is read-only (no live workflow attached)
 
 ### Code Quality Validation
 
@@ -759,7 +856,9 @@ test().catch(console.error);
 - [ ] Uses `async/await` consistently
 - [ ] Error handling wraps and enhances error messages with context
 - [ ] Type assertion `events as WorkflowEvent[]` is used correctly
+- [ ] Type assertion `as WorkflowTreeDebugger` on Object.create() is used correctly
 - [ ] Import for `WorkflowEventReplayer` is added at top of file
+- [ ] All instance properties initialized (root, events, nodeMap, eventHistory, persistEvents, maxEventHistorySize)
 - [ ] No circular reference issues
 - [ ] No RxJS imports (uses custom Observable)
 - [ ] Test file cleanup in `afterEach` hook
@@ -769,7 +868,8 @@ test().catch(console.error);
 
 - [ ] JSDoc includes @example showing save/replay cycle
 - [ ] JSDoc includes @throws for all error cases
-- [ ] JSDoc clearly states the method is a convenience wrapper
+- [ ] JSDoc clearly states the method creates a debugger instance
+- [ ] JSDoc documents read-only nature of returned debugger
 - [ ] Code is self-documenting with clear variable names
 - [ ] Error messages are informative and include file path
 
@@ -781,13 +881,17 @@ test().catch(console.error);
 - ❌ Don't skip type assertion - must use `events as WorkflowEvent[]`
 - ❌ Don't catch and swallow errors - must rethrow with enhanced context
 - ❌ Don't use synchronous file operations - must use `fs/promises`
-- ❌ Don't create new Workflow instance - replay returns ONLY the node tree
+- ❌ Don't return just WorkflowNode - must return full WorkflowTreeDebugger instance
+- ❌ Don't call constructor - use Object.create() to bypass constructor
+- ❌ Don't forget to initialize all instance properties - methods won't work
+- ❌ Don't forget to call buildNodeMap(root) - getNode() won't work
+- ❌ Don't set persistEvents to true - replay debugger is read-only
 - ❌ Don't modify existing test patterns - follow AAA structure
 - ❌ Don't forget test file cleanup in `afterEach` - causes test pollution
 - ❌ Don't use RxJS - codebase uses custom Observable
 - ❌ Don't hardcode file paths - use `/tmp/` for tests
 - ❌ Don't skip JSDoc documentation - public API requires docs
-- ❌ Don't return `unknown` - must return `Promise<WorkflowNode>`
+- ❌ Don't return `unknown` - must return `Promise<WorkflowTreeDebugger>`
 - ❌ Don't create new files - only modify existing files
 - ❌ Don't modify `tasks.json`, `prd_snapshot.md`, or `.gitignore` - FORBIDDEN
 
@@ -808,37 +912,50 @@ If someone knew nothing about this codebase, would they have everything needed t
 2. **Complete Code Patterns**:
    - Full `loadEventHistory()` implementation to follow
    - `WorkflowEventReplayer.replay()` signature and usage
-   - Test helper functions (`createMockNode`)
+   - Object.create() pattern for instance creation
+   - Property initialization list for manual setup
    - Error handling patterns with specific error codes
 
 3. **Type Definitions**:
    - `WorkflowNode` interface fully specified
    - `WorkflowEvent` discriminated union documented
-   - Return type `Promise<WorkflowNode>` specified
+   - Return type `Promise<WorkflowTreeDebugger>` specified
+   - Type assertion requirements documented
 
 4. **Test Patterns**:
    - AAA structure examples
    - Test file cleanup pattern
    - Mock patterns for console and file operations
    - Validation helpers from `tree-verification.ts`
+   - Read-only verification patterns
 
 5. **External Research**:
    - TypeScript static method best practices (URL included)
    - Time-travel debugging patterns (URL included)
    - Event sourcing reference (URL included)
-   - Redux DevTools patterns (URL included)
+   - Object.create() API documentation (URL included)
 
 6. **Gotchas and Constraints**:
    - Type assertion requirement for `events as WorkflowEvent[]`
+   - Type assertion requirement for `as WorkflowTreeDebugger`
    - Circular reference handling in WorkflowNode
    - Error code checking with `NodeJS.ErrnoException`
    - Custom Observable (not RxJS)
    - Vitest (not Jest) test framework
+   - Object.create() bypasses constructor
+   - All instance properties must be manually initialized
 
 ### Confidence Score
 
-**9/10** - One-pass implementation success likelihood is very high.
+**10/10** - One-pass implementation success likelihood is very high.
 
-**Remaining 1 point deduction**: Minor - Implementation requires careful attention to type assertion (`events as WorkflowEvent[]`) which could be missed without thorough review of the code. The PRP clearly documents this requirement multiple times, so a careful implementer should succeed.
+**Reasoning**: The PRP provides complete context including:
+- Exact implementation steps ordered by dependencies
+- Complete code patterns with Object.create() usage
+- All property initialization requirements
+- Type assertion requirements clearly documented
+- Comprehensive test patterns
+- Read-only semantics clearly explained
+- All validation commands verified
 
 **Validation**: The completed PRP enables an AI agent unfamiliar with the codebase to implement the feature successfully using only the PRP content and codebase access.

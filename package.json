@@ -46,11 +46,14 @@
     "start:reflection": "tsx examples/examples/09-reflection.ts",
     "start:introspection": "tsx examples/examples/10-introspection.ts",
     "start:reparenting": "tsx examples/examples/11-reparenting-workflows.ts",
+    "start:ink": "tsx examples/examples/ink-debugger-hello.tsx",
     "generate:llms": "npx tsx scripts/generate-llms-full.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.1",
+    "ink": "^6.6.0",
     "lru-cache": "^10.4.3",
+    "react": "^19.0.0",
     "zod": "^3.23.0"
   },
   "devDependencies": {
@@ -60,7 +63,7 @@
     "vitest": "^1.0.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "files": [
     "dist"
