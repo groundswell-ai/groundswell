@@ -18,7 +18,7 @@
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "Task: Create Provider Type Definitions",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Define all TypeScript interfaces and types for the provider abstraction layer in src/types/providers.ts",
               "subtasks": [
                 {
@@ -68,7 +68,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S5",
                   "title": "Define ProviderResult, ModelSpec, and GlobalProviderConfig",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",

@@ -1,4 +1,4 @@
-import type { Tool, MCPServer, Skill } from './sdk-primitives.js';
+import type { Tool, MCPServer, Skill, TokenUsage } from './sdk-primitives.js';
 import type { AgentResponse } from './agent.js';
 
 /**
@@ -131,18 +131,28 @@ export interface ProviderRequest {
 
 /**
  * Model specification
- * Normalized model identifier with provider information
  *
- * @remarks
- * This type will be fully defined in P1.M1.T1.S5.
- * This placeholder provides the basic structure for Provider.normalizeModel().
+ * Represents a parsed model identifier with provider and model name.
+ * Supports both plain ("claude-sonnet-4") and qualified ("anthropic/claude-opus-4")
+ * formats per PRD 7.8.
+ *
+ * @example
+ * ```ts
+ * // Plain format (uses default provider)
+ * parseModelSpec('claude-sonnet-4', 'anthropic')
+ * // Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
+ *
+ * // Qualified format (explicit provider)
+ * parseModelSpec('opencode/gpt-4')
+ * // Returns: { provider: 'opencode', model: 'gpt-4', raw: 'opencode/gpt-4' }
+ * ```
  */
 export interface ModelSpec {
   /** Provider identifier */
   provider: ProviderId;
   /** Model name (without provider prefix) */
   model: string;
-  /** Original raw model string */
+  /** Original raw model string (preserves user input) */
   raw: string;
 }
 
@@ -157,6 +167,201 @@ export interface ModelSpec {
 export type ToolExecutor = (
   request: ToolExecutionRequest
 ) => Promise<ToolExecutionResult>;
+
+// ========================
+// ProviderResult Types (PRD 6)
+// ========================
+
+/**
+ * Provider response status
+ *
+ * Three-state status indicating the outcome of a provider operation.
+ * - 'success': Operation completed successfully with valid data
+ * - 'error': Operation failed with error details
+ * - 'partial': Operation partially completed (streaming, incremental)
+ */
+export type ProviderResponseStatus =
+  | 'success'
+  | 'error'
+  | 'partial';
+
+/**
+ * Detailed error information for provider operations
+ *
+ * Provides structured error details for failed provider operations.
+ * Used in ProviderResult when status is 'error'.
+ */
+export interface ProviderErrorDetails {
+  /**
+   * Machine-readable error code
+   * Examples: VALIDATION_FAILED, EXECUTION_FAILED, API_REQUEST_FAILED
+   */
+  code: string;
+
+  /**
+   * Human-readable error description
+   * Explains what went wrong in user-friendly terms
+   */
+  message: string;
+
+  /**
+   * Additional error context
+   * May contain structured data about the error for debugging
+   */
+  details?: Record<string, unknown> | null;
+
+  /**
+   * Whether the error is recoverable
+   * Hint for parent workflow retry logic
+   */
+  recoverable: boolean;
+}
+
+/**
+ * Metadata about provider operation execution
+ *
+ * Contains execution context information for provider operations.
+ * Always present in ProviderResult regardless of status.
+ */
+export interface ProviderResponseMetadata {
+  /**
+   * Provider identifier
+   * ID of the provider that generated this response
+   */
+  providerId: string;
+
+  /**
+   * Unix timestamp in milliseconds
+   * Time when the response was generated
+   */
+  timestamp: number;
+
+  /**
+   * Execution duration in milliseconds
+   * Time taken for the provider operation to complete
+   */
+  duration?: number | null;
+
+  /**
+   * Request correlation ID
+   * Used for tracing requests across distributed systems
+   */
+  requestId?: string | null;
+
+  /**
+   * Token usage from the API
+   * Breakdown of input, output, and cache tokens used
+   */
+  usage?: TokenUsage;
+
+  /**
+   * Number of tool invocations
+   * Count of tool/function calls made during execution
+   */
+  toolCalls?: number;
+}
+
+/**
+ * Provider execution result wrapper
+ *
+ * Wraps the result of provider execution with status, data, error,
+ * and metadata. Uses discriminated union pattern for type safety.
+ *
+ * ## PRD 6.4 Response Requirements
+ *
+ * All ProviderResult instances MUST satisfy:
+ * 1. **Strict JSON**: Parseable by JSON.parse()
+ * 2. **No Prose Wrapping**: No markdown or conversational text
+ * 3. **Consistent Structure**: Conforms to this interface
+ * 4. **Null over Undefined**: Use null for absent values
+ * 5. **Error Responses**: Failed ops return valid JSON with status='error'
+ *
+ * ## Type Narrowing
+ *
+ * The status field is a discriminant. Use type guards to narrow:
+ * - status='success' → data is T (not null), error is null
+ * - status='error' → data is null, error is ProviderErrorDetails (not null)
+ * - status='partial' → data is T (not null), error may be null
+ *
+ * @template T - The type of data returned on success (unknown by default)
+ * @see {@link ProviderResponseStatus}, {@link ProviderErrorDetails}
+ *
+ * @example
+ * ```ts
+ * const result: ProviderResult<{ answer: string }> = {
+ *   status: 'success',
+ *   data: { answer: '42' },
+ *   error: null,
+ *   metadata: { providerId: 'anthropic', timestamp: Date.now() }
+ * };
+ * ```
+ */
+export interface ProviderResult<T = unknown> {
+  /**
+   * Response status discriminator
+   * Use for type narrowing: 'success' | 'error' | 'partial'
+   */
+  status: ProviderResponseStatus;
+
+  /**
+   * Response data
+   * Present on success and partial responses, null on error
+   */
+  data: T | null;
+
+  /**
+   * Error details
+   * Present on error responses, null on success
+   */
+  error: ProviderErrorDetails | null;
+
+  /**
+   * Response metadata
+   * Always present, contains execution context
+   */
+  metadata: ProviderResponseMetadata;
+}
+
+// ========================
+// Global Provider Configuration (PRD 7.6)
+// ========================
+
+/**
+ * Global provider configuration
+ *
+ * Configures default provider and per-provider options that cascade
+ * to all agents unless explicitly overridden.
+ *
+ * ## Configuration Cascade (PRD 7.7)
+ *
+ * Priority order (lowest to highest):
+ * 1. GlobalProviderConfig (this config)
+ * 2. AgentConfig.provider / AgentConfig.providerOptions
+ * 3. Prompt-level overrides
+ *
+ * @example
+ * ```ts
+ * configureProviders({
+ *   defaultProvider: 'opencode',
+ *   providerDefaults: {
+ *     opencode: { endpoint: 'http://localhost:8080' },
+ *     anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
+ *   }
+ * });
+ * ```
+ */
+export interface GlobalProviderConfig {
+  /**
+   * Default provider to use when none specified
+   */
+  defaultProvider: ProviderId;
+
+  /**
+   * Per-provider default options
+   * Mapped by provider ID, all options are optional
+   */
+  providerDefaults?: Partial<Record<ProviderId, ProviderOptions>>;
+}
 
 // ========================
 // Provider Interface (PRD 7.3)

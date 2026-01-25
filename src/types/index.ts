@@ -36,6 +36,11 @@ export type {
   ToolExecutionResult,
   ModelSpec,
   ToolExecutor,
+  ProviderResult,
+  ProviderResponseStatus,
+  ProviderErrorDetails,
+  ProviderResponseMetadata,
+  GlobalProviderConfig,
 } from './providers.js';
 
 // Agent types
