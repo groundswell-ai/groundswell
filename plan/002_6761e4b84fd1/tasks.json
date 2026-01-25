@@ -356,7 +356,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Phase 2: Optional Enhancements",
-      "status": "Planned",
+      "status": "Ready",
       "description": "Optional improvements identified during research. Not required for PRD compliance but valuable for long-term maintainability.",
       "milestones": [
         {
@@ -443,7 +443,7 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Milestone 2.2: Ink-Based Terminal UI (Optional)",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Build reactive terminal UI using Ink for interactive tree debugging",
           "tasks": [
             {
@@ -479,14 +479,14 @@
               "type": "Task",
               "id": "P2.M2.T2",
               "title": "Add interactive features (expand/collapse, navigation)",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Implement user interactions for tree exploration",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T2.S1",
                   "title": "Implement expand/collapse for tree nodes",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T1.S2"
@@ -497,7 +497,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T2.S2",
                   "title": "Add split-pane layout with node details",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T2.S1"

@@ -13,6 +13,6 @@ export default defineConfig({
   esbuild: {
     target: 'node18',
     jsx: 'automatic',
-    jsxImportSource: 'ink',
+    jsxImportSource: 'react',
   },
 });

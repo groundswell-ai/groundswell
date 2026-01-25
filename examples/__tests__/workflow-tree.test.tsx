@@ -74,7 +74,7 @@ describe('WorkflowTree', () => {
   };
 
   it('renders tree with proper indentation', () => {
-    const { lastFrame } = render(<WorkflowTree node={mockNode} />);
+    const { lastFrame } = render(<WorkflowTree node={mockNode} expandedIds={new Set([mockNode.id])} />);
     const output = lastFrame();
     expect(output).toContain('Test Workflow');
     expect(output).toContain('Child 1');
@@ -82,7 +82,7 @@ describe('WorkflowTree', () => {
   });
 
   it('renders branch connectors correctly', () => {
-    const { lastFrame } = render(<WorkflowTree node={mockNode} />);
+    const { lastFrame } = render(<WorkflowTree node={mockNode} expandedIds={new Set([mockNode.id])} />);
     const output = lastFrame();
     // First child should use ├── (not last)
     expect(output).toContain('├──');
@@ -91,7 +91,7 @@ describe('WorkflowTree', () => {
   });
 
   it('renders status symbols', () => {
-    const { lastFrame } = render(<WorkflowTree node={mockNode} />);
+    const { lastFrame } = render(<WorkflowTree node={mockNode} expandedIds={new Set([mockNode.id])} />);
     const output = lastFrame();
     expect(output).toContain('◐'); // running
     expect(output).toContain('✓'); // completed
@@ -153,7 +153,7 @@ describe('WorkflowTree', () => {
       stateSnapshot: null,
     };
 
-    const { lastFrame } = render(<WorkflowTree node={nestedNode} />);
+    const { lastFrame } = render(<WorkflowTree node={nestedNode} expandedIds={new Set([nestedNode.id, 'child1'])} />);
     const output = lastFrame();
 
     expect(output).toContain('Root');
@@ -208,7 +208,7 @@ describe('WorkflowTreeDebuggerUI', () => {
     const mockDebugger = new MockWorkflowTreeDebugger(mockTree);
 
     const { lastFrame } = render(
-      <WorkflowTreeDebuggerUI debugger={mockDebugger as any} />
+      <WorkflowTreeDebuggerUI treeDebugger={mockDebugger as any} />
     );
 
     expect(lastFrame()).toContain('Workflow Tree Debugger');
@@ -245,7 +245,7 @@ describe('WorkflowTreeDebuggerUI', () => {
     };
 
     const { unmount } = render(
-      <WorkflowTreeDebuggerUI debugger={mockDebugger as any} />
+      <WorkflowTreeDebuggerUI treeDebugger={mockDebugger as any} />
     );
 
     unmount();

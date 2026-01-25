@@ -19,6 +19,12 @@ import { WorkflowTreeNode } from './WorkflowTreeNode.js';
 export interface WorkflowTreeProps {
   /** The root workflow node to render */
   node: WorkflowNode;
+  /** Set of expanded node IDs */
+  expandedIds?: Set<string>;
+  /** Toggle callback for expand/collapse (optional, for future use) */
+  onToggle?: (nodeId: string) => void;
+  /** Currently selected node ID for keyboard navigation */
+  selectedId?: string | null;
 }
 
 /**
@@ -43,8 +49,21 @@ export interface WorkflowTreeProps {
  * <WorkflowTree node={tree} />
  * ```
  */
-export const WorkflowTree: React.FC<WorkflowTreeProps> = ({ node }) => {
-  return <WorkflowTreeNode node={node} isRoot={true} />;
+export const WorkflowTree: React.FC<WorkflowTreeProps> = ({
+  node,
+  expandedIds,
+  onToggle,
+  selectedId,
+}) => {
+  return (
+    <WorkflowTreeNode
+      node={node}
+      isRoot={true}
+      expandedIds={expandedIds}
+      onToggle={onToggle}
+      selectedId={selectedId}
+    />
+  );
 };
 
 export default WorkflowTree;

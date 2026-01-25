@@ -40,6 +40,12 @@ export interface WorkflowTreeNodeProps {
   isLast?: boolean;
   /** Whether this is the root node (no connector/prefix) */
   isRoot?: boolean;
+  /** Set of expanded node IDs */
+  expandedIds?: Set<string>;
+  /** Toggle callback for expand/collapse (optional, for future use) */
+  onToggle?: (nodeId: string) => void;
+  /** Currently selected node ID for keyboard navigation */
+  selectedId?: string | null;
 }
 
 /**
@@ -59,7 +65,15 @@ export const WorkflowTreeNode: React.FC<WorkflowTreeNodeProps> = ({
   prefix = '',
   isLast = false,
   isRoot = false,
+  expandedIds = new Set(),
+  onToggle,
+  selectedId = null,
 }) => {
+  // Expand/collapse state
+  const isExpanded = expandedIds.has(node.id);
+  const hasChildren = node.children.length > 0;
+  const isSelected = selectedId === node.id;
+
   // Calculate connector based on position
   // Root nodes have no connector, children use ├── or └──
   const connector = isRoot ? '' : (isLast ? '└── ' : '├── ');
@@ -69,6 +83,14 @@ export const WorkflowTreeNode: React.FC<WorkflowTreeNodeProps> = ({
   // If parent was last: prefix + '    ' (just spaces)
   const childPrefix = isRoot ? '' : prefix + (isLast ? '    ' : '│   ');
 
+  // Expand/collapse indicator: ▸ for collapsed, ▾ for expanded, space for leaf nodes
+  const expandIndicator = hasChildren
+    ? (isExpanded ? '▾' : '▸')
+    : ' ';
+
+  // Child count text for collapsed nodes
+  const childText = node.children.length === 1 ? 'child' : 'children';
+
   return (
     <Box flexDirection="column">
       {/* Current node */}
@@ -77,16 +99,29 @@ export const WorkflowTreeNode: React.FC<WorkflowTreeNodeProps> = ({
         {!isRoot && <Text dimColor>{prefix}</Text>}
         {/* Connector (├── or └──) */}
         {!isRoot && <Text dimColor>{connector}</Text>}
+        {/* Expand/collapse indicator */}
+        <Text
+          bold={isSelected}
+          color={isSelected ? 'cyan' : undefined}
+        >
+          {expandIndicator}
+        </Text>
+        {/* Space */}
+        <Text> </Text>
         {/* Status icon */}
         <StatusIcon status={node.status} />
         {/* Space */}
         <Text> </Text>
         {/* Node name with status color */}
         <Text color={getStatusColor(node.status)}>{node.name}</Text>
+        {/* Collapsed placeholder */}
+        {hasChildren && !isExpanded && (
+          <Text dimColor> ▸ [{node.children.length} {childText}]</Text>
+        )}
       </Box>
 
-      {/* Recursively render children */}
-      {node.children.map((child, index) => (
+      {/* Recursively render children only if expanded */}
+      {isExpanded && hasChildren && node.children.map((child, index) => (
         <WorkflowTreeNode
           key={child.id}
           node={child}
@@ -94,6 +129,9 @@ export const WorkflowTreeNode: React.FC<WorkflowTreeNodeProps> = ({
           prefix={childPrefix}
           isLast={index === node.children.length - 1}
           isRoot={false}
+          expandedIds={expandedIds}
+          onToggle={onToggle}
+          selectedId={selectedId}
         />
       ))}
     </Box>
