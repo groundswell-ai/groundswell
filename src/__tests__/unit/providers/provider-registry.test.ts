@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { ProviderRegistry } from '../../../providers/provider-registry.js';
+import { ProviderRegistry, InitializationStatus } from '../../../providers/provider-registry.js';
 import type { Provider, ProviderId, ProviderCapabilities } from '../../../types/providers.js';
 import type { AgentResponse } from '../../../types/agent.js';
 import type { ProviderRequest, ToolExecutor, ProviderHookEvents, ModelSpec } from '../../../types/providers.js';
@@ -24,6 +24,8 @@ import type { MCPServer, Tool, Skill } from '../../../types/sdk-primitives.js';
 
 // Reset after each test for isolation
 afterEach(() => {
+  const registry = ProviderRegistry.getInstance();
+  registry._resetInitStateForTesting();
   ProviderRegistry._resetForTesting();
 });
 
@@ -420,6 +422,483 @@ describe('ProviderRegistry', () => {
 
       // Original provider should still be there
       expect(registry.get('anthropic')).toBe(provider1);
+    });
+  });
+
+  // ============================================================================
+  // Provider Initialization Tests (P1.M3.T1.S2)
+  // ============================================================================
+
+  describe('initializeProvider()', () => {
+    it('should successfully initialize a provider', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      await registry.initializeProvider('anthropic');
+
+      expect(provider.initialize).toHaveBeenCalledTimes(1);
+      expect(provider.initialize).toHaveBeenCalledWith(undefined);
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.INITIALIZED);
+      expect(registry.isReady('anthropic')).toBe(true);
+    });
+
+    it('should pass options to provider.initialize()', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      const options = { apiKey: 'sk-test', timeout: 5000 };
+      await registry.initializeProvider('anthropic', options);
+
+      expect(provider.initialize).toHaveBeenCalledTimes(1);
+      expect(provider.initialize).toHaveBeenCalledWith(options);
+    });
+
+    it('should cache promise to prevent duplicate initialization', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      // Track concurrent initialization calls
+      let initCallCount = 0;
+      provider.initialize = vi.fn().mockImplementation(async () => {
+        initCallCount++;
+        await new Promise(resolve => setTimeout(resolve, 10));
+      });
+
+      // Start multiple concurrent initializations
+      const promise1 = registry.initializeProvider('anthropic');
+      const promise2 = registry.initializeProvider('anthropic');
+      const promise3 = registry.initializeProvider('anthropic');
+
+      // All promises should resolve
+      await Promise.all([promise1, promise2, promise3]);
+
+      // Provider should only be initialized once (promise caching worked)
+      expect(provider.initialize).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return immediately if already initialized', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      await registry.initializeProvider('anthropic');
+      expect(provider.initialize).toHaveBeenCalledTimes(1);
+
+      // Second call should return immediately without re-initializing
+      await registry.initializeProvider('anthropic');
+      expect(provider.initialize).toHaveBeenCalledTimes(1);
+    });
+
+    it('should throw if provider is not registered', async () => {
+      const registry = ProviderRegistry.getInstance();
+
+      await expect(registry.initializeProvider('anthropic')).rejects.toThrow(
+        "Provider 'anthropic' is not registered"
+      );
+    });
+
+    it('should store error on initialization failure', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      const initError = new Error('Initialization failed');
+      provider.initialize = vi.fn().mockRejectedValue(initError);
+      registry.register(provider);
+
+      await expect(registry.initializeProvider('anthropic')).rejects.toThrow('Initialization failed');
+
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.FAILED);
+      expect(registry.isReady('anthropic')).toBe(false);
+
+      const statuses = registry.getAllStatuses();
+      const state = statuses.get('anthropic');
+      expect(state?.error).toBe(initError);
+    });
+
+    it('should track initialization state transitions', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      // Initially uninitialized
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.UNINITIALIZED);
+
+      // During initialization (hard to test directly, but we can check after)
+      const initPromise = registry.initializeProvider('anthropic');
+
+      // After completion
+      await initPromise;
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.INITIALIZED);
+    });
+  });
+
+  describe('initializeAll()', () => {
+    it('should initialize all registered providers in parallel', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: {
+          anthropic: { apiKey: 'sk-anthropic' },
+          opencode: { endpoint: 'http://localhost:8080' }
+        }
+      };
+
+      const result = await registry.initializeAll(config);
+
+      expect(result.success).toContain('anthropic');
+      expect(result.success).toContain('opencode');
+      expect(result.failed).toHaveLength(0);
+
+      expect(anthropic.initialize).toHaveBeenCalledWith({ apiKey: 'sk-anthropic' });
+      expect(opencode.initialize).toHaveBeenCalledWith({ endpoint: 'http://localhost:8080' });
+    });
+
+    it('should allow partial success - one failure should not prevent others', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      // Make opencode fail
+      const opencodeError = new Error('OpenCode connection failed');
+      opencode.initialize = vi.fn().mockRejectedValue(opencodeError);
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: undefined
+      };
+
+      const result = await registry.initializeAll(config);
+
+      expect(result.success).toContain('anthropic');
+      expect(result.failed).toHaveLength(1);
+      expect(result.failed[0].providerId).toBe('opencode');
+      expect(result.failed[0].error).toBe(opencodeError);
+    });
+
+    it('should aggregate all errors in failed array', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      const anthropicError = new Error('Anthropic auth failed');
+      const opencodeError = new Error('OpenCode connection failed');
+
+      anthropic.initialize = vi.fn().mockRejectedValue(anthropicError);
+      opencode.initialize = vi.fn().mockRejectedValue(opencodeError);
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: undefined
+      };
+
+      const result = await registry.initializeAll(config);
+
+      expect(result.success).toHaveLength(0);
+      expect(result.failed).toHaveLength(2);
+
+      const failedProviderIds = result.failed.map(f => f.providerId).sort();
+      expect(failedProviderIds).toEqual(['anthropic', 'opencode']);
+    });
+
+    it('should return empty results for empty registry', async () => {
+      const registry = ProviderRegistry.getInstance();
+
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: undefined
+      };
+
+      const result = await registry.initializeAll(config);
+
+      expect(result.success).toHaveLength(0);
+      expect(result.failed).toHaveLength(0);
+    });
+
+    it('should resolve options from config.providerDefaults', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: {
+          anthropic: { apiKey: 'sk-123', timeout: 10000 },
+          opencode: { endpoint: 'http://localhost:9000' }
+        }
+      };
+
+      await registry.initializeAll(config);
+
+      expect(anthropic.initialize).toHaveBeenCalledWith({ apiKey: 'sk-123', timeout: 10000 });
+      expect(opencode.initialize).toHaveBeenCalledWith({ endpoint: 'http://localhost:9000' });
+    });
+
+    it('should handle undefined providerDefaults', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      registry.register(anthropic);
+
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: undefined
+      };
+
+      await registry.initializeAll(config);
+
+      expect(anthropic.initialize).toHaveBeenCalledWith(undefined);
+    });
+
+    it('should use Promise.allSettled for parallel execution', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      // Track timing to verify parallel execution
+      let anthropicStartTime = 0;
+      let opencodeStartTime = 0;
+
+      anthropic.initialize = vi.fn().mockImplementation(async () => {
+        anthropicStartTime = Date.now();
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
+      opencode.initialize = vi.fn().mockImplementation(async () => {
+        opencodeStartTime = Date.now();
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: undefined
+      };
+
+      const overallStart = Date.now();
+      await registry.initializeAll(config);
+      const overallDuration = Date.now() - overallStart;
+
+      // Both should have started at roughly the same time (parallel)
+      expect(Math.abs(anthropicStartTime - opencodeStartTime)).toBeLessThan(20);
+
+      // Total time should be close to single provider time (not sum of both)
+      expect(overallDuration).toBeLessThan(120); // 50ms + overhead, not 100ms
+    });
+  });
+
+  describe('getStatus()', () => {
+    it('should return UNINITIALIZED for unknown provider', () => {
+      const registry = ProviderRegistry.getInstance();
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.UNINITIALIZED);
+    });
+
+    it('should return correct status after initialization', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.UNINITIALIZED);
+
+      await registry.initializeProvider('anthropic');
+
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.INITIALIZED);
+    });
+
+    it('should return FAILED after initialization failure', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      provider.initialize = vi.fn().mockRejectedValue(new Error('Failed'));
+      registry.register(provider);
+
+      try {
+        await registry.initializeProvider('anthropic');
+      } catch {
+        // Expected to fail
+      }
+
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.FAILED);
+    });
+  });
+
+  describe('isReady()', () => {
+    it('should return false for uninitialized provider', () => {
+      const registry = ProviderRegistry.getInstance();
+      expect(registry.isReady('anthropic')).toBe(false);
+    });
+
+    it('should return true for initialized provider', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      await registry.initializeProvider('anthropic');
+
+      expect(registry.isReady('anthropic')).toBe(true);
+    });
+
+    it('should return false for failed provider', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      provider.initialize = vi.fn().mockRejectedValue(new Error('Failed'));
+      registry.register(provider);
+
+      try {
+        await registry.initializeProvider('anthropic');
+      } catch {
+        // Expected to fail
+      }
+
+      expect(registry.isReady('anthropic')).toBe(false);
+    });
+  });
+
+  describe('getAllStatuses()', () => {
+    it('should return empty map for empty registry', () => {
+      const registry = ProviderRegistry.getInstance();
+      const statuses = registry.getAllStatuses();
+
+      expect(statuses).toBeInstanceOf(Map);
+      expect(statuses.size).toBe(0);
+    });
+
+    it('should return all provider statuses', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      // Initialize both providers to create state entries
+      await registry.initializeProvider('anthropic');
+      await registry.initializeProvider('opencode');
+
+      const statuses = registry.getAllStatuses();
+
+      expect(statuses.size).toBe(2);
+      expect(statuses.get('anthropic')?.status).toBe(InitializationStatus.INITIALIZED);
+      expect(statuses.get('opencode')?.status).toBe(InitializationStatus.INITIALIZED);
+    });
+
+    it('should return a copy (not internal Map)', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      // Initialize to create state entry
+      await registry.initializeProvider('anthropic');
+
+      const statuses1 = registry.getAllStatuses();
+      const statuses2 = registry.getAllStatuses();
+
+      // Should be different Map instances
+      expect(statuses1).not.toBe(statuses2);
+
+      // Modifying returned map should not affect internal state
+      statuses1.clear();
+      const statuses3 = registry.getAllStatuses();
+      expect(statuses3.size).toBe(1);
+    });
+  });
+
+  describe('_resetInitStateForTesting()', () => {
+    it('should clear all initialization states', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      await registry.initializeProvider('anthropic');
+      expect(registry.isReady('anthropic')).toBe(true);
+
+      registry._resetInitStateForTesting();
+
+      expect(registry.getStatus('anthropic')).toBe(InitializationStatus.UNINITIALIZED);
+      expect(registry.isReady('anthropic')).toBe(false);
+    });
+
+    it('should allow re-initialization after reset', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      // First initialization
+      await registry.initializeProvider('anthropic');
+      expect(provider.initialize).toHaveBeenCalledTimes(1);
+
+      // Reset
+      registry._resetInitStateForTesting();
+
+      // Second initialization should work
+      await registry.initializeProvider('anthropic');
+      expect(provider.initialize).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('Initialization Integration Scenarios', () => {
+    it('should handle typical initialization workflow', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const anthropic = createMockProvider('anthropic');
+      const opencode = createMockProvider('opencode');
+
+      registry.register(anthropic);
+      registry.register(opencode);
+
+      const config = {
+        defaultProvider: 'anthropic' as const,
+        providerDefaults: {
+          anthropic: { apiKey: 'sk-test' },
+          opencode: { endpoint: 'http://localhost:8080' }
+        }
+      };
+
+      // Initialize all
+      const result = await registry.initializeAll(config);
+      expect(result.success).toHaveLength(2);
+
+      // Check readiness
+      expect(registry.isReady('anthropic')).toBe(true);
+      expect(registry.isReady('opencode')).toBe(true);
+
+      // Get all statuses
+      const statuses = registry.getAllStatuses();
+      expect(statuses.size).toBe(2);
+    });
+
+    it('should handle concurrent initialization calls', async () => {
+      const registry = ProviderRegistry.getInstance();
+      const provider = createMockProvider('anthropic');
+      registry.register(provider);
+
+      // Fire multiple concurrent initializations
+      const promises = [
+        registry.initializeProvider('anthropic'),
+        registry.initializeProvider('anthropic'),
+        registry.initializeProvider('anthropic'),
+        registry.initializeProvider('anthropic')
+      ];
+
+      await Promise.all(promises);
+
+      // Should only initialize once
+      expect(provider.initialize).toHaveBeenCalledTimes(1);
     });
   });
 });

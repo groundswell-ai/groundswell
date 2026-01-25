@@ -1,7 +1,8 @@
 /**
  * Provider module exports
  *
- * Exports the ProviderRegistry class for managing provider instances.
+ * Exports the ProviderRegistry class for managing provider instances
+ * and InitializationStatus enum for type-safe status checking.
  */
 
-export { ProviderRegistry } from './provider-registry.js';
+export { ProviderRegistry, InitializationStatus } from './provider-registry.js';

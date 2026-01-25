@@ -7,7 +7,60 @@
  * @module providers
  */
 
-import type { Provider, ProviderId } from '../types/providers.js';
+import type {
+  Provider,
+  ProviderId,
+  ProviderOptions,
+  GlobalProviderConfig
+} from '../types/providers.js';
+
+// ============================================================================
+// Type Definitions for Initialization Tracking
+// ============================================================================
+
+/**
+ * Provider initialization status enum
+ *
+ * Defines all possible initialization states for type-safe status tracking.
+ */
+export enum InitializationStatus {
+  /** Provider not yet initialized */
+  UNINITIALIZED = 'uninitialized',
+  /** Currently initializing (in progress) */
+  INITIALIZING = 'initializing',
+  /** Successfully initialized */
+  INITIALIZED = 'initialized',
+  /** Initialization failed */
+  FAILED = 'failed',
+}
+
+/**
+ * Provider initialization state with metadata
+ *
+ * Tracks initialization progress and caches the init promise.
+ */
+interface ProviderInitState {
+  /** Current initialization status */
+  status: InitializationStatus;
+  /** Cached initialization promise (prevents duplicate init) */
+  initPromise?: Promise<void>;
+  /** Error from failed initialization */
+  error?: Error;
+  /** Timestamp when initialization completed */
+  initializedAt?: number;
+}
+
+/**
+ * Batch initialization result with aggregated status
+ *
+ * Discriminated union for type-safe result handling.
+ */
+interface BatchInitResult {
+  /** Successfully initialized provider IDs */
+  success: ProviderId[];
+  /** Failed providers with errors */
+  failed: Array<{ providerId: ProviderId; error: Error }>;
+}
 
 /**
  * Singleton registry for managing provider instances.
@@ -69,6 +122,13 @@ export class ProviderRegistry {
    * @internal
    */
   private providers: Map<ProviderId, Provider> = new Map();
+
+  /**
+   * Private initialization state storage - maps ProviderId to ProviderInitState
+   *
+   * @internal
+   */
+  private states: Map<ProviderId, ProviderInitState> = new Map();
 
   /**
    * Private constructor - prevents direct instantiation
@@ -185,6 +245,228 @@ export class ProviderRegistry {
   }
 
   // ============================================================================
+  // Instance Methods - Provider Initialization
+  // ============================================================================
+
+  /**
+   * Initialize a single provider with promise caching
+   *
+   * Initializes a provider with the given options. Multiple concurrent calls
+   * to initialize the same provider will share the same promise (no duplicate
+   * initialization). Already initialized providers return immediately.
+   *
+   * ## Promise Caching
+   *
+   * The initialization promise is cached in the provider's state. Concurrent
+   * calls to initialize the same provider will await the same promise.
+   *
+   * ## State Transitions
+   *
+   * - UNINITIALIZED → INITIALIZING → INITIALIZED (success)
+   * - UNINITIALIZED → INITIALIZING → FAILED (error)
+   *
+   * @param id - The provider id to initialize
+   * @param options - Optional provider configuration options
+   * @returns Promise that resolves when initialization completes
+   * @throws {Error} If provider is not registered
+   * @throws {Error} If provider initialization fails
+   *
+   * @example
+   * ```ts
+   * const registry = ProviderRegistry.getInstance();
+   * await registry.initializeProvider('anthropic', { apiKey: 'sk-...' });
+   * console.log(registry.isReady('anthropic')); // true
+   * ```
+   */
+  public async initializeProvider(
+    id: ProviderId,
+    options?: ProviderOptions
+  ): Promise<void> {
+    // Get provider from registry
+    const provider = this.get(id);
+    if (!provider) {
+      throw new Error(`Provider '${id}' is not registered`);
+    }
+
+    // Get or create initialization state
+    let state = this.states.get(id);
+    if (!state) {
+      state = { status: InitializationStatus.UNINITIALIZED };
+      this.states.set(id, state);
+    }
+
+    // Return cached promise if already initializing
+    if (state.status === InitializationStatus.INITIALIZING && state.initPromise) {
+      return state.initPromise;
+    }
+
+    // Return immediately if already initialized
+    if (state.status === InitializationStatus.INITIALIZED) {
+      return;
+    }
+
+    // Start initialization
+    state.status = InitializationStatus.INITIALIZING;
+    state.initPromise = (async () => {
+      try {
+        await provider.initialize(options);
+        state.status = InitializationStatus.INITIALIZED;
+        state.initializedAt = Date.now();
+        state.error = undefined;
+      } catch (error) {
+        state.status = InitializationStatus.FAILED;
+        state.error = error as Error;
+        throw error; // Re-throw for caller
+      }
+    })();
+
+    return state.initPromise;
+  }
+
+  /**
+   * Initialize all registered providers in parallel
+   *
+   * Uses Promise.allSettled to allow partial success - if one provider fails,
+   * others continue initialization. Errors are aggregated in the return value.
+   *
+   * Provider options are resolved from config.providerDefaults[providerId].
+   * If no options are configured for a provider, undefined is passed.
+   *
+   * ## Parallel Initialization
+   *
+   * All providers initialize concurrently for faster startup. The method
+   * waits for all initialization attempts to complete before returning.
+   *
+   * ## Error Aggregation
+   *
+   * This method never throws - all errors are collected in the returned
+   * BatchInitResult.failed array. Check this array to identify failed providers.
+   *
+   * @param config - Global provider configuration with provider defaults
+   * @returns Promise resolving to success/failure lists
+   *
+   * @example
+   * ```ts
+   * const registry = ProviderRegistry.getInstance();
+   * const config = getGlobalProviderConfig();
+   * const result = await registry.initializeAll(config);
+   *
+   * console.log(`Initialized: ${result.success.join(', ')}`);
+   * if (result.failed.length > 0) {
+   *   console.error(`Failed: ${result.failed.map(f => f.providerId).join(', ')}`);
+   * }
+   * ```
+   */
+  public async initializeAll(
+    config: GlobalProviderConfig
+  ): Promise<BatchInitResult> {
+    const providerIds = Array.from(this.providers.keys());
+
+    // Map each provider ID to an initialization function
+    const initPromises = providerIds.map(async (id) => {
+      // Resolve options from config.providerDefaults
+      const options = config.providerDefaults?.[id];
+      try {
+        await this.initializeProvider(id, options);
+        return { status: 'success' as const, providerId: id };
+      } catch (error) {
+        return {
+          status: 'failed' as const,
+          providerId: id,
+          error: error as Error
+        };
+      }
+    });
+
+    // Use Promise.allSettled for partial success tolerance
+    const results = await Promise.allSettled(initPromises);
+
+    // Aggregate results
+    const success: ProviderId[] = [];
+    const failed: Array<{ providerId: ProviderId; error: Error }> = [];
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const value = result.value;
+        if (value.status === 'success') {
+          success.push(value.providerId);
+        } else {
+          failed.push({ providerId: value.providerId, error: value.error });
+        }
+      }
+      // Promise.allSettled never rejects, but handle defensively
+    }
+
+    return { success, failed };
+  }
+
+  /**
+   * Get initialization status for a provider
+   *
+   * Returns the current initialization status for the given provider ID.
+   * Unknown providers return UNINITIALIZED status.
+   *
+   * @param id - The provider id to check
+   * @returns Current initialization status
+   *
+   * @example
+   * ```ts
+   * const registry = ProviderRegistry.getInstance();
+   * const status = registry.getStatus('anthropic');
+   * console.log(status); // 'initialized' | 'initializing' | 'failed' | 'uninitialized'
+   * ```
+   */
+  public getStatus(id: ProviderId): InitializationStatus {
+    return this.states.get(id)?.status ?? InitializationStatus.UNINITIALIZED;
+  }
+
+  /**
+   * Check if a provider is ready to use
+   *
+   * Returns true only if the provider has successfully initialized.
+   * Use this method to check provider readiness before use.
+   *
+   * @param id - The provider id to check
+   * @returns true if provider is initialized and ready, false otherwise
+   *
+   * @example
+   * ```ts
+   * const registry = ProviderRegistry.getInstance();
+   * if (registry.isReady('anthropic')) {
+   *   const provider = registry.get('anthropic');
+   *   // Use provider
+   * }
+   * ```
+   */
+  public isReady(id: ProviderId): boolean {
+    return this.getStatus(id) === InitializationStatus.INITIALIZED;
+  }
+
+  /**
+   * Get all provider initialization states
+   *
+   * Returns a copy of the internal states Map for health checks,
+   * monitoring, and debugging. The returned Map is a shallow copy -
+   * modifications to it won't affect internal state.
+   *
+   * @returns Map of provider ID to initialization state
+   *
+   * @example
+   * ```ts
+   * const registry = ProviderRegistry.getInstance();
+   * const statuses = registry.getAllStatuses();
+   *
+   * for (const [id, state] of statuses.entries()) {
+   *   console.log(`${id}: ${state.status}`);
+   * }
+   * ```
+   */
+  public getAllStatuses(): Map<ProviderId, ProviderInitState> {
+    // Return a copy to prevent external mutation
+    return new Map(this.states);
+  }
+
+  // ============================================================================
   // Testing Utilities - Internal Use Only
   // ============================================================================
 
@@ -217,5 +499,39 @@ export class ProviderRegistry {
    */
   public static _resetForTesting(): void {
     ProviderRegistry.instance = null as any;
+  }
+
+  /**
+   * Reset initialization state for testing
+   *
+   * **FOR TESTING PURPOSES ONLY**
+   *
+   * Clears the initialization states Map, removing all cached promises
+   * and status information. Use in afterEach() hooks along with
+   * _resetForTesting() to ensure complete test isolation.
+   *
+   * @internal
+   *
+   * @example
+   * ```ts
+   * import { describe, it, afterEach } from 'vitest';
+   * import { ProviderRegistry } from './provider-registry.js';
+   *
+   * describe('ProviderRegistry', () => {
+   *   afterEach(() => {
+   *     const registry = ProviderRegistry.getInstance();
+   *     registry._resetInitStateForTesting();
+   *     ProviderRegistry._resetForTesting();
+   *   });
+   *
+   *   it('should initialize fresh', () => {
+   *     const registry = ProviderRegistry.getInstance();
+   *     // Test with clean initialization state
+   *   });
+   * });
+   * ```
+   */
+  public _resetInitStateForTesting(): void {
+    this.states.clear();
   }
 }
