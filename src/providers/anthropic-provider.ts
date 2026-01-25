@@ -144,11 +144,27 @@ export class AnthropicProvider implements Provider {
   /**
    * Terminate the provider and cleanup resources
    *
+   * Clears the SDK module reference to allow garbage collection.
+   * The Anthropic SDK is stateless and manages its own resources internally.
+   *
    * @remarks
    * Implemented in P2.M1.T1.S3
    */
   async terminate(): Promise<void> {
-    // Implemented in P2.M1.T1.S3
+    // Idempotent check: if SDK is already null, return immediately
+    // FOLLOW: initialize() pattern at lines 107-110 (if (this.sdk) { return; })
+    if (this.sdk === null) {
+      return;
+    }
+
+    // Clear SDK reference to allow garbage collection
+    // CRITICAL: No other cleanup needed - SDK is stateless (see research/anthropic_sdk_cleanup.md)
+    // CRITICAL: SDK manages its own resources - Query objects auto-cleanup on completion
+    // CRITICAL: ProviderRegistry manages initialization state externally
+    this.sdk = null;
+
+    // GOTCHA: No return value needed - Promise<void> is implicit
+    // GOTCHA: No throws possible from null check and assignment
   }
 
   /**

@@ -274,7 +274,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S3",
                   "title": "Implement terminate() method",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T1.S2"
