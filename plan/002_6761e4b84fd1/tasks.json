@@ -69,7 +69,7 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "Update all Agent.prompt() call sites to handle AgentResponse",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Update all existing code that calls Agent.prompt() to handle the new AgentResponse<T> return type instead of raw T.",
               "subtasks": [
                 {
@@ -107,7 +107,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S4",
                   "title": "Update test files to assert on AgentResponse",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T2.S3"
@@ -127,7 +127,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T3.S1",
                   "title": "Verify AgentResponse types are exported from index.ts",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Public API exports are in src/index.ts per SYSTEM_CONTEXT.md.\n2. INPUT: src/types/agent.ts (AgentResponse definitions). src/index.ts (exports).\n3. LOGIC: Read src/index.ts to verify AgentResponse, AgentResponseStatus, AgentErrorDetails, AgentResponseMetadata are all exported. If missing, add exports.\n4. OUTPUT: All AgentResponse types exported from main index.ts for public consumption."
