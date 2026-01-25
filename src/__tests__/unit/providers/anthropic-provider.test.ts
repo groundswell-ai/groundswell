@@ -142,6 +142,9 @@ describe('AnthropicProvider', () => {
     it('should have loadSkills() method with correct signature', async () => {
       const provider = new AnthropicProvider();
 
+      // Initialize provider first (loadSkills requires SDK initialization)
+      await provider.initialize();
+
       // Should return Promise<void>
       const result = provider.loadSkills([]);
 

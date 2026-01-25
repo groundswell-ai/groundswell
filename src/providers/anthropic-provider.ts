@@ -53,6 +53,8 @@ import {
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
 import { MCPHandler } from "../core/mcp-handler.js";
 import { parseModelSpec } from "../utils/model-spec.js";
+import { readFile } from "fs/promises";
+import { join } from "path";
 
 export class AnthropicProvider implements Provider {
   /**
@@ -119,6 +121,17 @@ export class AnthropicProvider implements Provider {
    * @internal
    */
   private mcpServerConfig: import("@anthropic-ai/claude-agent-sdk").McpServerConfig | null = null;
+
+  /**
+   * Combined skills prompt for injection into system prompts
+   *
+   * Stores the formatted skills content from loadSkills() for injection
+   * into system prompts during execute() calls. Skills are combined with
+   * markdown headers and separators.
+   *
+   * @internal
+   */
+  private skillsPrompt: string = '';
 
   /**
    * Initialize the Anthropic provider
@@ -194,6 +207,9 @@ export class AnthropicProvider implements Provider {
     // Clear MCP server configuration (from P2.M1.T1.S7)
     this.mcpServerConfig = null;
 
+    // Clear skills prompt (from P2.M1.T1.S8)
+    this.skillsPrompt = '';
+
     // GOTCHA: No return value needed - Promise<void> is implicit
     // GOTCHA: No throws possible from null check and assignment
   }
@@ -236,7 +252,8 @@ export class AnthropicProvider implements Provider {
       model: modelSpec.model,
 
       // System prompt mapping (from src/core/agent.ts:317-318)
-      systemPrompt: request.options.systemPrompt,
+      // CRITICAL: Inject loaded skills via buildSystemPromptWithSkills() helper
+      systemPrompt: this.buildSystemPromptWithSkills(request.options.systemPrompt),
 
       // Tools mapping to allowedTools (string[])
       // CRITICAL: Map tool objects to tool names (from src/core/agent.ts:405-407)
@@ -414,12 +431,109 @@ export class AnthropicProvider implements Provider {
   /**
    * Load skills into the provider
    *
-   * @param skills - Array of skill definitions
+   * Skills are read from SKILL.md files in each skill directory and combined
+   * into a formatted system prompt fragment for injection during execute().
+   *
+   * @param skills - Array of skill definitions with name and path
+   * @throws {Error} When SDK is not initialized
+   * @throws {Error} When SKILL.md file cannot be read
    * @remarks
-   * Implemented in P2.M1.T1.S8
+   * Each skill directory must contain a SKILL.md file. Skills are combined
+   * with markdown headers (### Skill Name) and separators (---).
+   *
+   * @example
+   * ```ts
+   * const provider = new AnthropicProvider();
+   * await provider.initialize();
+   * await provider.loadSkills([
+   *   { name: 'math-expert', path: '/skills/math' },
+   *   { name: 'code-reviewer', path: '/skills/code' }
+   * ]);
+   * ```
    */
   async loadSkills(skills: Skill[]): Promise<void> {
-    // Implemented in P2.M1.T1.S8
+    // PATTERN: SDK initialization check (follow execute() pattern at lines 219-223)
+    // CRITICAL: Validate SDK is loaded before proceeding
+    if (!this.sdk) {
+      throw new Error("SDK not initialized. Call initialize() first.");
+    }
+
+    // Handle empty skills array - nothing to load
+    if (skills.length === 0) {
+      this.skillsPrompt = '';
+      return;
+    }
+
+    // Load each skill's SKILL.md content
+    const skillContents: string[] = [];
+
+    for (const skill of skills) {
+      try {
+        // GOTCHA: Skill.path is directory, must join with 'SKILL.md'
+        const skillMdPath = join(skill.path, 'SKILL.md');
+        const content = await readFile(skillMdPath, 'utf-8');
+
+        // Format skill with markdown header
+        skillContents.push(`### ${skill.name}\n\n${content.trim()}`);
+      } catch (error) {
+        // PATTERN: Wrap errors with context (follow registerMCPs pattern)
+        throw new Error(
+          `Failed to load skill '${skill.name}' from ${skill.path}: ` +
+          `${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+    }
+
+    // Combine all skills with markdown separator
+    // PATTERN: Use "\n\n---\n\n" for visual clarity (horizontal rule)
+    this.skillsPrompt = skillContents.join('\n\n---\n\n');
+  }
+
+  /**
+   * Build system prompt with skills injected
+   *
+   * Combines the base system prompt with loaded skills for injection into
+   * the Anthropic SDK's systemPrompt parameter.
+   *
+   * @param baseSystemPrompt - Optional base system prompt to enhance with skills
+   * @returns Enhanced system prompt with skills section, or base prompt unchanged if no skills loaded
+   * @internal
+   * @remarks
+   * Three handling cases:
+   * 1. No skills loaded - returns basePrompt unchanged
+   * 2. No base prompt - returns skills-only prompt with default header
+   * 3. Both exist - combines with "## Available Skills" section
+   */
+  private buildSystemPromptWithSkills(baseSystemPrompt?: string): string {
+    // Case 1: No skills loaded - return base prompt unchanged
+    if (!this.skillsPrompt) {
+      return baseSystemPrompt ?? '';
+    }
+
+    // Case 2: No base prompt - return skills with default header
+    if (!baseSystemPrompt) {
+      return `You are a helpful assistant.
+
+## Available Skills
+
+${this.skillsPrompt}
+
+## Instructions
+Leverage the available skills above when responding to requests.
+`;
+    }
+
+    // Case 3: Both exist - combine with skills section
+    return `${baseSystemPrompt}
+
+## Available Skills
+
+${this.skillsPrompt}
+
+## Skill Usage
+When responding, leverage the available skills above.
+Each skill provides specific capabilities and guidelines.
+`;
   }
 
   /**

@@ -245,7 +245,7 @@
               "type": "Task",
               "id": "P2.M1.T1",
               "title": "Task: Implement AnthropicProvider Class",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Create AnthropicProvider class in src/core/providers/anthropic/anthropic-provider.ts",
               "subtasks": [
                 {
@@ -330,7 +330,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S8",
                   "title": "Implement loadSkills() method",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T1.S1"
