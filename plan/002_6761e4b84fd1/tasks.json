@@ -151,7 +151,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Milestone 1.2: Validation & Error Handling",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Add runtime validation and error handling for AgentResponse compliance",
           "tasks": [
             {
@@ -187,7 +187,7 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Add integration tests for AgentResponse compliance",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Create comprehensive tests ensuring AgentResponse contract is always met",
               "subtasks": [
                 {
@@ -214,7 +214,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S3",
                   "title": "Write adversarial tests for AgentResponse edge cases",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S2"
@@ -243,7 +243,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Write migration guide with before/after examples",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This is a breaking API change. Users need clear migration path.\n2. INPUT: Old prompt() signature (returns T), new signature (returns AgentResponse<T>). Updated example files from P1.M1.T2.S2.\n3. LOGIC: Create docs/migration-guide-agent-response.md. Document: (1) What changed, (2) Why this change (PRD requirement), (3) Before/after code examples, (4) Common patterns (status checking, error handling, data extraction), (5) Migration checklist. Use actual example conversions.\n4. OUTPUT: Comprehensive migration guide with code examples."
