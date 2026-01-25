@@ -2,7 +2,7 @@
 
 ### **Hierarchical Workflow Engine with Full Observability & Tree Debugging**
 
-Version: **1.0**
+Version: **1.1**
 Status: **Implementation-ready**
 
 ---
@@ -30,6 +30,7 @@ This PRD includes:
 ✔️ Observer/event system skeleton
 ✔️ Snapshot system spec
 ✔️ Error/restart semantics
+✔️ Multi-provider Agent SDK support (Anthropic + OpenCode)
 
 ---
 
@@ -247,15 +248,283 @@ Workflows receiving agent responses SHOULD validate against the `AgentResponse` 
 
 ---
 
-# **7. Snapshot System**
+# **7. Agent SDK Provider System**
 
-## **7.1 State Snapshot**
+Groundswell supports multiple Agent SDK providers with full feature parity. Users select a provider once at the top level; all workflows, agents, and prompts inherit that setting unless explicitly overridden.
+
+## **7.1 Supported Providers**
+
+| Provider | SDK | Description |
+|----------|-----|-------------|
+| `anthropic` | Anthropic Agent SDK (`claude-agent-sdk`) | Claude models via Anthropic's official Agent SDK |
+| `opencode` | OpenCode Agent SDK | Multi-provider support (Anthropic, OpenAI, Ollama, 75+ providers) |
+
+## **7.2 ProviderId**
+
+```ts
+export type ProviderId = 'anthropic' | 'opencode';
+```
+
+## **7.3 Provider Interface**
+
+All providers implement this interface:
+
+```ts
+export interface Provider {
+  readonly id: ProviderId;
+  readonly capabilities: ProviderCapabilities;
+
+  initialize(options?: ProviderOptions): Promise<void>;
+  terminate(): Promise<void>;
+
+  execute<T>(
+    request: ProviderRequest,
+    toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
+    hooks?: ProviderHookEvents
+  ): Promise<ProviderResult<T>>;
+
+  registerMCPs(servers: MCPServer[]): Promise<Tool[]>;
+  loadSkills(skills: Skill[]): Promise<void>;
+  normalizeModel(model: string): ModelSpec;
+}
+```
+
+## **7.4 ProviderCapabilities**
+
+```ts
+export interface ProviderCapabilities {
+  mcp: boolean;              // MCP server connections
+  skills: boolean;           // Skill loading
+  lsp: boolean;              // Language Server Protocol integration
+  streaming: boolean;        // Streaming responses
+  sessions: boolean;         // Session-based state
+  extendedThinking: boolean; // Extended thinking/reasoning
+}
+```
+
+| Capability | Anthropic SDK | OpenCode SDK |
+|------------|--------------|--------------|
+| MCP | ✓ (via MCPHandler) | ✓ (native) |
+| Skills | ✓ (system prompt) | ✓ (native `/skills`) |
+| LSP | ✓ (MCP plugins) | ✓ (explicit `lsp` tool) |
+| Streaming | ✓ (message) | ✓ (SSE) |
+| Sessions | ✗ (stateless) | ✓ |
+| Extended Thinking | ✗ | ✓ |
+
+## **7.5 ProviderOptions**
+
+```ts
+export interface ProviderOptions {
+  endpoint?: string;                  // API endpoint override
+  apiKey?: string;                    // API key (if not from environment)
+  sessionId?: string;                 // Session ID for session-based providers
+  timeout?: number;                   // Timeout in milliseconds
+  headers?: Record<string, string>;   // Custom headers
+}
+```
+
+## **7.6 Global Provider Configuration**
+
+```ts
+export interface GlobalProviderConfig {
+  defaultProvider: ProviderId;
+  providerDefaults?: Partial<Record<ProviderId, ProviderOptions>>;
+}
+
+export function configureProviders(config: GlobalProviderConfig): void;
+```
+
+**Example:**
+
+```ts
+import { configureProviders } from 'groundswell';
+
+// Set once at application startup - cascades to all agents
+configureProviders({
+  defaultProvider: 'opencode',
+  providerDefaults: {
+    opencode: { endpoint: 'http://localhost:8080' },
+    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
+  },
+});
+```
+
+## **7.7 Configuration Cascade**
+
+Provider configuration cascades through the hierarchy:
+
+```
+GlobalProviderConfig (highest priority for defaults)
+    ↓
+AgentConfig.provider / AgentConfig.providerOptions
+    ↓
+PromptOverrides.provider / PromptOverrides.providerOptions
+    ↓
+Prompt-level overrides (lowest priority)
+```
+
+Resolution uses null-coalescing: first defined value wins.
+
+## **7.8 Model Specification**
+
+Model strings support two formats:
+
+| Format | Example | Usage |
+|--------|---------|-------|
+| Plain name | `claude-sonnet-4-20250514` | Uses current provider |
+| Provider-qualified | `anthropic/claude-opus-4-20250514` | Explicit provider |
+
+**OpenCode provider/model format:**
+
+```ts
+// OpenCode supports 75+ providers
+'anthropic/claude-sonnet-4-20250514'
+'openai/gpt-4'
+'ollama/llama3'
+'google/gemini-pro'
+```
+
+```ts
+export interface ModelSpec {
+  provider: ProviderId;
+  model: string;
+  raw: string;  // Original specification string
+}
+
+export function parseModelSpec(model: string, defaultProvider?: ProviderId): ModelSpec;
+export function formatModelForProvider(spec: ModelSpec, targetProvider: ProviderId): string;
+```
+
+## **7.9 AgentConfig Extensions**
+
+```ts
+export interface AgentConfig {
+  // ... existing fields ...
+
+  /** Provider to use (inherits from global if not specified) */
+  provider?: ProviderId;
+
+  /** Provider-specific options */
+  providerOptions?: ProviderOptions;
+
+  /** Model specification (supports "provider/model" format) */
+  model?: string;
+}
+```
+
+## **7.10 Tool Execution**
+
+Tools are executed locally via MCPHandler regardless of provider. The provider delegates tool calls back to the agent:
+
+```ts
+export interface ToolExecutionRequest {
+  name: string;     // Tool name (may be namespaced: "server__tool")
+  input: unknown;   // Tool input parameters
+}
+
+export interface ToolExecutionResult {
+  content: string | unknown;
+  isError: boolean;
+}
+```
+
+## **7.11 Hook Adaptation**
+
+Groundswell hooks are adapted to provider-specific events:
+
+```ts
+export interface ProviderHookEvents {
+  onToolStart?: (tool: ToolExecutionRequest) => Promise<void> | void;
+  onToolEnd?: (tool: ToolExecutionRequest, result: ToolExecutionResult, duration: number) => Promise<void> | void;
+  onSessionStart?: () => Promise<void> | void;
+  onSessionEnd?: (totalDuration: number) => Promise<void> | void;
+  onStream?: (chunk: string) => void;
+}
+```
+
+Mapping from `AgentHooks`:
+
+| AgentHooks | ProviderHookEvents |
+|------------|-------------------|
+| `preToolUse` | `onToolStart` |
+| `postToolUse` | `onToolEnd` |
+| `sessionStart` | `onSessionStart` |
+| `sessionEnd` | `onSessionEnd` |
+
+## **7.12 LSP Integration**
+
+Both providers support Language Server Protocol for code intelligence:
+
+**Anthropic SDK:** LSP via MCP plugins (automatic diagnostics after edits)
+
+**OpenCode SDK:** Explicit `lsp` tool with actions:
+- `definition` - Go to definition
+- `references` - Find references
+- `hover` - Hover information
+- `completion` - Code completion
+- `diagnostics` - Get diagnostics
+
+```ts
+export interface LSPConfig {
+  enabled: boolean;
+  languages?: string[];  // Restrict to specific languages
+}
+```
+
+## **7.13 Provider Usage Examples**
+
+**Default (Anthropic):**
+
+```ts
+const agent = new Agent({
+  name: 'Analyzer',
+  model: 'claude-sonnet-4-20250514',
+});
+```
+
+**OpenCode with multi-provider:**
+
+```ts
+const agent = new Agent({
+  name: 'Analyzer',
+  provider: 'opencode',
+  model: 'openai/gpt-4',
+  providerOptions: {
+    endpoint: 'http://localhost:8080',
+  },
+});
+```
+
+**Override at prompt level:**
+
+```ts
+const response = await agent.prompt(myPrompt, {
+  model: 'anthropic/claude-opus-4-20250514',  // Override for this call
+});
+```
+
+## **7.14 Feature Parity Requirements**
+
+All features MUST work identically across providers:
+
+1. **MCP Tools**: Register, discover, and execute MCP tools
+2. **Skills**: Load and invoke skills
+3. **Hooks**: All hook types fire with consistent context
+4. **AgentResponse**: Same response format regardless of provider
+5. **Caching**: Cache keys incorporate provider for isolation
+6. **Workflow Integration**: Events emit correctly in workflow context
+
+---
+
+# **8. Snapshot System**
+
+## **8.1 State Snapshot**
 
 ```ts
 export type SerializedWorkflowState = Record<string, unknown>;
 ```
 
-## **7.2 ObservedState Metadata**
+## **8.2 ObservedState Metadata**
 
 ```ts
 export interface StateFieldMetadata {
@@ -266,9 +535,9 @@ export interface StateFieldMetadata {
 
 ---
 
-# **8. Observers**
+# **9. Observers**
 
-## **8.1 WorkflowObserver**
+## **9.1 WorkflowObserver**
 
 ```ts
 export interface WorkflowObserver {
@@ -283,9 +552,9 @@ Observers attach to the **root workflow** and receive all events.
 
 ---
 
-# **9. Decorators (Complete Technical Specification)**
+# **10. Decorators (Complete Technical Specification)**
 
-## **9.1 @Step() Decorator**
+## **10.1 @Step() Decorator**
 
 ```ts
 export interface StepOptions {
@@ -307,7 +576,7 @@ export function Step(options: StepOptions = {}): MethodDecorator;
 
 ---
 
-## **9.2 @Task() Decorator**
+## **10.2 @Task() Decorator**
 
 ```ts
 export interface TaskOptions {
@@ -326,7 +595,7 @@ export function Task(options: TaskOptions = {}): MethodDecorator;
 
 ---
 
-## **9.3 @ObservedState Decorator**
+## **10.3 @ObservedState Decorator**
 
 ```ts
 export function ObservedState(meta: StateFieldMetadata = {}): PropertyDecorator;
@@ -336,7 +605,7 @@ Fields marked with this decorator are included in snapshots.
 
 ---
 
-# **10. Restart Semantics**
+# **11. Restart Semantics**
 
 * Descendant workflows never request restart upward.
 * A parent step decides whether restart is needed by analyzing:
@@ -354,7 +623,7 @@ Restartability is **opt-in** at the step method level; not global.
 
 ---
 
-# **11. Optional Multi-Error Merging**
+# **12. Optional Multi-Error Merging**
 
 ```ts
 export interface ErrorMergeStrategy {
@@ -368,9 +637,9 @@ Default: **disabled** → first error wins (race is preserved).
 
 ---
 
-# **12. Tree Debugger API**
+# **13. Tree Debugger API**
 
-## **12.1 Tree Debugger Interface**
+## **13.1 Tree Debugger Interface**
 
 ```ts
 export interface WorkflowTreeDebugger {
@@ -388,13 +657,13 @@ This is consumed by the terminal UI.
 
 ---
 
-# **13. Base Classes (Class Skeletons)**
+# **14. Base Classes (Class Skeletons)**
 
 Below are implementation-ready class skeletons with exact method signatures.
 
 ---
 
-# **13.1 WorkflowLogger Skeleton**
+# **14.1 WorkflowLogger Skeleton**
 
 ```ts
 export class WorkflowLogger {
@@ -419,7 +688,7 @@ export class WorkflowLogger {
 
 ---
 
-# **13.2 Workflow Base Class Skeleton**
+# **14.2 Workflow Base Class Skeleton**
 
 ```ts
 export abstract class Workflow {
@@ -480,7 +749,7 @@ export abstract class Workflow {
 
 ---
 
-# **13.3 Decorator Skeletons**
+# **14.3 Decorator Skeletons**
 
 These are implementation-level scaffolds.
 
@@ -600,7 +869,7 @@ export function Task(opts: TaskOptions = {}): MethodDecorator {
 
 ---
 
-# **14. Example Workflow Using the System**
+# **15. Example Workflow Using the System**
 
 ```ts
 class TestCycleWorkflow extends Workflow {
@@ -638,7 +907,7 @@ class TDDOrchestrator extends Workflow {
 
 ---
 
-# **15. Acceptance Criteria (Updated)**
+# **16. Acceptance Criteria (Updated)**
 
 This PRD now includes:
 
@@ -651,5 +920,6 @@ This PRD now includes:
 * error/restart models
 * snapshot system
 * **agent response model (all responses MUST be JSON)**
+* **multi-provider Agent SDK support with cascading configuration**
 
 A senior engineer should be able to implement the full engine from this PRD.
