@@ -450,7 +450,7 @@
               "type": "Task",
               "id": "P2.M2.T1",
               "title": "Evaluate Ink and create prototype",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Research Ink library and build basic tree visualization prototype",
               "subtasks": [
                 {
@@ -466,7 +466,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S2",
                   "title": "Build reactive tree component prototype",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T1.S1"
@@ -486,7 +486,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T2.S1",
                   "title": "Implement expand/collapse for tree nodes",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T1.S2"
