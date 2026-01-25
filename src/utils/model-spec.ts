@@ -166,3 +166,85 @@ export function parseModelSpec(
     raw
   };
 }
+
+/**
+ * Format a ModelSpec for a specific target provider
+ *
+ * ## Behavior
+ *
+ * ### Same Provider (Pass-Through)
+ * When `spec.provider` matches `targetProvider`, returns the model name only.
+ *
+ * **Example:**
+ * - Input: `{ provider: 'anthropic', model: 'claude-3-5-sonnet', raw: 'anthropic/claude-3-5-sonnet' }`, `'anthropic'`
+ * - Output: `"claude-3-5-sonnet"`
+ *
+ * ### Different Providers (Error)
+ * When providers differ, throws an error. Cross-provider model translation
+ * is not supported in the MVP.
+ *
+ * **Example:**
+ * - Input: `{ provider: 'anthropic', model: 'claude-3-5-sonnet', raw: 'anthropic/claude-3-5-sonnet' }`, `'opencode'`
+ * - Output: Throws `Error` with message:
+ *   `"Cannot translate anthropic/claude-3-5-sonnet to opencode provider. Cross-provider model translation is not supported."`
+ *
+ * ## Use Cases
+ *
+ * 1. **Model Validation**: Validate that a model spec is compatible with a target provider
+ * 2. **API Preparation**: Format model names for provider-specific API requests
+ * 3. **Configuration**: Prepare model strings for provider initialization
+ *
+ * ## Future Enhancements (Out of Scope)
+ *
+ * - Cross-provider model mapping table (e.g., claude-3-5-sonnet → gpt-4-turbo)
+ * - Capability-based model matching (tier-based translation)
+ * - Alias support for model name variants
+ *
+ * @param spec - ModelSpec from parseModelSpec() or Provider.normalizeModel()
+ * @param targetProvider - The provider to format the model for
+ * @returns Formatted model string for target provider (model name only)
+ * @throws {Error} When providers differ with message:
+ *   "Cannot translate {source}/{model} to {target} provider. Cross-provider model translation is not supported."
+ *
+ * @example
+ * ```ts
+ * // Same provider: pass-through
+ * const spec = parseModelSpec('anthropic/claude-3-5-sonnet');
+ * const model = formatModelForProvider(spec, 'anthropic');
+ * console.log(model); // "claude-3-5-sonnet"
+ *
+ * // Different provider: error
+ * const spec = parseModelSpec('anthropic/claude-3-5-sonnet');
+ * try {
+ *   formatModelForProvider(spec, 'opencode');
+ * } catch (error) {
+ *   console.error((error as Error).message);
+ *   // "Cannot translate anthropic/claude-3-5-sonnet to opencode provider. Cross-provider model translation is not supported."
+ * }
+ *
+ * // Use with Provider.normalizeModel()
+ * const provider = new AnthropicProvider();
+ * const spec = provider.normalizeModel('claude-opus-4');
+ * const model = formatModelForProvider(spec, 'anthropic');
+ * console.log(model); // "claude-opus-4"
+ * ```
+ *
+ * @see {@link parseModelSpec} for creating ModelSpec objects
+ * @see {@link ModelSpec} for the input type structure
+ * @see {@link ProviderId} for valid provider identifiers
+ */
+export function formatModelForProvider(
+  spec: ModelSpec,
+  targetProvider: ProviderId
+): string {
+  // Pass-through: same provider
+  if (spec.provider === targetProvider) {
+    return spec.model;
+  }
+
+  // Error: different providers (translation not supported in MVP)
+  throw new Error(
+    `Cannot translate ${spec.provider}/${spec.model} to ${targetProvider} provider. ` +
+    'Cross-provider model translation is not supported.'
+  );
+}

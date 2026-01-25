@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { parseModelSpec } from '../../../utils/model-spec.js';
+import { parseModelSpec, formatModelForProvider } from '../../../utils/model-spec.js';
 import type { ModelSpec, ProviderId } from '../../../types/providers.js';
 
 describe('parseModelSpec', () => {
@@ -162,6 +162,100 @@ describe('parseModelSpec', () => {
       } else {
         expect.fail('Provider should be anthropic');
       }
+    });
+  });
+});
+
+describe('formatModelForProvider', () => {
+  describe('same provider pass-through', () => {
+    it('should return model name when providers match (anthropic)', () => {
+      const spec: ModelSpec = {
+        provider: 'anthropic',
+        model: 'claude-3-5-sonnet',
+        raw: 'anthropic/claude-3-5-sonnet'
+      };
+
+      const result = formatModelForProvider(spec, 'anthropic');
+
+      expect(result).toBe('claude-3-5-sonnet');
+    });
+
+    it('should return model name when providers match (opencode)', () => {
+      const spec: ModelSpec = {
+        provider: 'opencode',
+        model: 'gpt-4-turbo',
+        raw: 'opencode/gpt-4-turbo'
+      };
+
+      const result = formatModelForProvider(spec, 'opencode');
+
+      expect(result).toBe('gpt-4-turbo');
+    });
+
+    it('should work with specs from parseModelSpec', () => {
+      const spec = parseModelSpec('anthropic/claude-opus-4');
+
+      const result = formatModelForProvider(spec, 'anthropic');
+
+      expect(result).toBe('claude-opus-4');
+    });
+
+    it('should work with plain format specs from parseModelSpec', () => {
+      const spec = parseModelSpec('claude-sonnet-4', 'opencode');
+
+      const result = formatModelForProvider(spec, 'opencode');
+
+      expect(result).toBe('claude-sonnet-4');
+    });
+  });
+
+  describe('cross-provider translation error', () => {
+    it('should throw when converting anthropic to opencode', () => {
+      const spec: ModelSpec = {
+        provider: 'anthropic',
+        model: 'claude-3-5-sonnet',
+        raw: 'anthropic/claude-3-5-sonnet'
+      };
+
+      expect(() => formatModelForProvider(spec, 'opencode')).toThrow(
+        /Cannot translate.*anthropic\/claude-3-5-sonnet.*to.*opencode/
+      );
+    });
+
+    it('should throw when converting opencode to anthropic', () => {
+      const spec: ModelSpec = {
+        provider: 'opencode',
+        model: 'gpt-4',
+        raw: 'opencode/gpt-4'
+      };
+
+      expect(() => formatModelForProvider(spec, 'anthropic')).toThrow(
+        /Cannot translate.*opencode\/gpt-4.*to.*anthropic/
+      );
+    });
+
+    it('should include helpful error message', () => {
+      const spec: ModelSpec = {
+        provider: 'anthropic',
+        model: 'claude-sonnet-4',
+        raw: 'anthropic/claude-sonnet-4'
+      };
+
+      expect(() => formatModelForProvider(spec, 'opencode')).toThrow(
+        'Cross-provider model translation is not supported'
+      );
+    });
+
+    it('should include all context in error message', () => {
+      const spec: ModelSpec = {
+        provider: 'opencode',
+        model: 'gpt-4-turbo',
+        raw: 'opencode/gpt-4-turbo'
+      };
+
+      expect(() => formatModelForProvider(spec, 'anthropic')).toThrow(
+        /Cannot translate opencode\/gpt-4-turbo to anthropic provider/
+      );
     });
   });
 });
