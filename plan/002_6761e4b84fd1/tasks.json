@@ -274,7 +274,7 @@
               "type": "Task",
               "id": "P1.M4.T1",
               "title": "Run full test suite and fix failures",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Execute all tests (unit, integration, adversarial) and fix any issues",
               "subtasks": [
                 {
@@ -301,7 +301,7 @@
                   "type": "Subtask",
                   "id": "P1.M4.T1.S3",
                   "title": "Run adversarial tests and fix failures",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M4.T1.S2"
@@ -314,14 +314,14 @@
               "type": "Task",
               "id": "P1.M4.T2",
               "title": "Verify TypeScript compilation and type checking",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Ensure no type errors and build succeeds",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M4.T2.S1",
                   "title": "Run TypeScript compiler and fix errors",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Build command is 'npm run build' (tsc) per SYSTEM_CONTEXT.md. Lint command is 'npm run lint' (tsc --noEmit).\n2. INPUT: Complete codebase with AgentResponse changes.\n3. LOGIC: Run 'npm run lint' to check types. Fix any type errors: missing properties, incorrect generic usage, wrong return types. Common issues: forgetting to check response.status before accessing response.data. Then run 'npm run build' to generate dist/.\n4. OUTPUT: Clean TypeScript compilation with zero errors. dist/ directory populated."
