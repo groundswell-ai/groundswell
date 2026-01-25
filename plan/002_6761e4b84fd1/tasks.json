@@ -158,7 +158,7 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Create AgentResponse Zod schema validation",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Add Zod schema to validate AgentResponse objects at runtime",
               "subtasks": [
                 {
@@ -174,7 +174,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S2",
                   "title": "Add validation to Agent.prompt() return path",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T1.S1"
@@ -194,7 +194,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "Write tests for valid AgentResponse structures",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Tests use Vitest framework per SYSTEM_CONTEXT.md. Test location: src/__tests__/unit/.\n2. INPUT: AgentResponse interface, Zod schemas from P1.M2.T1.S1.\n3. LOGIC: Create new test file src/__tests__/unit/agent-response.test.ts. Test cases: (1) Success response has all required fields, (2) Error response has populated error field, (3) Metadata always includes agentId and timestamp, (4) Null is used instead of undefined, (5) All responses are valid JSON (JSON.parse(JSON.stringify(response)) succeeds).\n4. OUTPUT: Comprehensive test suite validating AgentResponse contract compliance."

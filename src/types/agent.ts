@@ -479,6 +479,17 @@ export const AGENT_ERROR_CODES = {
    * (e.g., tool not found, tool returned error, tool timeout).
    */
   TOOL_EXECUTION_FAILED: 'TOOL_EXECUTION_FAILED',
+
+  /**
+   * Internal validation or system error
+   *
+   * Use when an internal validation fails or a system error occurs.
+   * This indicates a bug in the code (e.g., factory helper produced invalid response).
+   * Non-recoverable because retrying with the same inputs will produce the same error.
+   *
+   * Per PRD 6.6: Internal validation failures should return this error code.
+   */
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 
 // ========================

@@ -6,6 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { z } from 'zod';
 import type {
   AgentConfig,
   PromptOverrides,
@@ -23,7 +24,8 @@ import type {
 import {
   createSuccessResponse,
   createErrorResponse,
-} from '../types/agent.js';
+  AgentResponseSchema,
+} from '../types/index.js';
 import type { Prompt } from './prompt.js';
 import { MCPHandler } from './mcp-handler.js';
 import { generateId } from '../utils/id.js';
@@ -519,16 +521,76 @@ export class Agent {
 
       const agentResponse = createSuccessResponse(validated, metadata);
 
+      // Validate before returning (defense-in-depth)
+      const validatedResponse = this.validateResponse(agentResponse, prompt.responseFormat);
+
       // Store in cache if enabled
       if (cacheEnabled && cacheKey) {
-        await defaultCache.set(cacheKey, agentResponse, { prefix: this.id });
+        await defaultCache.set(cacheKey, validatedResponse, { prefix: this.id });
       }
 
-      return agentResponse;
+      return validatedResponse;
     } finally {
       // Restore environment
       this.restoreEnvironment(originalEnv);
     }
+  }
+
+  /**
+   * Validates an AgentResponse against the schema before returning
+   *
+   * This provides defense-in-depth validation to ensure all returned responses
+   * conform to the AgentResponse schema, even if factory helpers have bugs.
+   *
+   * @template T - The type of response data
+   * @param response - The response to validate
+   * @param dataSchema - The Zod schema for the response data (from Prompt.responseFormat)
+   * @returns The validated response, or an INTERNAL_ERROR response if validation fails
+   *
+   * @private
+   */
+  private validateResponse<T>(
+    response: AgentResponse<T>,
+    dataSchema: z.ZodTypeAny
+  ): AgentResponse<T> {
+    // Create schema for this response type
+    const schema = AgentResponseSchema(dataSchema);
+
+    // Validate response against schema
+    const validation = schema.safeParse(response);
+
+    if (validation.success) {
+      // Response is valid, return it unchanged
+      return response;
+    }
+
+    // Validation failed - this indicates a bug in our code
+    // Log detailed error information for debugging
+    console.error('Agent response validation failed', {
+      agentId: this.id,
+      timestamp: Date.now(),
+      errorCount: validation.error.errors.length,
+      errors: validation.error.errors.map(err => ({
+        path: err.path.join('.'),
+        message: err.message,
+        code: err.code,
+      })),
+    });
+
+    // Return INTERNAL_ERROR response
+    // Use createErrorResponse which is already imported
+    return createErrorResponse(
+      'INTERNAL_ERROR',
+      'Internal response validation failed',
+      {
+        validationErrors: validation.error.errors.map(err => ({
+          path: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      },
+      false  // Non-recoverable - indicates system bug
+    ) as AgentResponse<T>;
   }
 
   /**

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Agent } from '../../core/agent.js';
 import { MCPHandler } from '../../core/mcp-handler.js';
 import { Prompt } from '../../core/prompt.js';
@@ -6,6 +6,7 @@ import { z } from 'zod';
 import {
   isSuccess,
   isError,
+  createErrorResponse,
   type AgentResponse,
 } from '../../types/agent.js';
 
@@ -564,6 +565,122 @@ describe('Agent.prompt()', () => {
       // Assert - Metadata present even on error
       expect(mockResponse.metadata.agentId).toBeDefined();
       expect(mockResponse.metadata.timestamp).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe('Agent.prompt() response validation', () => {
+  let agent: Agent;
+
+  beforeEach(() => {
+    agent = new Agent({ name: 'Test Agent' });
+  });
+
+  it('should have INTERNAL_ERROR in AGENT_ERROR_CODES', async () => {
+    // Import AGENT_ERROR_CODES using dynamic import
+    const { AGENT_ERROR_CODES } = await import('../../types/agent.js');
+    expect(AGENT_ERROR_CODES.INTERNAL_ERROR).toBe('INTERNAL_ERROR');
+  });
+
+  describe('validateResponse helper method', () => {
+    it('should pass through valid responses', () => {
+      const validResponse: AgentResponse<{ result: string }> = {
+        status: 'success',
+        data: { result: 'hello' },
+        error: null,
+        metadata: {
+          agentId: agent.id,
+          timestamp: Date.now(),
+        },
+      };
+
+      const dataSchema = z.object({ result: z.string() });
+      const result = (agent as any).validateResponse(validResponse, dataSchema);
+
+      expect(result).toEqual(validResponse);
+    });
+
+    it('should return INTERNAL_ERROR for invalid responses', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Create an invalid response (error should be null for success status)
+      const invalidResponse: AgentResponse<{ result: string }> = {
+        status: 'success',
+        data: { result: 'hello' },
+        error: {
+          code: 'ERROR',
+          message: 'This should be null for success',
+          recoverable: false,
+        },
+        metadata: {
+          agentId: agent.id,
+          timestamp: Date.now(),
+        },
+      };
+
+      const dataSchema = z.object({ result: z.string() });
+      const result = (agent as any).validateResponse(invalidResponse, dataSchema);
+
+      expect(result.status).toBe('error');
+      expect(result.error?.code).toBe('INTERNAL_ERROR');
+      expect(result.error?.recoverable).toBe(false);
+
+      errorSpy.mockRestore();
+    });
+
+    it('should log detailed error information on validation failure', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Create an invalid response
+      const invalidResponse: AgentResponse<{ result: string }> = {
+        status: 'success',
+        data: { result: 123 }, // Wrong type
+        error: null,
+        metadata: {
+          agentId: agent.id,
+          timestamp: Date.now(),
+        },
+      };
+
+      const dataSchema = z.object({ result: z.string() });
+      (agent as any).validateResponse(invalidResponse, dataSchema);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Agent response validation failed',
+        expect.objectContaining({
+          agentId: agent.id,
+          timestamp: expect.any(Number),
+          errorCount: expect.any(Number),
+          errors: expect.any(Array),
+        })
+      );
+
+      errorSpy.mockRestore();
+    });
+
+    it('should include validation errors in INTERNAL_ERROR response', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Create an invalid response
+      const invalidResponse: AgentResponse<{ result: string }> = {
+        status: 'success',
+        data: { result: 123 }, // Wrong type
+        error: null,
+        metadata: {
+          agentId: agent.id,
+          timestamp: Date.now(),
+        },
+      };
+
+      const dataSchema = z.object({ result: z.string() });
+      const result = (agent as any).validateResponse(invalidResponse, dataSchema);
+
+      expect(result.status).toBe('error');
+      expect(result.error?.code).toBe('INTERNAL_ERROR');
+      expect(result.error?.details).toBeDefined();
+      expect(Array.isArray(result.error?.details?.validationErrors)).toBe(true);
+
+      errorSpy.mockRestore();
     });
   });
 });
