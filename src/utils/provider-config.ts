@@ -49,7 +49,7 @@
 
 // Type imports from providers module
 // CRITICAL: Use .js extension (TypeScript requirement for ESM)
-import type { GlobalProviderConfig } from '../types/providers.js';
+import type { GlobalProviderConfig, ProviderId } from '../types/providers.js';
 
 // ============================================================================
 // Module-Private Variable Storage
@@ -77,30 +77,96 @@ import type { GlobalProviderConfig } from '../types/providers.js';
 let globalConfig: GlobalProviderConfig | null = null;
 
 // ============================================================================
-// Future Functions (To Be Implemented in Subsequent Subtasks)
+// Private Validation Helpers
+// ============================================================================
+
+/**
+ * Type guard to check if a string is a valid ProviderId
+ *
+ * @param value - The string value to check
+ * @returns True if the value is a valid ProviderId ('anthropic' | 'opencode')
+ */
+function isValidProviderId(value: string): value is ProviderId {
+  return value === 'anthropic' || value === 'opencode';
+}
+
+/**
+ * Get comma-separated list of supported providers for error messages
+ *
+ * @returns Formatted list of valid provider IDs
+ */
+function getSupportedProvidersList(): string {
+  return '"anthropic", "opencode"';
+}
+
+// ============================================================================
+// Public API Functions
 // ============================================================================
 
 /**
  * Configure global provider settings
  *
- * **TO BE IMPLEMENTED IN P1.M2.T1.S2**
+ * Validates the configuration and stores it in the module-private
+ * globalConfig variable. This function should be called once at
+ * application startup.
  *
- * This function will mutate the module-private `globalConfig` variable.
+ * ## Validation
+ *
+ * - `defaultProvider` must be 'anthropic' or 'opencode'
+ * - `providerDefaults` keys (if present) must be valid ProviderIds
+ *
+ * ## Configuration Cascade (PRD 7.7)
+ *
+ * This global config is the lowest priority in the cascade:
+ * 1. GlobalProviderConfig (this config) - lowest priority
+ * 2. AgentConfig.provider / AgentConfig.providerOptions
+ * 3. Prompt-level overrides - highest priority
  *
  * @param config - Global provider configuration
- * @throws {Error} If configuration is invalid
+ * @throws {Error} If defaultProvider is invalid
+ * @throws {Error} If providerDefaults contains invalid provider IDs
  *
  * @example
  * ```ts
+ * import { configureProviders } from 'groundswell';
+ *
  * configureProviders({
- *   defaultProvider: 'anthropic',
+ *   defaultProvider: 'opencode',
  *   providerDefaults: {
- *     anthropic: { apiKey: 'sk-...' }
+ *     opencode: { endpoint: 'http://localhost:8080' },
+ *     anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
  *   }
  * });
  * ```
  */
-// export function configureProviders(config: GlobalProviderConfig): void { ... }
+export function configureProviders(config: GlobalProviderConfig): void {
+  // Step 1: Validate defaultProvider
+  if (!isValidProviderId(config.defaultProvider)) {
+    throw new Error(
+      `Invalid default provider: "${config.defaultProvider}". ` +
+      `Supported providers: ${getSupportedProvidersList()}`
+    );
+  }
+
+  // Step 2: Validate providerDefaults keys (if present)
+  if (config.providerDefaults) {
+    for (const providerId of Object.keys(config.providerDefaults)) {
+      if (!isValidProviderId(providerId)) {
+        throw new Error(
+          `Invalid provider in providerDefaults: "${providerId}". ` +
+          `Supported providers: ${getSupportedProvidersList()}`
+        );
+      }
+    }
+  }
+
+  // Step 3: Store configuration (validation passed)
+  globalConfig = config;
+}
+
+// ============================================================================
+// Future Functions (To Be Implemented in Subsequent Subtasks)
+// ============================================================================
 
 /**
  * Get the current global provider configuration
