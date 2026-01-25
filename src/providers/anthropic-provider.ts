@@ -44,10 +44,10 @@ import type {
   ToolExecutor,
   ProviderHookEvents,
   ModelSpec,
-} from '../types/providers.js';
-import type { AgentResponse } from '../types/agent.js';
-import type { Tool, MCPServer, Skill } from '../types/sdk-primitives.js';
-import { parseModelSpec } from '../utils/model-spec.js';
+} from "../types/providers.js";
+import type { AgentResponse } from "../types/agent.js";
+import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
+import { parseModelSpec } from "../utils/model-spec.js";
 
 export class AnthropicProvider implements Provider {
   /**
@@ -55,7 +55,7 @@ export class AnthropicProvider implements Provider {
    *
    * @readonly
    */
-  readonly id: ProviderId = 'anthropic';
+  readonly id: ProviderId = "anthropic";
 
   /**
    * Provider capability flags
@@ -93,7 +93,7 @@ export class AnthropicProvider implements Provider {
    *
    * @internal
    */
-  private sdk: typeof import('@anthropic-ai/claude-agent-sdk') | null = null;
+  private sdk: typeof import("@anthropic-ai/claude-agent-sdk") | null = null;
 
   /**
    * Initialize the Anthropic provider
@@ -113,17 +113,19 @@ export class AnthropicProvider implements Provider {
     // Dynamic import of the Anthropic SDK for lazy loading
     // This allows optional dependencies and faster startup
     try {
-      this.sdk = await import('@anthropic-ai/claude-agent-sdk');
+      this.sdk = await import("@anthropic-ai/claude-agent-sdk");
     } catch (error) {
       // Rethrow with descriptive message for ProviderRegistry to track
       throw new Error(
-        `Failed to load @anthropic-ai/claude-agent-sdk: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to load @anthropic-ai/claude-agent-sdk: ${error instanceof Error ? error.message : "Unknown error"}`,
       );
     }
 
     // Validate import succeeded
     if (!this.sdk) {
-      throw new Error('Failed to load @anthropic-ai/claude-agent-sdk: Import returned null');
+      throw new Error(
+        "Failed to load @anthropic-ai/claude-agent-sdk: Import returned null",
+      );
     }
 
     // Note: Options are stored for later use in execute() method
@@ -171,20 +173,77 @@ export class AnthropicProvider implements Provider {
   /**
    * Execute a prompt request
    *
+   * Constructs the SDK query from ProviderRequest and executes it via the Anthropic SDK.
+   *
    * @param request - Provider request with prompt and options
-   * @param toolExecutor - Callback for executing tools
-   * @param hooks - Optional lifecycle hooks
+   * @param toolExecutor - Callback for executing tools (used in P2.M1.T1.S6)
+   * @param hooks - Optional lifecycle hooks (adapter in P2.M1.T2.S1)
    * @returns Typed agent response
    * @remarks
-   * Implemented in P2.M1.T1.S5 (query construction) and P2.M1.T1.S6 (message iteration)
+   * P2.M1.T1.S5: Query construction - builds AgentSDKOptions and calls SDK query()
+   * P2.M1.T1.S6: Message iteration - iterates AsyncGenerator and builds AgentResponse
    */
   async execute<T>(
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
-    hooks?: ProviderHookEvents
+    hooks?: ProviderHookEvents,
   ): Promise<AgentResponse<T>> {
-    // Implemented in P2.M1.T1.S5-S6
-    return {} as AgentResponse<T>;
+    // PATTERN: SDK initialization check (follow initialize() pattern at lines 107-110)
+    // CRITICAL: Validate SDK is loaded before attempting to use it
+    if (!this.sdk) {
+      throw new Error("SDK not initialized. Call initialize() first.");
+    }
+
+    // PATTERN: Model resolution using normalizeModel()
+    // FROM: src/providers/anthropic-provider.ts:246-259
+    // Default model from src/core/agent.ts:320
+    const modelSpec = this.normalizeModel(
+      request.options.model ?? "claude-sonnet-4-20250514",
+    );
+
+    // PATTERN: AgentSDKOptions construction (EXACT pattern from src/core/agent.ts:397-426)
+    // CRITICAL: Map ProviderRequest fields to SDK Options format
+    const sdkOptions = {
+      // Model mapping
+      model: modelSpec.model,
+
+      // System prompt mapping (from src/core/agent.ts:317-318)
+      systemPrompt: request.options.systemPrompt,
+
+      // Tools mapping to allowedTools (string[])
+      // CRITICAL: Map tool objects to tool names (from src/core/agent.ts:405-407)
+      ...(request.options.tools &&
+        request.options.tools.length > 0 && {
+          allowedTools: request.options.tools.map((t) => t.name),
+        }),
+
+      // MCP servers (placeholder for P2.M1.T1.S7)
+      // mcpServers: undefined,
+
+      // Hooks (placeholder for P2.M1.T2.S1)
+      // hooks: undefined,
+    };
+
+    // PATTERN: SDK query() call (EXACT pattern from src/core/agent.ts:431)
+    // CRITICAL: query() returns AsyncGenerator<SDKMessage> (not Promise!)
+    // Do NOT await the query() call - it returns the generator synchronously
+    const queryResult = this.sdk.query({
+      prompt: request.prompt,
+      options: sdkOptions,
+    });
+
+    // TODO: P2.M1.T1.S6 - Iterate messages and build AgentResponse
+    // FOR NOW: Return temporary response to satisfy interface
+    // FROM: src/types/agent.ts:540-550 (createSuccessResponse pattern)
+    return {
+      status: "success",
+      data: queryResult as T, // Temporary cast - will iterate in P2.M1.T1.S6
+      error: null,
+      metadata: {
+        agentId: this.id,
+        timestamp: Date.now(),
+      },
+    } satisfies AgentResponse<T>;
   }
 
   /**
@@ -245,13 +304,13 @@ export class AnthropicProvider implements Provider {
    */
   normalizeModel(model: string): ModelSpec {
     // Delegate to existing utility function
-    const spec = parseModelSpec(model, 'anthropic');
+    const spec = parseModelSpec(model, "anthropic");
 
     // Provider-specific validation
     if (spec.provider !== this.id) {
       throw new Error(
         `Cannot normalize ${spec.provider}/${spec.model} with AnthropicProvider. ` +
-        `Use ProviderRegistry.get('${spec.provider}') instead.`
+          `Use ProviderRegistry.get('${spec.provider}') instead.`,
       );
     }
 

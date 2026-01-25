@@ -296,7 +296,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S5",
                   "title": "Implement execute() method - query construction",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 3,
                   "dependencies": [
                     "P2.M1.T1.S2",
