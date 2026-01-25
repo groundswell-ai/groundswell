@@ -46,6 +46,10 @@ import type {
   ModelSpec,
 } from "../types/providers.js";
 import type { AgentResponse } from "../types/agent.js";
+import {
+  createSuccessResponse,
+  createErrorResponse,
+} from "../types/agent.js";
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
 import { parseModelSpec } from "../utils/model-spec.js";
 
@@ -224,6 +228,10 @@ export class AnthropicProvider implements Provider {
       // hooks: undefined,
     };
 
+    // PATTERN: Start time tracking for duration calculation
+    // FROM: src/core/agent.ts line 406
+    const startTime = Date.now();
+
     // PATTERN: SDK query() call (EXACT pattern from src/core/agent.ts:431)
     // CRITICAL: query() returns AsyncGenerator<SDKMessage> (not Promise!)
     // Do NOT await the query() call - it returns the generator synchronously
@@ -232,18 +240,79 @@ export class AnthropicProvider implements Provider {
       options: sdkOptions,
     });
 
-    // TODO: P2.M1.T1.S6 - Iterate messages and build AgentResponse
-    // FOR NOW: Return temporary response to satisfy interface
-    // FROM: src/types/agent.ts:540-550 (createSuccessResponse pattern)
-    return {
-      status: "success",
-      data: queryResult as T, // Temporary cast - will iterate in P2.M1.T1.S6
-      error: null,
-      metadata: {
-        agentId: this.id,
-        timestamp: Date.now(),
-      },
-    } satisfies AgentResponse<T>;
+    // PATTERN: Message iteration and AgentResponse construction
+    // FROM: src/core/agent.ts lines 437-492
+    let resultMessage: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null = null;
+    let toolCallCount = 0;
+
+    // Iterate over the AsyncGenerator of SDK messages
+    for await (const message of queryResult) {
+      // Count tool uses from assistant messages
+      if (message.type === "assistant") {
+        const content = message.message?.content;
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === "tool_use") {
+              toolCallCount++;
+              // Note: Hooks adapter will be implemented in P2.M1.T2.S1
+            }
+          }
+        }
+      }
+
+      // Capture the final result message
+      if (message.type === "result") {
+        resultMessage = message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
+      }
+    }
+
+    // Calculate duration from start time
+    const duration = Date.now() - startTime;
+
+    // Handle missing result message
+    if (!resultMessage) {
+      return createErrorResponse(
+        "INVALID_RESPONSE_FORMAT",
+        "No result message received from Agent SDK",
+        { duration },
+        false
+      ) as AgentResponse<T>;
+    }
+
+    // Handle error subtypes (error_during_execution, error_max_turns)
+    if (resultMessage.subtype !== "success") {
+      const errorResult = resultMessage as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage & {
+        subtype: string;
+        errors?: string[];
+      };
+      return createErrorResponse(
+        "EXECUTION_FAILED",
+        `Agent SDK execution failed: ${errorResult.subtype}`,
+        {
+          errors: errorResult.errors ?? [],
+          subtype: errorResult.subtype,
+        },
+        errorResult.subtype === "error_max_turns" // Recoverable if just hit turn limit
+      ) as AgentResponse<T>;
+    }
+
+    // Extract usage from result
+    const usage = {
+      input_tokens: resultMessage.usage?.input_tokens ?? 0,
+      output_tokens: resultMessage.usage?.output_tokens ?? 0,
+    };
+
+    // Extract data from result (prefer structured_output, fallback to result)
+    const data = (resultMessage.structured_output ?? resultMessage.result) as T;
+
+    // Return success response with metadata
+    return createSuccessResponse(data, {
+      agentId: this.id,
+      timestamp: Date.now(),
+      duration,
+      usage,
+      toolCalls: toolCallCount,
+    });
   }
 
   /**
