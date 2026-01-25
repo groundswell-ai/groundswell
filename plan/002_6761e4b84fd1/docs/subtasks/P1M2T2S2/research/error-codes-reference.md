@@ -138,38 +138,3 @@ When tools fail, the `details` field should include:
 
 ### PRD 6.6 Validation Requirement
 "Workflows receiving agent responses SHOULD validate against the `AgentResponse` schema before processing. Invalid responses must be treated as errors with code `INVALID_RESPONSE_FORMAT`."
-
-## Existing Test Files for Reference
-
-1. **agent-response-factory.test.ts** - Lines 84-138: Error response factory tests
-2. **agent-response.test.ts** - Lines 1014-1147: Error response schema validation tests
-3. **agent-response-public-api.test.ts** - Lines 145-152: Error code export tests
-4. **agent.test.ts** - Lines 603-684: Internal error handling tests
-
-## createErrorResponse Factory Function
-
-**File**: `/home/dustin/projects/groundswell/src/types/agent.ts` (lines 595-615)
-
-```typescript
-export function createErrorResponse(
-  code: string,
-  message: string,
-  details?: Record<string, unknown>,
-  recoverable: boolean = false
-): AgentResponse<null> {
-  return {
-    status: 'error',
-    data: null,
-    error: {
-      code,
-      message,
-      details: details ?? null,
-      recoverable,
-    },
-    metadata: {
-      agentId: 'unknown',
-      timestamp: Date.now(),
-    },
-  };
-}
-```

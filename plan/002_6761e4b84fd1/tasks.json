@@ -151,7 +151,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Milestone 1.2: Validation & Error Handling",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Add runtime validation and error handling for AgentResponse compliance",
           "tasks": [
             {
@@ -187,7 +187,7 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Add integration tests for AgentResponse compliance",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Create comprehensive tests ensuring AgentResponse contract is always met",
               "subtasks": [
                 {
@@ -203,7 +203,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S2",
                   "title": "Write tests for error code handling",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S1"
@@ -214,7 +214,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S3",
                   "title": "Write adversarial tests for AgentResponse edge cases",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S2"
