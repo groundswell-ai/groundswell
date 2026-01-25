@@ -2,11 +2,26 @@
  * Agent - Lightweight wrapper around Anthropic's Agent SDK
  *
  * Agents execute prompts and manage tool invocation cycles.
- * All configuration properties map 1:1 to Anthropic SDK.
+ * All configuration properties map 1:1 to Anthropic Agent SDK.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import {
+  query,
+  createSdkMcpServer,
+  tool,
+  type Options as AgentSDKOptions,
+  type SDKMessage,
+  type SDKResultMessage,
+  type McpServerConfig,
+  type HookCallback,
+  type HookInput,
+  type PreToolUseHookInput,
+  type PostToolUseHookInput,
+  type SessionStartHookInput,
+  type SessionEndHookInput,
+} from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type {
   AgentConfig,
   PromptOverrides,
@@ -48,12 +63,7 @@ export interface PromptResult<T> {
 }
 
 /**
- * Internal message type for conversation history
- */
-type Message = Anthropic.MessageParam;
-
-/**
- * Agent class - executes prompts via Anthropic SDK
+ * Agent class - executes prompts via Anthropic Agent SDK
  */
 export class Agent {
   /** Unique identifier for this agent instance */
@@ -64,9 +74,6 @@ export class Agent {
 
   /** Stored configuration */
   private readonly config: AgentConfig;
-
-  /** Anthropic client instance */
-  private readonly client: Anthropic;
 
   /** MCP handler for tool management */
   private readonly mcpHandler: MCPHandler;
@@ -86,11 +93,6 @@ export class Agent {
     this.name = config.name ?? 'Agent';
     this.config = config;
     this.model = config.model ?? 'claude-sonnet-4-20250514';
-
-    // Create Anthropic client
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
 
     // Initialize MCP handler
     this.mcpHandler = new MCPHandler();
@@ -194,7 +196,112 @@ export class Agent {
   }
 
   /**
-   * Internal prompt execution with full flow
+   * Build MCP server configurations for Agent SDK
+   */
+  private buildMcpServers(): Record<string, McpServerConfig> | undefined {
+    const mcpServers: Record<string, McpServerConfig> = {};
+
+    // Get all tools from our MCPHandler and create SDK MCP servers
+    let serverIndex = 0;
+    for (const handler of [this.mcpHandler, ...this.mcpHandlers]) {
+      const sdkServer = handler.toAgentSDKServer();
+      if (sdkServer) {
+        // Use a unique name for each server
+        const serverName = `groundswell-mcp-${serverIndex++}`;
+        mcpServers[serverName] = sdkServer;
+      }
+    }
+
+    return Object.keys(mcpServers).length > 0 ? mcpServers : undefined;
+  }
+
+  /**
+   * Build hooks configuration for Agent SDK
+   */
+  private buildAgentSDKHooks(
+    effectiveHooks: AgentHooks
+  ): Partial<Record<string, { hooks: HookCallback[] }>> {
+    const sdkHooks: Partial<Record<string, { hooks: HookCallback[] }>> = {};
+
+    // PreToolUse hooks
+    if (effectiveHooks.preToolUse && effectiveHooks.preToolUse.length > 0) {
+      sdkHooks['PreToolUse'] = {
+        hooks: effectiveHooks.preToolUse.map(
+          (hook) => async (input: HookInput) => {
+            const preInput = input as PreToolUseHookInput;
+            await hook({
+              toolName: preInput.tool_name,
+              toolInput: preInput.tool_input,
+              agentId: this.id,
+            } as PreToolUseContext);
+            return { continue: true };
+          }
+        ),
+      };
+    }
+
+    // PostToolUse hooks
+    if (effectiveHooks.postToolUse && effectiveHooks.postToolUse.length > 0) {
+      sdkHooks['PostToolUse'] = {
+        hooks: effectiveHooks.postToolUse.map(
+          (hook) => async (input: HookInput) => {
+            const postInput = input as PostToolUseHookInput;
+            await hook({
+              toolName: postInput.tool_name,
+              toolInput: postInput.tool_input,
+              toolOutput: postInput.tool_response,
+              agentId: this.id,
+              duration: 0, // SDK doesn't provide duration in hook input
+            } as PostToolUseContext);
+            return { continue: true };
+          }
+        ),
+      };
+    }
+
+    // SessionStart hooks
+    if (effectiveHooks.sessionStart && effectiveHooks.sessionStart.length > 0) {
+      sdkHooks['SessionStart'] = {
+        hooks: effectiveHooks.sessionStart.map(
+          (hook) => async (_input: HookInput) => {
+            await hook({
+              agentId: this.id,
+              agentName: this.name,
+            } as SessionStartContext);
+            return { continue: true };
+          }
+        ),
+      };
+    }
+
+    // SessionEnd hooks
+    if (effectiveHooks.sessionEnd && effectiveHooks.sessionEnd.length > 0) {
+      sdkHooks['SessionEnd'] = {
+        hooks: effectiveHooks.sessionEnd.map(
+          (hook) => async (_input: HookInput) => {
+            await hook({
+              agentId: this.id,
+              agentName: this.name,
+              totalDuration: 0, // Will be calculated after execution
+            } as SessionEndContext);
+            return { continue: true };
+          }
+        ),
+      };
+    }
+
+    return sdkHooks;
+  }
+
+  /**
+   * Convert Zod schema to JSON Schema for Agent SDK outputFormat
+   */
+  private zodToJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
+    return zodToJsonSchema(schema, { $refStrategy: 'none' }) as Record<string, unknown>;
+  }
+
+  /**
+   * Internal prompt execution with full flow using Agent SDK
    */
   private async executePrompt<T>(
     prompt: Prompt<T>,
@@ -202,8 +309,6 @@ export class Agent {
   ): Promise<AgentResponse<T>> {
     const startTime = Date.now();
     const requestId = generateId();
-    let toolCallCount = 0;
-    let totalUsage: TokenUsage = { input_tokens: 0, output_tokens: 0 };
 
     // Get execution context for event emission
     const ctx = getExecutionContext();
@@ -285,209 +390,181 @@ export class Agent {
       this.config.hooks
     );
 
-    const effectiveStop = overrides?.stop;
-
     // Set up environment variables
     const originalEnv = this.setupEnvironment(overrides?.env ?? this.config.env);
 
     try {
-      // Call session start hooks
-      await this.callHooks(effectiveHooks?.sessionStart, {
-        agentId: this.id,
-        agentName: this.name,
-      } as SessionStartContext);
+      // Build Agent SDK options
+      const sdkOptions: AgentSDKOptions = {
+        model: effectiveModel,
+        systemPrompt: effectiveSystem,
+        env: { ...process.env, ...(overrides?.env ?? this.config.env) } as Record<string, string>,
+      };
 
-      // Build initial messages
-      const messages: Message[] = [
-        { role: 'user', content: prompt.buildUserMessage() },
-      ];
+      // Add tools if available
+      if (effectiveTools && effectiveTools.length > 0) {
+        sdkOptions.allowedTools = effectiveTools.map((t) => t.name);
+      }
 
-      // Execute conversation loop
-      let response = await this.callApi(
-        messages,
-        effectiveSystem,
-        effectiveTools,
-        effectiveModel,
-        effectiveMaxTokens,
-        effectiveTemperature,
-        effectiveStop
-      );
+      // Add MCP servers
+      const mcpServers = this.buildMcpServers();
+      if (mcpServers) {
+        sdkOptions.mcpServers = mcpServers;
+      }
 
-      totalUsage = this.addUsage(totalUsage, response.usage);
+      // Add hooks
+      if (effectiveHooks) {
+        sdkOptions.hooks = this.buildAgentSDKHooks(effectiveHooks);
+      }
 
-      // Handle tool use loop
-      while (response.stop_reason === 'tool_use') {
-        const toolUseBlocks = response.content.filter(
-          (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
-        );
+      // Add output format for structured response using JSON Schema
+      const jsonSchema = this.zodToJsonSchema(prompt.responseFormat);
+      sdkOptions.outputFormat = {
+        type: 'json_schema',
+        schema: jsonSchema as Record<string, unknown>,
+      };
 
-        const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      // Build user message
+      const userMessage = prompt.buildUserMessage();
 
-        for (const toolUse of toolUseBlocks) {
-          toolCallCount++;
+      // Execute query using Agent SDK
+      const q = query({ prompt: userMessage, options: sdkOptions });
 
-          // Call pre-tool hooks
-          await this.callHooks(effectiveHooks?.preToolUse, {
-            toolName: toolUse.name,
-            toolInput: toolUse.input,
-            agentId: this.id,
-          } as PreToolUseContext);
+      // Collect messages and find the result
+      let resultMessage: SDKResultMessage | null = null;
+      let toolCallCount = 0;
 
-          const toolStartTime = Date.now();
+      for await (const message of q) {
+        // Count tool uses from assistant messages
+        if (message.type === 'assistant') {
+          const content = message.message?.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === 'tool_use') {
+                toolCallCount++;
 
-          // Execute tool
-          const result = await this.executeTool(toolUse.name, toolUse.input);
-
-          // Check if tool execution returned an error response
-          if (result && typeof result === 'object' && 'status' in result) {
-            // This is an AgentResponse error - return it immediately
-            return result as AgentResponse<T>;
+                // Emit tool invocation event if in workflow context
+                if (ctx) {
+                  this.emitWorkflowEvent({
+                    type: 'toolInvocation',
+                    toolName: block.name,
+                    input: block.input,
+                    output: undefined, // Not available at this point
+                    duration: 0,
+                    node: ctx.workflowNode,
+                  });
+                }
+              }
+            }
           }
-
-          const toolDuration = Date.now() - toolStartTime;
-
-          // Emit tool invocation event if in workflow context
-          if (ctx) {
-            this.emitWorkflowEvent({
-              type: 'toolInvocation',
-              toolName: toolUse.name,
-              input: toolUse.input,
-              output: result,
-              duration: toolDuration,
-              node: ctx.workflowNode,
-            });
-          }
-
-          // Call post-tool hooks
-          await this.callHooks(effectiveHooks?.postToolUse, {
-            toolName: toolUse.name,
-            toolInput: toolUse.input,
-            toolOutput: result,
-            agentId: this.id,
-            duration: toolDuration,
-          } as PostToolUseContext);
-
-          toolResults.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content:
-              typeof result === 'string' ? result : JSON.stringify(result),
-          });
         }
 
-        // Add assistant message with tool uses
-        messages.push({ role: 'assistant', content: response.content });
-
-        // Add tool results
-        messages.push({ role: 'user', content: toolResults });
-
-        // Continue conversation
-        response = await this.callApi(
-          messages,
-          effectiveSystem,
-          effectiveTools,
-          effectiveModel,
-          effectiveMaxTokens,
-          effectiveTemperature,
-          effectiveStop
-        );
-
-        totalUsage = this.addUsage(totalUsage, response.usage);
+        // Capture the final result message
+        if (message.type === 'result') {
+          resultMessage = message as SDKResultMessage;
+        }
       }
-
-      // Extract text response
-      const textContent = response.content.find(
-        (block): block is Anthropic.TextBlock => block.type === 'text'
-      );
-
-      if (!textContent) {
-        return createErrorResponse(
-          'INVALID_RESPONSE_FORMAT',
-          'No text response received from API',
-          { stopReason: response.stop_reason },
-          false
-        ) as AgentResponse<T>;
-      }
-
-      // Parse JSON from response
-      const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        return createErrorResponse(
-          'INVALID_RESPONSE_FORMAT',
-          'No JSON object found in response',
-          { responseText: textContent.text.substring(0, 200) },
-          false
-        ) as AgentResponse<T>;
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
-
-      // Validate with schema - use safeValidateResponse to catch Zod errors
-      const validationResult = prompt.safeValidateResponse(parsed);
-
-      if (!validationResult.success) {
-        const zodError = validationResult.error;
-
-        // Format user-friendly error summary
-        const errorSummary = zodError.errors
-          .map(err => {
-            const field = err.path.length > 0 ? err.path.join('.') : 'response';
-            return `${field}: ${err.message}`;
-          })
-          .join('; ');
-
-        // Log validation failure
-        console.error('Response validation failed', {
-          agentId: this.id,
-          agentName: this.name,
-          requestId,
-          errorCount: zodError.errors.length,
-          validationErrors: zodError.errors.map(err => ({
-            path: err.path.join('.'),
-            message: err.message,
-            code: err.code,
-          })),
-        });
-
-        // Calculate duration for metadata
-        const duration = Date.now() - startTime;
-
-        // Return error response
-        const errorResponse = createErrorResponse(
-          'INVALID_RESPONSE_FORMAT',
-          `Response validation failed: ${errorSummary}`,
-          {
-            validationErrors: zodError.errors.map(err => ({
-              field: err.path.join('.') || 'root',
-              message: err.message,
-              code: err.code,
-            })),
-            errorCount: zodError.errors.length,
-          },
-          false // not recoverable
-        );
-
-        // Override metadata with actual execution values
-        errorResponse.metadata = {
-          agentId: this.id,
-          timestamp: startTime,
-          duration,
-          requestId,
-        };
-
-        return errorResponse as AgentResponse<T>;
-      }
-
-      const validated = validationResult.data;
-
-      // Call session end hooks
-      await this.callHooks(effectiveHooks?.sessionEnd, {
-        agentId: this.id,
-        agentName: this.name,
-        totalDuration: Date.now() - startTime,
-      } as SessionEndContext);
 
       const duration = Date.now() - startTime;
+
+      // Handle result
+      if (!resultMessage) {
+        return createErrorResponse(
+          'INVALID_RESPONSE_FORMAT',
+          'No result message received from Agent SDK',
+          { duration },
+          false
+        ) as AgentResponse<T>;
+      }
+
+      // Check for errors in result
+      if (resultMessage.subtype !== 'success') {
+        const errorResult = resultMessage as SDKResultMessage & { subtype: string; errors?: string[] };
+        return createErrorResponse(
+          'EXECUTION_FAILED',
+          `Agent SDK execution failed: ${errorResult.subtype}`,
+          {
+            errors: errorResult.errors ?? [],
+            subtype: errorResult.subtype,
+          },
+          errorResult.subtype === 'error_max_turns' // Recoverable if just hit turn limit
+        ) as AgentResponse<T>;
+      }
+
+      // Extract usage from result
+      const totalUsage: TokenUsage = {
+        input_tokens: resultMessage.usage?.input_tokens ?? 0,
+        output_tokens: resultMessage.usage?.output_tokens ?? 0,
+      };
+
+      // Get structured output from result
+      let validated: T;
+
+      if (resultMessage.structured_output !== undefined) {
+        // Use structured output directly
+        const validationResult = prompt.safeValidateResponse(resultMessage.structured_output);
+        if (!validationResult.success) {
+          const zodError = validationResult.error;
+          const errorSummary = zodError.errors
+            .map((err) => {
+              const field = err.path.length > 0 ? err.path.join('.') : 'response';
+              return `${field}: ${err.message}`;
+            })
+            .join('; ');
+
+          return createErrorResponse(
+            'INVALID_RESPONSE_FORMAT',
+            `Response validation failed: ${errorSummary}`,
+            {
+              validationErrors: zodError.errors.map((err) => ({
+                field: err.path.join('.') || 'root',
+                message: err.message,
+                code: err.code,
+              })),
+            },
+            false
+          ) as AgentResponse<T>;
+        }
+        validated = validationResult.data;
+      } else {
+        // Fall back to parsing result text
+        const jsonMatch = resultMessage.result?.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          return createErrorResponse(
+            'INVALID_RESPONSE_FORMAT',
+            'No JSON object found in response',
+            { responseText: resultMessage.result?.substring(0, 200) },
+            false
+          ) as AgentResponse<T>;
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]);
+        const validationResult = prompt.safeValidateResponse(parsed);
+
+        if (!validationResult.success) {
+          const zodError = validationResult.error;
+          const errorSummary = zodError.errors
+            .map((err) => {
+              const field = err.path.length > 0 ? err.path.join('.') : 'response';
+              return `${field}: ${err.message}`;
+            })
+            .join('; ');
+
+          return createErrorResponse(
+            'INVALID_RESPONSE_FORMAT',
+            `Response validation failed: ${errorSummary}`,
+            {
+              validationErrors: zodError.errors.map((err) => ({
+                field: err.path.join('.') || 'root',
+                message: err.message,
+                code: err.code,
+              })),
+            },
+            false
+          ) as AgentResponse<T>;
+        }
+        validated = validationResult.data;
+      }
 
       // Emit prompt end event if in workflow context
       if (ctx) {
@@ -501,13 +578,6 @@ export class Agent {
           tokenUsage: totalUsage,
         });
       }
-
-      const result: PromptResult<T> = {
-        data: validated,
-        usage: totalUsage,
-        duration,
-        toolCalls: toolCallCount,
-      };
 
       // Create AgentResponse with metadata including usage and toolCalls
       const metadata: AgentResponseMetadata = {
@@ -530,6 +600,16 @@ export class Agent {
       }
 
       return validatedResponse;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const message = error instanceof Error ? error.message : 'Unknown error';
+
+      return createErrorResponse(
+        'API_REQUEST_FAILED',
+        `Agent SDK error: ${message}`,
+        { duration },
+        true // API errors are typically recoverable
+      ) as AgentResponse<T>;
     } finally {
       // Restore environment
       this.restoreEnvironment(originalEnv);
@@ -570,7 +650,7 @@ export class Agent {
       agentId: this.id,
       timestamp: Date.now(),
       errorCount: validation.error.errors.length,
-      errors: validation.error.errors.map(err => ({
+      errors: validation.error.errors.map((err) => ({
         path: err.path.join('.'),
         message: err.message,
         code: err.code,
@@ -583,102 +663,14 @@ export class Agent {
       'INTERNAL_ERROR',
       'Internal response validation failed',
       {
-        validationErrors: validation.error.errors.map(err => ({
+        validationErrors: validation.error.errors.map((err) => ({
           path: err.path.join('.'),
           message: err.message,
           code: err.code,
         })),
       },
-      false  // Non-recoverable - indicates system bug
+      false // Non-recoverable - indicates system bug
     ) as AgentResponse<T>;
-  }
-
-  /**
-   * Call the Anthropic API
-   */
-  private async callApi(
-    messages: Message[],
-    system: string | undefined,
-    tools: Tool[] | undefined,
-    model: string,
-    maxTokens: number,
-    temperature: number | undefined,
-    stop: string[] | undefined
-  ): Promise<Anthropic.Message> {
-    const params: Anthropic.MessageCreateParams = {
-      model,
-      max_tokens: maxTokens,
-      messages,
-    };
-
-    if (system) {
-      params.system = system;
-    }
-
-    if (tools && tools.length > 0) {
-      params.tools = tools.map((tool) => ({
-        name: tool.name,
-        description: tool.description,
-        input_schema: tool.input_schema as Anthropic.Tool['input_schema'],
-      }));
-    }
-
-    if (temperature !== undefined) {
-      params.temperature = temperature;
-    }
-
-    if (stop && stop.length > 0) {
-      params.stop_sequences = stop;
-    }
-
-    return this.client.messages.create(params);
-  }
-
-  /**
-   * Execute a tool (either direct or via MCP)
-   * Returns the tool result on success, or AgentResponse<null> on error
-   */
-  private async executeTool(
-    name: string,
-    input: unknown
-  ): Promise<unknown | AgentResponse<null>> {
-    // First, check stored MCPHandler instances (they have registered executors)
-    for (const handler of this.mcpHandlers) {
-      if (handler.hasTool(name)) {
-        const result = await handler.executeTool(name, input);
-        if (result.is_error) {
-          return createErrorResponse(
-            'TOOL_EXECUTION_FAILED',
-            result.content as string,
-            { toolName: name, toolInput: input },
-            false
-          );
-        }
-        return result.content;
-      }
-    }
-
-    // Fall back to main mcpHandler (for non-MCPHandler MCPServers)
-    if (this.mcpHandler.hasTool(name)) {
-      const result = await this.mcpHandler.executeTool(name, input);
-      if (result.is_error) {
-        return createErrorResponse(
-          'TOOL_EXECUTION_FAILED',
-          result.content as string,
-          { toolName: name, toolInput: input },
-          false
-        );
-      }
-      return result.content;
-    }
-
-    // No handler found
-    return createErrorResponse(
-      'TOOL_EXECUTION_FAILED',
-      `No handler found for tool '${name}'`,
-      { toolName: name },
-      false
-    );
   }
 
   /**
@@ -725,19 +717,6 @@ export class Agent {
   }
 
   /**
-   * Call hooks of a specific type
-   */
-  private async callHooks<T>(
-    hooks: ((context: T) => Promise<void> | void)[] | undefined,
-    context: T
-  ): Promise<void> {
-    if (!hooks) return;
-    for (const hook of hooks) {
-      await hook(context);
-    }
-  }
-
-  /**
    * Set up environment variables
    */
   private setupEnvironment(
@@ -764,15 +743,5 @@ export class Agent {
         process.env[key] = value;
       }
     }
-  }
-
-  /**
-   * Add token usage from response
-   */
-  private addUsage(total: TokenUsage, usage: Anthropic.Usage): TokenUsage {
-    return {
-      input_tokens: total.input_tokens + usage.input_tokens,
-      output_tokens: total.output_tokens + usage.output_tokens,
-    };
   }
 }

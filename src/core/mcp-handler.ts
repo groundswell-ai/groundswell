@@ -2,9 +2,15 @@
  * MCP Handler - Manages MCP server connections and tool execution
  *
  * Provides integration with MCP (Model Context Protocol) servers,
- * converting MCP tools to Anthropic Tool format.
+ * converting MCP tools to Anthropic Tool format and Agent SDK MCP format.
  */
 
+import {
+  createSdkMcpServer,
+  tool as sdkTool,
+  type McpServerConfig,
+} from '@anthropic-ai/claude-agent-sdk';
+import { z } from 'zod';
 import type { MCPServer, Tool, ToolResult } from '../types/index.js';
 
 /**
@@ -24,9 +30,10 @@ interface RegisteredTool {
 /**
  * MCPHandler - Manages MCP server registration and tool execution
  *
- * Currently supports:
- * - inprocess transport: Direct tool registration
- * - stdio transport: Documented for future implementation
+ * Supports:
+ * - inprocess transport: Direct tool registration with executors
+ * - stdio transport: External MCP server processes
+ * - Agent SDK integration: Convert to SDK MCP server format
  */
 export class MCPHandler {
   /** Registered MCP servers */
@@ -151,6 +158,125 @@ export class MCPHandler {
    */
   public getServerNames(): string[] {
     return Array.from(this.servers.keys());
+  }
+
+  /**
+   * Convert to Agent SDK MCP server configuration
+   * Returns an SDK MCP server that can be used with query()
+   */
+  public toAgentSDKServer(): McpServerConfig | null {
+    const tools = this.getTools();
+    if (tools.length === 0) {
+      return null;
+    }
+
+    // Create SDK tool definitions from registered tools
+    const sdkTools = Array.from(this.registeredTools.entries()).map(
+      ([fullName, registered]) => {
+        // Convert JSON Schema input_schema to Zod raw shape for SDK tool
+        // The tool() function expects a ZodRawShape, not a ZodObject
+        const zodRawShape = this.jsonSchemaToZodRawShape(registered.tool.input_schema);
+
+        return sdkTool(
+          fullName,
+          registered.tool.description,
+          zodRawShape,
+          async (args: unknown) => {
+            try {
+              const result = await registered.executor(args);
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: typeof result === 'string' ? result : JSON.stringify(result),
+                  },
+                ],
+              };
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Unknown error';
+              return {
+                content: [{ type: 'text' as const, text: `Error: ${message}` }],
+                isError: true,
+              };
+            }
+          }
+        );
+      }
+    );
+
+    // Create SDK MCP server with all tools
+    return createSdkMcpServer({
+      name: 'groundswell-mcp',
+      version: '1.0.0',
+      tools: sdkTools,
+    });
+  }
+
+  /**
+   * Convert JSON Schema to Zod raw shape (for tool() function)
+   * The Agent SDK tool() expects a ZodRawShape, not a ZodObject
+   */
+  private jsonSchemaToZodRawShape(
+    schema: Tool['input_schema']
+  ): Record<string, z.ZodTypeAny> {
+    const zodProps: Record<string, z.ZodTypeAny> = {};
+
+    if (schema.properties) {
+      for (const [key, value] of Object.entries(schema.properties)) {
+        zodProps[key] = this.jsonSchemaPropertyToZod(value as Record<string, unknown>);
+      }
+    }
+
+    // Handle required fields - mark non-required as optional
+    if (schema.required && schema.required.length > 0) {
+      const requiredSet = new Set(schema.required);
+      const processedProps: Record<string, z.ZodTypeAny> = {};
+
+      for (const [key, zodType] of Object.entries(zodProps)) {
+        if (!requiredSet.has(key)) {
+          processedProps[key] = zodType.optional();
+        } else {
+          processedProps[key] = zodType;
+        }
+      }
+
+      return processedProps;
+    }
+
+    return zodProps;
+  }
+
+  /**
+   * Convert a JSON Schema property to Zod type
+   */
+  private jsonSchemaPropertyToZod(prop: Record<string, unknown>): z.ZodTypeAny {
+    const type = prop.type as string;
+
+    switch (type) {
+      case 'string':
+        return z.string();
+      case 'number':
+      case 'integer':
+        return z.number();
+      case 'boolean':
+        return z.boolean();
+      case 'array':
+        if (prop.items) {
+          return z.array(this.jsonSchemaPropertyToZod(prop.items as Record<string, unknown>));
+        }
+        return z.array(z.unknown());
+      case 'object':
+        if (prop.properties) {
+          const nestedSchema: Record<string, z.ZodTypeAny> = {};
+          for (const [key, value] of Object.entries(prop.properties as Record<string, unknown>)) {
+            nestedSchema[key] = this.jsonSchemaPropertyToZod(value as Record<string, unknown>);
+          }
+          return z.object(nestedSchema);
+        }
+        return z.record(z.unknown());
+      default:
+        return z.unknown();
+    }
   }
 
   /**
