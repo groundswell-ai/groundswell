@@ -45,6 +45,14 @@ export {
   isPartial,
 } from './agent.js';
 
+// Zod schemas for AgentResponse validation
+export {
+  AgentResponseStatusSchema,
+  AgentErrorDetailsSchema,
+  AgentResponseMetadataSchema,
+  AgentResponseSchema,
+} from './agent.js';
+
 // Prompt types
 export type { PromptConfig } from './prompt.js';
 

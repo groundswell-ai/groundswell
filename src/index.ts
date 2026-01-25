@@ -70,6 +70,14 @@ export {
   isPartial,
 } from './types/index.js';
 
+// Re-export AgentResponse Zod schemas
+export {
+  AgentResponseStatusSchema,
+  AgentErrorDetailsSchema,
+  AgentResponseMetadataSchema,
+  AgentResponseSchema,
+} from './types/index.js';
+
 // Core classes
 export { Workflow, type WorkflowExecutor } from './core/workflow.js';
 export { WorkflowLogger } from './core/logger.js';

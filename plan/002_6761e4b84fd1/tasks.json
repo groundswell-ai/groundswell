@@ -158,14 +158,14 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Create AgentResponse Zod schema validation",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Add Zod schema to validate AgentResponse objects at runtime",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Define Zod schemas for all AgentResponse types",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Project uses Zod ^3.23.0 per EXTERNAL_DEPENDENCIES.md. Existing Zod patterns in src/core/prompt.ts.\n2. INPUT: AgentResponse interface from src/types/agent.ts.\n3. LOGIC: Create Zod schemas in src/types/agent.ts or new validation file. Schemas: AgentResponseStatusSchema (enum), AgentErrorDetailsSchema, AgentResponseMetadataSchema, AgentResponseSchema (generic). Use z.discriminatedUnion() for status-based validation. Ensure null handling (z.null() not z.undefined()).\n4. OUTPUT: Exported Zod schemas: AgentResponseSchema, AgentErrorDetailsSchema, AgentResponseMetadataSchema."
@@ -174,7 +174,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S2",
                   "title": "Add validation to Agent.prompt() return path",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T1.S1"

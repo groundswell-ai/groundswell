@@ -4,6 +4,7 @@
  */
 
 import type { Tool, MCPServer, Skill, AgentHooks, TokenUsage } from './sdk-primitives.js';
+import { z } from 'zod';
 
 /**
  * Configuration for creating an Agent instance
@@ -718,4 +719,103 @@ export function isPartial<T>(
   response: AgentResponse<T>
 ): response is PartialResponse<T> {
   return response.status === 'partial';
+}
+
+// ========================
+// Zod Schema Definitions
+// ========================
+
+/**
+ * Zod schema for AgentResponseStatus enum
+ * Validates status values: 'success' | 'error' | 'partial'
+ *
+ * @example
+ * ```ts
+ * AgentResponseStatusSchema.parse('success'); // ✓
+ * AgentResponseStatusSchema.parse('invalid'); // ✗ ZodError
+ * ```
+ */
+export const AgentResponseStatusSchema = z.enum(['success', 'error', 'partial']);
+
+/**
+ * Zod schema for AgentErrorDetails interface
+ * Validates error details with null-over-undefined handling
+ *
+ * Per PRD 6.4.4: Use null for absent values, not undefined
+ */
+export const AgentErrorDetailsSchema = z.object({
+  /** Machine-readable error code (SCREAMING_SNAKE_CASE) */
+  code: z.string(),
+  /** Human-readable error description */
+  message: z.string(),
+  /** Additional error context - null if no details (PRD 6.4.4) */
+  details: z.record(z.string(), z.unknown()).nullable(),
+  /** Whether the error is recoverable (can retry) */
+  recoverable: z.boolean(),
+});
+
+/**
+ * Zod schema for AgentResponseMetadata interface
+ * Validates response metadata including agent ID and timestamp
+ */
+export const AgentResponseMetadataSchema = z.object({
+  /** Agent identifier */
+  agentId: z.string(),
+  /** Unix timestamp in milliseconds */
+  timestamp: z.number(),
+  /** Execution duration in milliseconds (optional) */
+  duration: z.number().optional(),
+  /** Request correlation ID (optional) */
+  requestId: z.string().optional(),
+  /** Token usage from API (optional - passthrough for complex type) */
+  usage: z.unknown().optional(),
+  /** Number of tool invocations (optional) */
+  toolCalls: z.number().optional(),
+});
+
+/**
+ * Zod schema factory for AgentResponse<T> discriminated union
+ * Creates a schema that validates responses based on status discriminator
+ *
+ * @template T - The Zod schema for the data type
+ * @param dataSchema - Zod schema for the response data
+ * @returns A discriminated union schema for AgentResponse
+ *
+ * @example
+ * ```ts
+ * // Create schema for string responses
+ * const StringResponseSchema = AgentResponseSchema(z.object({ result: z.string() }));
+ *
+ * // Validate a success response
+ * const result = StringResponseSchema.safeParse({
+ *   status: 'success',
+ *   data: { result: 'hello' },
+ *   error: null,
+ *   metadata: { agentId: 'test', timestamp: Date.now() }
+ * });
+ * ```
+ */
+export function AgentResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
+  const successSchema = z.object({
+    status: z.literal('success'),
+    data: dataSchema,
+    error: z.null(),  // PRD 6.4.4: null not undefined
+    metadata: AgentResponseMetadataSchema.optional(),
+  });
+
+  const errorSchema = z.object({
+    status: z.literal('error'),
+    data: z.null(),  // PRD 6.4.4: null not undefined
+    error: AgentErrorDetailsSchema,
+    metadata: AgentResponseMetadataSchema.optional(),
+  });
+
+  const partialSchema = z.object({
+    status: z.literal('partial'),
+    data: dataSchema,
+    error: z.null(),  // PRD 6.4.4: null not undefined
+    metadata: AgentResponseMetadataSchema.optional(),
+  });
+
+  return z.discriminatedUnion('status', [successSchema, errorSchema, partialSchema]);
 }
