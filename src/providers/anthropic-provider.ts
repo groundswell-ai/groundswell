@@ -104,7 +104,41 @@ export class AnthropicProvider implements Provider {
    * Implemented in P2.M1.T1.S2
    */
   async initialize(options?: ProviderOptions): Promise<void> {
-    // Implemented in P2.M1.T1.S2
+    // Idempotent check: if SDK is already loaded, return immediately
+    if (this.sdk) {
+      return;
+    }
+
+    // Dynamic import of the Anthropic SDK for lazy loading
+    // This allows optional dependencies and faster startup
+    try {
+      this.sdk = await import('@anthropic-ai/claude-agent-sdk');
+    } catch (error) {
+      // Rethrow with descriptive message for ProviderRegistry to track
+      throw new Error(
+        `Failed to load @anthropic-ai/claude-agent-sdk: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+
+    // Validate import succeeded
+    if (!this.sdk) {
+      throw new Error('Failed to load @anthropic-ai/claude-agent-sdk: Import returned null');
+    }
+
+    // Note: Options are stored for later use in execute() method
+    // The actual SDK client creation happens when execute() is called
+    // This is because SDK may need different clients per-request (e.g., custom endpoint)
+    //
+    // Relevant options for Anthropic (stored implicitly via options parameter):
+    // - options.apiKey: Will be used in execute() for SDK client
+    // - options.endpoint: Will be used in execute() for custom endpoint
+    // - options.timeout: Will be used in execute() for request timeout
+    // - options.headers: Will be used in execute() for custom headers
+    //
+    // Ignored option:
+    // - options.sessionId: Anthropic has sessions: false capability
+    //
+    // Note: No internal initialization flag needed - ProviderRegistry manages state externally
   }
 
   /**
