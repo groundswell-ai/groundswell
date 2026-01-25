@@ -176,7 +176,7 @@ describe('AnthropicProvider', () => {
 
       expect(modelSpec).toEqual({
         provider: 'anthropic',
-        model: 'anthropic/claude-opus-4',
+        model: 'claude-opus-4',
         raw: 'anthropic/claude-opus-4',
       });
     });

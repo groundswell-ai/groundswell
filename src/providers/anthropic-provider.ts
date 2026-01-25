@@ -47,6 +47,7 @@ import type {
 } from '../types/providers.js';
 import type { AgentResponse } from '../types/agent.js';
 import type { Tool, MCPServer, Skill } from '../types/sdk-primitives.js';
+import { parseModelSpec } from '../utils/model-spec.js';
 
 export class AnthropicProvider implements Provider {
   /**
@@ -213,17 +214,47 @@ export class AnthropicProvider implements Provider {
   /**
    * Normalize a model string to a ModelSpec
    *
-   * @param model - Model string (e.g., 'claude-sonnet-4' or 'anthropic/claude-opus-4')
-   * @returns Parsed model specification
-   * @remarks
-   * Full implementation in P2.M1.T1.S4
+   * Parses model strings in two formats:
+   * - Plain: "claude-sonnet-4" → { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
+   * - Qualified: "anthropic/claude-opus-4" → { provider: 'anthropic', model: 'claude-opus-4', raw: 'anthropic/claude-opus-4' }
+   *
+   * Delegates to {@link parseModelSpec} for parsing and validation.
+   * Validates that the provider is 'anthropic'.
+   *
+   * @param model - Model string to normalize
+   * @returns Parsed ModelSpec with provider='anthropic'
+   * @throws {Error} When model specification is invalid (delegated to parseModelSpec)
+   * @throws {Error} When provider is not 'anthropic'
+   *
+   * @example
+   * ```ts
+   * const provider = new AnthropicProvider();
+   *
+   * // Plain format
+   * provider.normalizeModel('claude-sonnet-4');
+   * // Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
+   *
+   * // Qualified format
+   * provider.normalizeModel('anthropic/claude-opus-4');
+   * // Returns: { provider: 'anthropic', model: 'claude-opus-4', raw: 'anthropic/claude-opus-4' }
+   *
+   * // Error: wrong provider
+   * provider.normalizeModel('opencode/gpt-4');
+   * // Throws: "Cannot normalize opencode/gpt-4 with AnthropicProvider..."
+   * ```
    */
   normalizeModel(model: string): ModelSpec {
-    // Full implementation in P2.M1.T1.S4
-    return {
-      provider: 'anthropic',
-      model,
-      raw: model,
-    };
+    // Delegate to existing utility function
+    const spec = parseModelSpec(model, 'anthropic');
+
+    // Provider-specific validation
+    if (spec.provider !== this.id) {
+      throw new Error(
+        `Cannot normalize ${spec.provider}/${spec.model} with AnthropicProvider. ` +
+        `Use ProviderRegistry.get('${spec.provider}') instead.`
+      );
+    }
+
+    return spec;
   }
 }
