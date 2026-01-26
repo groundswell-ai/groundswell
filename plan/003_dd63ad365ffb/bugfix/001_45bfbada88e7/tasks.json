@@ -203,7 +203,7 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Add validateAgentResponse Method to Workflow Class",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Implement workflow-level validation that wraps Agent.validateResponse with workflow-specific error handling and event emission.",
               "subtasks": [
                 {
@@ -237,7 +237,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S4",
                   "title": "Write unit tests for workflow-level validation",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1",
