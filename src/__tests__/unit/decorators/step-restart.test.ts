@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Workflow, Step, WorkflowEvent, type WorkflowError } from '../../../index.js';
 
 describe('@Step decorator with retry options', () => {
@@ -155,7 +155,7 @@ describe('@Step decorator with retry options', () => {
     class DelayWorkflow extends Workflow {
       attemptCount = 0;
 
-      @Step({ restartable: true, maxRetries: 2, retryDelayMs: 100 })
+      @Step({ restartable: true, maxRetries: 2, retryDelayMs: 50 })
       async delayedStep(): Promise<void> {
         timestamps.push(Date.now());
         this.attemptCount++;
@@ -176,7 +176,7 @@ describe('@Step decorator with retry options', () => {
     // Assert
     expect(timestamps.length).toBe(2);
     const delay = timestamps[1] - timestamps[0];
-    expect(delay).toBeGreaterThanOrEqual(100);  // At least 100ms delay
+    expect(delay).toBeGreaterThanOrEqual(50);  // At least 50ms delay
   });
 
   it('should emit stepStart, stepRetry, and stepEnd events in order', async () => {
