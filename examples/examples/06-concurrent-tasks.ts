@@ -344,6 +344,8 @@ export async function runConcurrentTasksExample(): Promise<void> {
     console.log(`  Parallel:   ${parTime}ms`);
     console.log(`  Speedup:    ${(seqTime / parTime).toFixed(2)}x`);
   }
+
+  console.log('\n=== Example 6 Complete ===');
 }
 
 // Run if executed directly

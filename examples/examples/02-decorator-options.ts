@@ -209,6 +209,8 @@ export async function runDecoratorOptionsExample(): Promise<void> {
   console.log('\nNote:');
   console.log('  - apiKey and password show as "***" (redacted)');
   console.log('  - internalCounter and debugInfo are not present (hidden)');
+
+  console.log('\n=== Example 2 Complete ===');
 }
 
 // Run if executed directly

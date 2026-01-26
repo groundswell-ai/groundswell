@@ -258,6 +258,8 @@ export async function runReparentingExample(): Promise<void> {
   console.log('\nReparenting Pattern:');
   console.log('  oldParent.detachChild(child);  // Step 1: Detach');
   console.log('  newParent.attachChild(child);  // Step 2: Attach');
+
+  console.log('\n=== Example 11 Complete ===');
 }
 
 // ============================================================

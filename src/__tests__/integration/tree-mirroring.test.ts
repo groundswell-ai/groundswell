@@ -174,20 +174,10 @@ describe('Tree Mirroring Integration', () => {
     // ACT: Attach child
     parent.attachChild(child);
 
-    // ASSERT: Verify treeUpdated event was received via onEvent
-    const treeUpdatedEvent = events.find((e) => e.type === 'treeUpdated');
-    expect(treeUpdatedEvent).toBeDefined();
-
-    // ASSERT: Type guard for discriminated union + verify root node
-    if (treeUpdatedEvent && treeUpdatedEvent.type === 'treeUpdated') {
-      expect(treeUpdatedEvent.root).toBe(parent.getNode());
-    }
-
     // ASSERT: Verify onTreeChanged callback was invoked
-    // NOTE: onTreeChanged is called for BOTH childAttached and treeUpdated events
-    expect(treeChangedCalls).toHaveLength(2);
+    // NOTE: onTreeChanged is called for childAttached event (treeUpdated removed as redundant)
+    expect(treeChangedCalls).toHaveLength(1);
     expect(treeChangedCalls[0]).toBe(parent.getNode());
-    expect(treeChangedCalls[1]).toBe(parent.getNode());
   });
 
   it('should emit treeUpdated when child is detached', () => {
@@ -213,25 +203,15 @@ describe('Tree Mirroring Integration', () => {
     // ACT: Detach child
     parent.detachChild(child);
 
-    // ASSERT: Verify treeUpdated event was received via onEvent
-    const treeUpdatedEvent = events.find((e) => e.type === 'treeUpdated');
-    expect(treeUpdatedEvent).toBeDefined();
-
-    // ASSERT: Type guard for discriminated union + verify root node
-    if (treeUpdatedEvent && treeUpdatedEvent.type === 'treeUpdated') {
-      expect(treeUpdatedEvent.root).toBe(parent.getNode());
-    }
-
     // ASSERT: Verify onTreeChanged callback was invoked
-    // NOTE: onTreeChanged is called for BOTH childDetached and treeUpdated events
-    expect(treeChangedCalls).toHaveLength(2);
+    // NOTE: onTreeChanged is called for childDetached event (treeUpdated removed as redundant)
+    expect(treeChangedCalls).toHaveLength(1);
     expect(treeChangedCalls[0]).toBe(parent.getNode());
-    expect(treeChangedCalls[1]).toBe(parent.getNode());
   });
 });
 
 describe('Tree Mirroring Integration - Multiple Operations', () => {
-  it('should emit treeUpdated for each attachChild operation', () => {
+  it('should emit childAttached for each attachChild operation', () => {
     // ARRANGE: Create parent and multiple children (no parents initially)
     const parent = new TDDOrchestrator('Parent');
     const child1 = new TDDOrchestrator('Child1');
@@ -253,19 +233,19 @@ describe('Tree Mirroring Integration - Multiple Operations', () => {
     parent.attachChild(child2);
     parent.attachChild(child3);
 
-    // ASSERT: Verify count of treeUpdated events equals number of operations
-    const treeUpdatedEvents = events.filter((e) => e.type === 'treeUpdated');
-    expect(treeUpdatedEvents).toHaveLength(3);
+    // ASSERT: Verify count of childAttached events equals number of operations
+    const childAttachedEvents = events.filter((e) => e.type === 'childAttached');
+    expect(childAttachedEvents).toHaveLength(3);
 
-    // ASSERT: Verify each event has correct root
-    treeUpdatedEvents.forEach((event) => {
-      if (event.type === 'treeUpdated') {
-        expect(event.root).toBe(parent.getNode());
+    // ASSERT: Verify each event has correct parent
+    childAttachedEvents.forEach((event) => {
+      if (event.type === 'childAttached') {
+        expect(event.parentId).toBe(parent.id);
       }
     });
   });
 
-  it('should emit treeUpdated for each detachChild operation', () => {
+  it('should emit childDetached for each detachChild operation', () => {
     // ARRANGE: Create parent with multiple children via constructor
     const parent = new TDDOrchestrator('Parent');
     const child1 = new TDDOrchestrator('Child1', parent);
@@ -287,19 +267,19 @@ describe('Tree Mirroring Integration - Multiple Operations', () => {
     parent.detachChild(child2);
     parent.detachChild(child3);
 
-    // ASSERT: Verify count of treeUpdated events equals number of operations
-    const treeUpdatedEvents = events.filter((e) => e.type === 'treeUpdated');
-    expect(treeUpdatedEvents).toHaveLength(3);
+    // ASSERT: Verify count of childDetached events equals number of operations
+    const childDetachedEvents = events.filter((e) => e.type === 'childDetached');
+    expect(childDetachedEvents).toHaveLength(3);
 
-    // ASSERT: Verify each event has correct root
-    treeUpdatedEvents.forEach((event) => {
-      if (event.type === 'treeUpdated') {
-        expect(event.root).toBe(parent.getNode());
+    // ASSERT: Verify each event has correct parent
+    childDetachedEvents.forEach((event) => {
+      if (event.type === 'childDetached') {
+        expect(event.parentId).toBe(parent.id);
       }
     });
   });
 
-  it('should emit treeUpdated for mixed sequential operations', () => {
+  it('should emit child events for mixed sequential operations', () => {
     // ARRANGE: Create parent and children
     const parent = new TDDOrchestrator('Parent');
     const child1 = new TDDOrchestrator('Child1');
@@ -323,21 +303,10 @@ describe('Tree Mirroring Integration - Multiple Operations', () => {
     parent.detachChild(child1);
     parent.attachChild(child3);
 
-    // ASSERT: Verify count of treeUpdated events equals number of operations
-    const treeUpdatedEvents = events.filter((e) => e.type === 'treeUpdated');
-    expect(treeUpdatedEvents).toHaveLength(5);
-
-    // ASSERT: Verify each event has correct root
-    treeUpdatedEvents.forEach((event) => {
-      if (event.type === 'treeUpdated') {
-        expect(event.root).toBe(parent.getNode());
-      }
-    });
-
-    // ASSERT: Verify event sequence matches operation sequence
-    const allTreeEvents = events.filter((e) =>
-      e.type === 'treeUpdated' || e.type === 'childAttached' || e.type === 'childDetached'
+    // ASSERT: Verify count of child events equals number of operations
+    const childEvents = events.filter((e) =>
+      e.type === 'childAttached' || e.type === 'childDetached'
     );
-    expect(allTreeEvents).toHaveLength(10); // 5 treeUpdated + 5 child events
+    expect(childEvents).toHaveLength(5);
   });
 });

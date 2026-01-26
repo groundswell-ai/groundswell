@@ -233,6 +233,8 @@ export async function runParentChildExample(): Promise<void> {
   const logLines = debugger_.toLogString().split('\n').slice(0, 15);
   console.log(logLines.join('\n'));
   console.log('...');
+
+  console.log('\n=== Example 3 Complete ===');
 }
 
 // Run if executed directly

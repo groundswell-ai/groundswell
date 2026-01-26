@@ -498,15 +498,12 @@ export class Workflow<T = unknown> {
     this.children.push(child);
     this.node.children.push(child.node);
 
-    // Emit child attached event
+    // Emit child attached event (triggers onTreeChanged via emitEvent)
     this.emitEvent({
       type: 'childAttached',
       parentId: this.id,
       child: child.node,
     });
-
-    // Emit treeUpdated event to trigger tree debugger rebuild
-    this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node });
   }
 
   /**
@@ -558,15 +555,12 @@ export class Workflow<T = unknown> {
     child.parent = null;
     child.node.parent = null; // Maintain 1:1 mirror between workflow tree and node tree
 
-    // Emit childDetached event
+    // Emit childDetached event (triggers onTreeChanged via emitEvent)
     this.emitEvent({
       type: 'childDetached',
       parentId: this.id,
       childId: child.id,
     });
-
-    // Emit treeUpdated event to trigger tree debugger rebuild
-    this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node });
   }
 
   /**

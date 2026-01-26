@@ -332,6 +332,8 @@ export async function runObserversDebuggerExample(): Promise<void> {
     console.log(`  Events received: ${metrics.eventCount}`);
     console.log(`  Logs received: ${metrics.logCount}`);
   }
+
+  console.log('\n=== Example 4 Complete ===');
 }
 
 // Run if executed directly

@@ -379,6 +379,8 @@ export async function runErrorHandlingExample(): Promise<void> {
       console.log('State:', wfError.state);
     }
   }
+
+  console.log('\n=== Example 5 Complete ===');
 }
 
 // Run if executed directly
