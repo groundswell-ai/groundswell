@@ -11,6 +11,7 @@ export type WorkflowEvent =
   | { type: 'childDetached'; parentId: string; childId: string }
   | { type: 'stateSnapshot'; node: WorkflowNode }
   | { type: 'stepStart'; node: WorkflowNode; step: string }
+  | { type: 'stepRetry'; node: WorkflowNode; step: string; retryCount: number; error: WorkflowError }
   | { type: 'stepEnd'; node: WorkflowNode; step: string; duration: number }
   | { type: 'error'; node: WorkflowNode; error: WorkflowError }
   | { type: 'taskStart'; node: WorkflowNode; task: string }
