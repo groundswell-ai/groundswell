@@ -1,43 +1,6 @@
 import type { ErrorMergeStrategy } from './error-strategy.js';
 import type { WorkflowError } from './error.js';
-
-/**
- * Error matching criterion for step restart decisions
- *
- * Supports three patterns for error matching:
- * 1. By error code - exact string or regex match
- * 2. By recoverable flag - match recoverable/non-recoverable errors
- * 3. Custom predicate - function for complex matching logic
- *
- * @example Match by error code
- * ```ts
- * const criterion: ErrorCriterion = { code: 'RATE_LIMIT_EXCEEDED' };
- * ```
- *
- * @example Match by regex
- * ```ts
- * const criterion: ErrorCriterion = { code: /TIMEOUT|NETWORK_ERROR/ };
- * ```
- *
- * @example Match by recoverable flag
- * ```ts
- * const criterion: ErrorCriterion = { recoverable: true };
- * ```
- *
- * @example Custom predicate
- * ```ts
- * const criterion: ErrorCriterion = (error) =>
- *   error.message.includes('temporary') || error.code === 'TIMEOUT';
- * ```
- *
- * @remarks
- * Function types must come last in the discriminated union for proper TypeScript type narrowing.
- * When checking criteria at runtime, always check `typeof criterion === 'function'` first.
- */
-export type ErrorCriterion =
-  | { code: string | RegExp }               // Match by error code (string or regex)
-  | { recoverable: boolean }                // Match by recoverable flag
-  | ((error: WorkflowError) => boolean);   // Custom predicate function (must be last)
+import type { ErrorCriterion } from './restart.js';
 
 /**
  * Configuration options for @Step decorator

@@ -7,9 +7,9 @@ export type { WorkflowEvent } from './events.js';
 export type { WorkflowObserver } from './observer.js';
 
 // Restart types
-export type { RestartAnalysis } from './restart.js';
+export type { RestartAnalysis, ErrorCriterion } from './restart.js';
 
-export type { StepOptions, TaskOptions, ErrorCriterion } from './decorators.js';
+export type { StepOptions, TaskOptions } from './decorators.js';
 export type { ErrorMergeStrategy } from './error-strategy.js';
 
 // SDK primitive types
