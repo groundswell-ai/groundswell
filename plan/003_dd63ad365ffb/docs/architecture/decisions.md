@@ -2,47 +2,28 @@
 
 This document records key architectural decisions made during the research and planning phase.
 
-## Decision 1: OpenCode SDK Strategy
+## Decision 1: OpenCode SDK Package Verification
 
-**Status:** OPEN (requires resolution)
+**Status:** DECIDED
 
 **Context:**
-The PRD specifies OpenCode SDK as a multi-provider solution supporting 75+ providers. However, research could not verify the existence or package name of this SDK due to web search rate limits.
+The PRD specifies OpenCode SDK as a multi-provider solution supporting 75+ providers. Initial research could not verify the package due to web search rate limits.
 
-**Options:**
+**Research Completed (P3.M1.T1.S1):**
+- **Package Verified:** `@opencode-ai/sdk@1.1.36` exists publicly on npm
+- **Maintainers:** adamelmore (adam@terminal.shop), thdxr (d@ironbay.co)
+- **License:** MIT
+- **Dependencies:** Zero runtime dependencies
+- **Versions:** 3,021+ published (actively maintained)
 
-### Option A: OpenCode is a Real Public Package
-**Action Required:**
-- Search npmjs.com for "opencode agent sdk" after rate limit reset (Feb 1, 2026)
-- Find GitHub repository
-- Document actual API and capabilities
-- Implement according to discovered patterns
+**Decision:** Option A - Package is Public
+- OpenCode SDK is a real, publicly available package
+- Proceed to P3.M1.T1.S2 for API documentation
+- Continue to P3.M1.T1.S3 for implementation strategy determination
 
-**Probability:** 60%
-
-### Option B: OpenCode is a Custom/Private Package
-**Action Required:**
-- Contact project maintainers for package details
-- Obtain installation instructions
-- Document internal API
-- Implement according to provided specifications
-
-**Probability:** 30%
-
-### Option C: OpenCode Doesn't Exist (Use Alternative)
-**Alternatives:**
-1. **LangChain.js** - Multi-provider support (OpenAI, Anthropic, etc.)
-2. **Vercel AI SDK** - Provider-agnostic interface
-3. **Custom Abstraction** - Build our own multi-provider layer
-
-**Action Required:**
-- Choose alternative SDK
-- Adjust PRD to reflect chosen solution
-- Implement provider abstraction using alternative
-
-**Probability:** 10%
-
-**Decision Deadline:** After web research (Feb 1, 2026) or maintainer consultation
+**References:**
+- P3.M1.T1.S1 Research: `./P3M1T1S1/research/opencode-sdk-research.md`
+- NPM Package: https://www.npmjs.com/package/@opencode-ai/sdk
 
 ---
 
@@ -115,92 +96,164 @@ await session.send('Continue');
 
 ---
 
-## Decision 3: Dependency Strategy for OpenCode SDK
+## Decision 3: OpenCode Implementation Strategy
 
-**Status:** DECISION NEEDED
+**Status:** DECIDED
 
 **Context:**
-How should OpenCode SDK be included as a dependency?
+OpenCode SDK has been verified as publicly available (`@opencode-ai/sdk@1.1.36`) and fully documented (P3.M1.T1.S2). However, research revealed significant architectural differences between OpenCode SDK and Groundswell's Provider interface pattern. This decision determines whether to proceed with OpenCode SDK implementation or choose an alternative multi-provider solution.
+
+**Key Findings from Research:**
+
+1. **Architectural Mismatch:** OpenCode SDK uses a client-server architecture requiring an external `opencode` server process, while Groundswell's Provider interface expects a standalone execution library.
+
+2. **Tool Execution Limitation:** OpenCode executes tools server-side with observation-only via events; Groundswell requires direct tool execution via `toolExecutor` callback.
+
+3. **Session Management:** OpenCode stores sessions server-side; Groundswell uses in-memory `Map<sessionId, SessionState>`.
+
+4. **Deployment Complexity:** Users must install and manage a separate CLI/server process (`npm install -g opencode`).
 
 **Options:**
 
-### Option A: Required Dependency
-**package.json:**
-```json
-{
-  "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.77",
-    "opencode-agent-sdk": "^1.0.0"
-  }
-}
-```
+### Option A: Implement OpenCode Provider (Strategy A)
+
+**Approach:** Create `OpenCodeProvider` class despite architectural differences
 
 **Pros:**
-- Always available
-- Simpler imports (no dynamic requires)
-- Type checking works out of the box
+- Native 75+ provider support as specified in PRD
+- Native MCP and LSP integration
+- Zero dependencies (lightweight client)
+- Matches PRD specification exactly
+- Actively maintained (3,021+ versions)
 
 **Cons:**
-- Increases bundle size for Anthropic-only users
-- Requires OpenCode to be published to npm
-- Forces all users to install both SDKs
+- External server dependency (deployment complexity)
+- Tool execution limitation (observation only, cannot delegate)
+- Session state server-side (abstraction leakage)
+- Requires user to install `opencode` CLI separately
+- Server lifecycle management in initialize()/terminate()
 
-### Option B: Optional Dependency
-**package.json:**
-```json
-{
-  "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.77"
-  },
-  "optionalDependencies": {
-    "opencode-agent-sdk": "^1.0.0"
-  }
-}
-```
+**Provider Interface Compatibility Assessment:**
 
-**Pros:**
-- Smaller bundle for Anthropic-only users
-- OpenCode installed only if needed
+| Method | Compatibility | Notes |
+|--------|--------------|-------|
+| `initialize()` | ✅ Yes | Can start server via `createOpencode()` |
+| `terminate()` | ✅ Yes | Can stop server via `server.close()` |
+| `execute()` | ⚠️ Partial | Cannot use `toolExecutor` callback (tools execute server-side) |
+| `registerMCPs()` | ⚠️ Partial | Dynamic add only via `mcp.add()` |
+| `loadSkills()` | ❌ No | Skills are server-side plugins |
+| `normalizeModel()` | ✅ Yes | Can parse `{providerID, modelID}` format |
 
-**Cons:**
-- Requires dynamic imports or try/catch requires
-- TypeScript needs `@types/opencode-agent-sdk` separately
-- May confuse users about availability
+**Critical Blocker:** The `execute()` method's `toolExecutor` callback requirement is fundamentally incompatible with OpenCode's server-side tool execution. This is a **showstopper** for full Provider interface compliance.
 
-### Option C: Peer Dependency
-**package.json:**
-```json
-{
-  "peerDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
-    "opencode-agent-sdk": "^1.0.0"
-  },
-  "peerDependenciesMeta": {
-    "opencode-agent-sdk": {
-      "optional": true
-    }
-  }
-}
-```
+### Option B: Contact Maintainers (Strategy B)
 
-**Pros:**
-- User controls version
-- Smallest bundle size
-- Flexibility for version requirements
+**Status:** Not Applicable - Package is public with documented API
 
-**Cons:**
-- Users must manually install
-- More complex setup
-- Version compatibility issues possible
+### Option C: Use Alternative SDK (Strategy C)
 
-**Recommendation:** Option A (Required Dependency)
-- OpenCode is a core feature (not optional)
-- Simpler developer experience
-- Type safety guaranteed
+**Researched Alternatives:**
 
-**Note:** If OpenCode SDK is not publicly available (private package), use Option C or make it a user-provided dependency.
+| Alternative | Providers | MCP Support | Architecture | Compatibility Score |
+|-------------|-----------|-------------|--------------|---------------------|
+| **LangChain.js** | 30+ | Native (@langchain/mcp-adapters) | Framework-heavy | 5.7/10 - Poor |
+| **Vercel AI SDK** | 17+ | Via LangChain adapters | Standalone | Not fully evaluated |
 
----
+**LangChain.js Assessment:**
+- **Pros:** Excellent TypeScript, native MCP, mature ecosystem
+- **Cons:** Framework architecture (chains/agents/AgentExecutor), incompatible with standalone Provider pattern
+- **Verdict:** LangChain.js is a framework, not a drop-in provider. Requires complex adapter layer.
+
+**Decision:** Strategy C - Use Alternative Approach with Architectural Refinement
+
+**Rationale:**
+
+After comprehensive analysis, **none of the evaluated options (A, B, or C) fully satisfy the requirements**. The decision requires a nuanced approach:
+
+1. **OpenCode SDK (Option A) cannot be implemented as specified** due to the fundamental tool execution architectural mismatch. The `toolExecutor` callback pattern is non-negotiable for Groundswell's design.
+
+2. **LangChain.js (Option C) is not a viable alternative** as it is a framework requiring chains/agents, not a standalone provider that can implement the Provider interface directly.
+
+3. **The PRD's requirement for "75+ providers via OpenCode SDK" is based on an assumption** that OpenCode SDK provides a direct execution interface like Anthropic's Agent SDK. Research proves this assumption incorrect.
+
+**Recommended Approach: Architectural Refinement (Hybrid Strategy)**
+
+Instead of choosing A, B, or C, recommend a **hybrid approach**:
+
+1. **Defer OpenCode Provider implementation** - Do NOT implement OpenCodeProvider in P3.M2
+
+2. **Implement direct provider integrations** for the most commonly needed providers:
+   - OpenAI (via `openai` package)
+   - Google Gemini (via `@google/generative-ai`)
+   - Other providers as needed
+
+3. **Reframe OpenCode as optional integration** - If users want 75+ providers via OpenCode, implement it as an **optional plugin/extension** that:
+   - Requires explicit opt-in (install `opencode` CLI separately)
+   - Documents server requirement and limitations clearly
+   - Accepts reduced functionality (no toolExecutor callback)
+
+4. **Update PRD Section 7.4** to reflect:
+   - Direct provider integrations for OpenAI, Google, etc.
+   - Optional OpenCode integration for extended provider support
+   - Clear documentation of trade-offs
+
+**Architectural Considerations:**
+
+1. **Tool Execution Pattern:** The `toolExecutor` callback is core to Groundswell's design. It enables:
+   - Centralized tool execution via MCPHandler
+   - Consistent tool lifecycle management
+   - Hook integration (onToolStart, onToolEnd)
+   - Error handling and retry logic
+
+   OpenCode's server-side tool execution breaks this pattern.
+
+2. **Session Management:** Groundswell's in-memory session state provides:
+   - Provider-agnostic session abstraction
+   - No external dependencies
+   - Simple lifecycle (create, get, delete)
+
+   OpenCode's server-side sessions create external state dependency.
+
+3. **Deployment Simplicity:** Groundswell is designed as a standalone npm package. OpenCode's server requirement:
+   - Adds deployment complexity (process management)
+   - Creates operational overhead (port conflicts, startup time)
+   - Increases user friction (install CLI separately)
+
+**PRD Alignment Assessment:**
+
+| PRD Requirement | OpenCode SDK | Alternative |
+|-----------------|--------------|-------------|
+| Multi-provider (75+) | ✅ Yes | ❌ No (unless OpenCode) |
+| Standalone execution | ❌ No (requires server) | ✅ Yes |
+| Tool execution via callback | ❌ No | ✅ Yes |
+| Native sessions | ✅ Yes | ✅ Yes (via abstraction) |
+| MCP support | ✅ Yes | ✅ Yes |
+
+**User Experience Impact:**
+
+- **With OpenCode:** Users must install CLI, manage server process, accept tool execution limitations
+- **With Direct Providers:** Simple npm install, no external dependencies, full tool control
+
+**Next Steps:**
+
+1. **Update PRD Section 7.4** to reflect direct provider integrations instead of OpenCode SDK
+2. **Implement P3.M2** for direct provider integrations (OpenAI, Google) instead of OpenCodeProvider
+3. **Create new task branch** for optional OpenCode plugin (future milestone)
+4. **Document architectural decision** with clear rationale for stakeholders
+5. **Re-evaluate OpenCode plugin** if user demand justifies the complexity
+
+**Risk Factors:**
+
+- **PRD Deviation:** This decision deviates from the PRD's specification of OpenCode SDK as the multi-provider solution. Stakeholder approval required.
+- **Provider Count:** Direct integrations will initially support fewer providers than OpenCode's 75+. Plan to prioritize most-needed providers.
+- **Future Work:** Optional OpenCode plugin may be needed if users demand extensive provider support.
+
+**References:**
+- P3.M1.T1.S1 Research: `./P3M1T1S1/research/opencode-sdk-research.md`
+- P3.M1.T1.S2 Research: `./P3M1T1S2/research/opencode-sdk-complete-research.md`
+- LangChain Research: `./docs/research/LANGCHAIN_JS_RESEARCH.md`
+- Provider Interface: `src/types/providers.ts`
+- External Dependencies: `./docs/architecture/external_dependencies.md`
 
 ## Decision 4: Provider Capability Detection
 

@@ -415,14 +415,14 @@
           "type": "Milestone",
           "id": "P3.M1",
           "title": "Milestone 3.1: OpenCode SDK Verification",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Verify OpenCode SDK package, document API, and determine implementation strategy",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M1.T1",
               "title": "Task: Research OpenCode SDK Package",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Search npm, GitHub, and documentation to locate OpenCode SDK package",
               "subtasks": [
                 {
@@ -449,7 +449,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T1.S3",
                   "title": "Determine implementation strategy",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M1.T1.S2"

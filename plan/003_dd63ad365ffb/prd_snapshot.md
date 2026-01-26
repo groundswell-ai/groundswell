@@ -254,10 +254,10 @@ Groundswell supports multiple Agent SDK providers with full feature parity. User
 
 ## **7.1 Supported Providers**
 
-| Provider | SDK | Description |
-|----------|-----|-------------|
-| `anthropic` | Anthropic Agent SDK (`claude-agent-sdk`) | Claude models via Anthropic's official Agent SDK |
-| `opencode` | OpenCode Agent SDK | Multi-provider support (Anthropic, OpenAI, Ollama, 75+ providers) |
+| Provider | SDK | Package | Description |
+|----------|-----|---------|-------------|
+| `anthropic` | Anthropic Agent SDK | `@anthropic-ai/claude-agent-sdk` | Claude models via Anthropic's official Agent SDK |
+| `opencode` | OpenCode SDK | `@opencode-ai/sdk` | Multi-provider support (Anthropic, OpenAI, Ollama, 75+ providers) |
 
 ## **7.2 ProviderId**
 
