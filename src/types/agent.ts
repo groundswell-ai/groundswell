@@ -4,6 +4,7 @@
  */
 
 import type { Tool, MCPServer, Skill, AgentHooks, TokenUsage } from './sdk-primitives.js';
+import type { ProviderId, ProviderOptions } from './providers.js';
 import { z } from 'zod';
 
 /**
@@ -38,7 +39,52 @@ export interface AgentConfig {
   /** Enable caching of prompt responses */
   enableCache?: boolean;
 
-  /** Model to use (defaults to claude-sonnet-4-20250514) */
+  /**
+   * Model identifier for LLM inference
+   *
+   * Supports two formats:
+   * - **Plain format**: `"claude-sonnet-4-20250514"` - Uses default provider
+   * - **Qualified format**: `"anthropic/claude-sonnet-4-20250514"` - Explicit provider
+   *
+   * When a plain model name is used (no provider prefix), the provider
+   * is determined by the configuration cascade: prompt override →
+   * agent provider → global default.
+   *
+   * ## Model Specification (PRD 7.8)
+   *
+   * The `parseModelSpec()` utility parses model strings into:
+   * - `provider`: Provider ID (anthropic, opencode, etc.)
+   * - `model`: Base model name without prefix
+   * - `raw`: Original input string
+   *
+   * @example <caption>Plain format (uses default provider)</caption>
+   * ```ts
+   * const config: AgentConfig = {
+   *   model: 'claude-sonnet-4-20250514'
+   *   // Uses provider from cascade
+   * };
+   * ```
+   *
+   * @example <caption>Qualified format (explicit provider)</caption>
+   * ```ts
+   * const config: AgentConfig = {
+   *   model: 'anthropic/claude-sonnet-4-20250514'
+   *   // Explicitly uses Anthropic provider
+   * };
+   * ```
+   *
+   * @example <caption>Qualified format with OpenCode provider</caption>
+   * ```ts
+   * const config: AgentConfig = {
+   *   model: 'opencode/gpt-4'
+   *   // Explicitly uses OpenCode provider
+   * };
+   * ```
+   *
+   * @default "claude-sonnet-4-20250514"
+   * @see {@link parseModelSpec} for model specification parsing
+   * @see {@link ModelSpec} for parsed model structure
+   */
   model?: string;
 
   /** Maximum tokens for responses */
@@ -46,6 +92,79 @@ export interface AgentConfig {
 
   /** Temperature for response generation */
   temperature?: number;
+
+  /**
+   * Provider to use for this agent
+   *
+   * Overrides the global default provider configured via
+   * `configureProviders()`. If not specified, uses the global
+   * default provider.
+   *
+   * ## Configuration Cascade (PRD 7.7)
+   *
+   * Priority order for provider resolution (highest to lowest):
+   * 1. Prompt-level provider override (highest)
+   * 2. AgentConfig.provider (this field)
+   * 3. GlobalProviderConfig.defaultProvider (lowest)
+   *
+   * @example <caption>Explicit Anthropic provider</caption>
+   * ```ts
+   * const config: AgentConfig = {
+   *   provider: 'anthropic'
+   * };
+   * ```
+   *
+   * @example <caption>Explicit OpenCode provider</caption>
+   * ```ts
+   * const config: AgentConfig = {
+   *   provider: 'opencode'
+   * };
+   * ```
+   *
+   * @see {@link GlobalProviderConfig} for global provider configuration
+   * @see {@link parseModelSpec} for model specification parsing
+   */
+  provider?: ProviderId;
+
+  /**
+   * Provider-specific options for this agent
+   *
+   * Merged with global provider defaults using "last write wins"
+   * semantics. This agent's options take precedence over global
+   * defaults, but can be overridden by prompt-level options.
+   *
+   * ## Options Merge (PRD 7.7)
+   *
+   * Options are merged with priority (highest to lowest):
+   * 1. Prompt-level providerOptions (highest)
+   * 2. AgentConfig.providerOptions (this field)
+   * 3. GlobalProviderConfig.providerDefaults[provider] (lowest)
+   *
+   * @example <caption>Custom endpoint and timeout</caption>
+   * ```ts
+   * const config: AgentConfig = {
+   *   providerOptions: {
+   *     endpoint: 'https://api.example.com',
+   *     timeout: 60000
+   *   }
+   * };
+   * ```
+   *
+   * @example <caption>Custom headers for authentication</caption>
+   * ```ts
+   * const config: AgentConfig = {
+   *   providerOptions: {
+   *     headers: {
+   *       'X-Custom-Auth': 'Bearer token123'
+   *     }
+   *   }
+   * };
+   * ```
+   *
+   * @see {@link ProviderOptions} for all available options
+   * @see {@link resolveProviderConfig} for merge implementation
+   */
+  providerOptions?: ProviderOptions;
 }
 
 /**
