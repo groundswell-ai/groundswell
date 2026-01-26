@@ -92,7 +92,7 @@ export class Agent {
 
   /**
    * Create a new Agent instance
-   * @param config Agent configuration
+   * @param config Agent configuration (default: { name: 'Agent', model: 'claude-sonnet-4-20250514' })
    */
   constructor(config: AgentConfig = {}) {
     this.id = generateId();
@@ -241,8 +241,8 @@ export class Agent {
 
   /**
    * Execute a prompt and return validated response
-   * @param prompt Prompt to execute
-   * @param overrides Optional overrides for this execution
+   * @param prompt Prompt to execute (required)
+   * @param overrides Optional overrides for this execution (default: undefined)
    * @returns AgentResponse containing validated response or error
    */
   public async prompt<T>(
@@ -278,9 +278,12 @@ export class Agent {
 
   /**
    * Execute a prompt with reflection capabilities
-   * @param prompt Prompt to execute
-   * @param overrides Optional overrides for this execution
+   * @param prompt Prompt to execute (required)
+   * @param overrides Optional overrides for this execution (default: undefined)
    * @returns AgentResponse containing validated response or error
+   * @remarks Reflection follows opt-out pattern: enabled by default unless explicitly disabled.
+   * When reflection is enabled (prompt.enableReflection, overrides.enableReflection, or
+   * config.enableReflection), prefixes system prompt with reflection instructions.
    */
   public async reflect<T>(
     prompt: Prompt<T>,
@@ -561,6 +564,9 @@ export class Agent {
 
   /**
    * Internal prompt execution with full flow using provider abstraction
+   * @side effects May emit workflow events, may read from/write to cache if enabled,
+   * may modify environment variables temporarily, validates response against schema,
+   * and stores result in cache if enabled.
    */
   private async executePrompt<T>(
     prompt: Prompt<T>,
@@ -880,8 +886,8 @@ export class Agent {
    * conform to the AgentResponse schema, even if factory helpers have bugs.
    *
    * @template T - The type of response data
-   * @param response - The response to validate
-   * @param dataSchema - The Zod schema for the response data (from Prompt.responseFormat)
+   * @param response - The response to validate (required)
+   * @param dataSchema - The Zod schema for the response data (required from Prompt.responseFormat)
    * @returns The validated response, or an INTERNAL_ERROR response if validation fails
    *
    * @private
@@ -972,6 +978,8 @@ export class Agent {
 
   /**
    * Set up environment variables
+   * @side effects Modifies process.env with provided values and returns original values for restoration.
+   * Restores environment in finally block of executePrompt.
    */
   private setupEnvironment(
     env?: Record<string, string>

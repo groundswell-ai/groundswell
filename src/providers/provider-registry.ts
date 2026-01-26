@@ -153,6 +153,8 @@ export class ProviderRegistry {
    * Returns the same instance on subsequent calls.
    *
    * @returns The singleton ProviderRegistry instance
+   * @remarks Creates instance on first call (lazy initialization).
+   * Returns same instance on subsequent calls.
    *
    * @example
    * ```ts
@@ -265,11 +267,12 @@ export class ProviderRegistry {
    * - UNINITIALIZED → INITIALIZING → INITIALIZED (success)
    * - UNINITIALIZED → INITIALIZING → FAILED (error)
    *
-   * @param id - The provider id to initialize
-   * @param options - Optional provider configuration options
+   * @param id - The provider id to initialize (required)
+   * @param options - Optional provider configuration options (default: undefined)
    * @returns Promise that resolves when initialization completes
    * @throws {Error} If provider is not registered
    * @throws {Error} If provider initialization fails
+   * @side effects May modify internal state, may fail provider if already initialized with different options.
    *
    * @example
    * ```ts
@@ -342,8 +345,9 @@ export class ProviderRegistry {
    * This method never throws - all errors are collected in the returned
    * BatchInitResult.failed array. Check this array to identify failed providers.
    *
-   * @param config - Global provider configuration with provider defaults
+   * @param config - Global provider configuration with provider defaults (required)
    * @returns Promise resolving to success/failure lists
+   * @side effects Modifies internal state, fails providers individually if initialization fails.
    *
    * @example
    * ```ts
@@ -491,6 +495,9 @@ export class ProviderRegistry {
    *
    * After all termination attempts complete, the providers and states
    * maps are cleared. This releases references and allows re-initialization.
+   *
+   * @side effects Calls provider.terminate() for each provider, clears internal state maps,
+   * logs errors for failed terminations, and performs cleanup for memory-based stores.
    *
    * @example
    * ```ts

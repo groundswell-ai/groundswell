@@ -182,8 +182,8 @@ export class AnthropicProvider implements Provider {
    *
    * Loads the Anthropic SDK and initializes the client.
    *
-   * @param options - Optional provider configuration (apiKey, endpoint, etc.)
-   * @remarks
+   * @param options - Optional provider configuration (apiKey, endpoint, sessionPersistence, etc.)
+   * @remarks Session storage defaults to MemorySessionStore if not specified.
    * Implemented in P2.M1.T1.S2
    */
   async initialize(options?: ProviderOptions): Promise<void> {
@@ -831,9 +831,9 @@ export class AnthropicProvider implements Provider {
    * discovered tools in MCP format. Also converts tools to SDK format
    * and stores the configuration for use in execute().
    *
-   * @param servers - Array of MCP server configurations
-   * @returns Array of discovered tools in MCP format
-   * @remarks
+   * @param servers - Array of MCP server configurations (required)
+   * @returns Array of discovered tools in MCP format (serverName__toolName)
+   * @remarks Modifies internal MCP handler state, converts tools to SDK format.
    * Implemented in P2.M1.T1.S7
    *
    * @example
@@ -897,11 +897,10 @@ export class AnthropicProvider implements Provider {
    * Skills are read from SKILL.md files in each skill directory and combined
    * into a formatted system prompt fragment for injection during execute().
    *
-   * @param skills - Array of skill definitions with name and path
+   * @param skills - Array of skill definitions with name and path (empty array clears existing skills)
    * @throws {Error} When SDK is not initialized
    * @throws {Error} When SKILL.md file cannot be read
-   * @remarks
-   * Each skill directory must contain a SKILL.md file. Skills are combined
+   * @remarks Each skill directory must contain a SKILL.md file. Skills are combined
    * with markdown headers (### Skill Name) and separators (---).
    *
    * @example
@@ -1138,7 +1137,7 @@ Each skill provides specific capabilities and guidelines.
    * Delegates to {@link parseModelSpec} for parsing and validation.
    * Validates that the provider is 'anthropic'.
    *
-   * @param model - Model string to normalize
+   * @param model - Model string to normalize (required)
    * @returns Parsed ModelSpec with provider='anthropic'
    * @throws {Error} When model specification is invalid (delegated to parseModelSpec)
    * @throws {Error} When provider is not 'anthropic'
@@ -1181,9 +1180,9 @@ Each skill provides specific capabilities and guidelines.
    * Initializes empty session state for the given session ID.
    * If session already exists, this is a no-op (idempotent).
    *
-   * @param sessionId - Unique identifier for the session
+   * @param sessionId - Unique identifier for the session (required)
    * @throws {Error} If SDK is not initialized
-   * @remarks
+   * @remarks Idempotent: if session exists, this is a no-op.
    * Session will be used when execute() receives matching sessionId in options.
    */
   async createSession(sessionId: string): Promise<void> {
@@ -1214,10 +1213,9 @@ Each skill provides specific capabilities and guidelines.
    * Retrieves the current session state including conversation history
    * and last result. Returns undefined if session doesn't exist.
    *
-   * @param sessionId - Session identifier to retrieve
+   * @param sessionId - Session identifier to retrieve (required)
    * @returns Session state or undefined if not found
-   * @remarks
-   * Updates lastAccessedAt timestamp and saves back to persistent stores.
+   * @remarks Updates lastAccessedAt timestamp and saves back to persistent stores.
    */
   async getSession(sessionId: string): Promise<SessionState | undefined> {
     const state = await this.sessionStore.load(sessionId);
@@ -1239,11 +1237,10 @@ Each skill provides specific capabilities and guidelines.
    * Removes the session from storage. If the session doesn't exist,
    * returns false.
    *
-   * @param sessionId - Session identifier to delete
+   * @param sessionId - Session identifier to delete (required)
    * @returns true if deleted, false if not found
    * @throws {Error} If SDK is not initialized
-   * @remarks
-   * This is a destructive operation - deleted sessions cannot be recovered
+   * @remarks Destructive operation: deleted sessions cannot be recovered
    * unless the store has backup/retention policies.
    */
   async deleteSession(sessionId: string): Promise<boolean> {

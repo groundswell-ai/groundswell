@@ -58,6 +58,8 @@
  * Uses lazy loading for the OpenCode SDK. The SDK is imported dynamically
  * in the initialize() method to support optional dependencies.
  *
+ * @side effects Logs deprecation warning once on first initialize() call.
+ *
  * @example
  * ```ts
  * // OLD (deprecated)
@@ -200,7 +202,7 @@ export class OpenCodeProvider implements Provider {
    * @param options - Optional provider configuration (endpoint, apiKey, timeout, etc.)
    * @throws {Error} When SDK module fails to load
    * @throws {Error} When server fails to start
-   * @remarks
+   * @remarks Port defaults to 4096, timeout defaults to 30000ms.
    * Implemented in P3.M2.T1.S2
    */
   async initialize(options?: ProviderOptions): Promise<void> {
@@ -437,16 +439,13 @@ export class OpenCodeProvider implements Provider {
    * When options.streaming is true, returns an AsyncGenerator that yields StreamEvent objects.
    * When options.streaming is false or undefined, returns a complete AgentResponse.
    *
-   * @param request - Provider request with prompt and options
-   * @param toolExecutor - Callback for executing tools (NOT USED - OpenCode limitation)
+   * @param request - Provider request with prompt and options (required)
+   * @param toolExecutor - Callback for executing tools (ignored in LLM-only mode)
    * @param hooks - Optional lifecycle hooks
    * @returns Typed agent response or AsyncGenerator for streaming
    * @throws {Error} When SDK is not initialized
-   * @remarks
-   * **Tool Execution Limitation:** OpenCode executes tools server-side with no
-   * client-side delegation mechanism. The toolExecutor parameter is accepted
-   * for interface compliance but cannot be used. This provider operates in
-   * LLM-only mode.
+   * @remarks LLM-only mode: Tools are executed server-side with no client delegation.
+   * The toolExecutor parameter is accepted for interface compliance but cannot be used.
    *
    * Full implementation in P3.M2.T1.S3
    * Streaming: Returns AsyncGenerator<StreamEvent> when options.streaming = true
@@ -856,9 +855,8 @@ export class OpenCodeProvider implements Provider {
    * @param servers - Array of MCP server configurations (ignored in LLM-only mode)
    * @returns Empty array (no tools in LLM-only mode)
    * @throws {Error} When SDK is not initialized
-   * @remarks
+   * @remarks MCP tool registration not supported due to server-side architecture.
    * This method returns an empty array to satisfy the Provider interface.
-   * MCP tool registration is not supported by OpenCode's server-side architecture.
    *
    * @example
    * ```ts
@@ -892,12 +890,12 @@ export class OpenCodeProvider implements Provider {
    * into a formatted system prompt fragment for injection during execute().
    * OpenCode has no native skills API, so skills are injected via system prompts.
    *
-   * @param skills - Array of skill definitions with name and path
+   * @param skills - Array of skill definitions with name and path (empty array clears existing skills)
    * @throws {Error} When SDK is not initialized
    * @throws {Error} When SKILL.md file cannot be read
-   * @remarks
-   * Each skill directory must contain a SKILL.md file. Skills are combined
+   * @remarks Each skill directory must contain a SKILL.md file. Skills are combined
    * with markdown headers (### Skill Name) and separators (---).
+   * OpenCode has no native skills API - skills injected via system prompts.
    *
    * @example
    * ```ts
@@ -1004,9 +1002,11 @@ Each skill provides specific capabilities and guidelines.
    * Delegates to {@link parseModelSpec} for parsing and validation.
    * Unlike AnthropicProvider, accepts ANY provider prefix (OpenCode supports 75+ providers).
    *
-   * @param model - Model string to normalize
+   * @param model - Model string to normalize (required)
    * @returns Parsed ModelSpec with validated provider and model
    * @throws {Error} When model specification is invalid (delegated to parseModelSpec)
+   * @remarks OpenCode supports 75+ providers via gateway. Accepts any provider prefix
+   * (e.g., 'gpt-4', 'claude-3-opus').
    *
    * @example
    * ```ts

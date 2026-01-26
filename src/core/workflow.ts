@@ -100,13 +100,12 @@ export class Workflow<T = unknown> {
   /**
    * Create a new workflow instance
    *
-   * @overload Class-based pattern
-   * @param name Human-readable name (defaults to class name)
-   * @param parent Optional parent workflow
-   *
-   * @overload Functional pattern
-   * @param config Workflow configuration
-   * @param executor Executor function
+   * @overload Class-based pattern: constructor(name?: string, parent?: Workflow)
+   * @overload Functional pattern: constructor(config: WorkflowConfig, executor?: WorkflowExecutor)
+   * @param name For class-based pattern, human-readable name (default: class name).
+   * For functional pattern, config object with workflow settings.
+   * @param parentOrExecutor For class-based pattern, optional parent workflow.
+   * For functional pattern, executor function.
    */
   constructor(name?: string | WorkflowConfig, parentOrExecutor?: Workflow | WorkflowExecutor<T>) {
     this.id = generateId();
@@ -185,12 +184,11 @@ export class Workflow<T = unknown> {
    * a convenient way to check workflow hierarchy relationships without manually
    * traversing the parent chain.
    *
-   * @warning This method reveals workflow hierarchy information. If your
-   * application exposes workflows via an API, ensure you implement proper
-   * access control to prevent unauthorized topology discovery. Note that
-   * the `parent` and `children` properties are already public, so this
-   * method does not expose any new information beyond what is currently
-   * accessible.
+   * @remarks SECURITY WARNING: This method reveals workflow hierarchy information.
+   * If your application exposes workflows via an API, ensure you implement proper
+   * access control to prevent unauthorized topology discovery. Note that the parent
+   * and children properties are already public, so this method does not expose any
+   * new information beyond what is currently accessible.
    *
    * **Time Complexity**: O(d) where d is the depth of the hierarchy
    * **Space Complexity**: O(d) for the visited Set in worst case (cycle detection)
@@ -270,6 +268,8 @@ export class Workflow<T = unknown> {
   /**
    * Add an observer to this workflow (must be root)
    * @throws Error if called on non-root workflow
+   * @side effects Adds observer to internal observers array for root workflows.
+   * Observers will receive notifications for workflow events.
    */
   public addObserver(observer: WorkflowObserver): void {
     if (this.parent) {
@@ -317,6 +317,8 @@ export class Workflow<T = unknown> {
    * @throws {Error} If the child is already attached to this workflow
    * @throws {Error} If the child already has a different parent (use detachChild() first for reparenting)
    * @throws {Error} If the child is an ancestor of this parent (would create circular reference)
+   * @side effects Modifies workflow tree structure, emits childAttached event,
+   * and triggers treeUpdated event for debugger.
    *
    * @example
    * ```ts
@@ -399,6 +401,8 @@ export class Workflow<T = unknown> {
    *
    * @param child - The child workflow to detach
    * @throws {Error} If the child is not attached to this parent workflow
+   * @side effects Modifies workflow tree structure, emits childDetached event,
+   * and triggers treeUpdated event for debugger.
    *
    * @example
    * ```ts
@@ -446,6 +450,8 @@ export class Workflow<T = unknown> {
 
   /**
    * Emit an event to all root observers
+   * @side effects Pushes event to node.events array and notifies all registered observers.
+   * May trigger treeUpdated notifications for specific event types.
    */
   public emitEvent(event: WorkflowEvent): void {
     this.node.events.push(event);
@@ -467,6 +473,8 @@ export class Workflow<T = unknown> {
 
   /**
    * Capture and emit a state snapshot
+   * @side effects Updates node.stateSnapshot, notifies observers via onStateUpdated callback,
+   * emits snapshot event, and triggers treeUpdated event for debugger.
    */
   public snapshotState(): void {
     const snapshot = getObservedState(this);
