@@ -179,10 +179,31 @@ export type ToolExecutor = (
 /**
  * Provider response status
  *
+ * @deprecated Since v1.5.0. Will be removed in v2.0.0.
+ * Use {@link AgentResponseStatus} instead.
+ *
+ * The values are identical: `'success' | 'error' | 'partial'`
+ *
+ * ## Migration Guide
+ *
+ * **Quick migration**: Replace `ProviderResponseStatus` with `AgentResponseStatus`
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import { ProviderResponseStatus } from 'groundswell';
+ * const status: ProviderResponseStatus = 'success';
+ *
+ * // AFTER (v1.5+)
+ * import { AgentResponseStatus } from 'groundswell';
+ * const status: AgentResponseStatus = 'success';
+ * ```
+ *
  * Three-state status indicating the outcome of a provider operation.
  * - 'success': Operation completed successfully with valid data
  * - 'error': Operation failed with error details
  * - 'partial': Operation partially completed (streaming, incremental)
+ *
+ * @see {@link AgentResponseStatus | New response status type}
  */
 export type ProviderResponseStatus =
   | 'success'
@@ -192,8 +213,39 @@ export type ProviderResponseStatus =
 /**
  * Detailed error information for provider operations
  *
+ * @deprecated Since v1.5.0. Will be removed in v2.0.0.
+ * Use {@link AgentErrorDetails} instead.
+ *
+ * The structure is identical - only the type name changed.
+ *
+ * ## Migration Guide
+ *
+ * **Quick migration**: Replace `ProviderErrorDetails` with `AgentErrorDetails`
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import { ProviderErrorDetails } from 'groundswell';
+ * const error: ProviderErrorDetails = {
+ *   code: 'VALIDATION_FAILED',
+ *   message: 'Invalid input',
+ *   details: null,
+ *   recoverable: false
+ * };
+ *
+ * // AFTER (v1.5+)
+ * import { AgentErrorDetails } from 'groundswell';
+ * const error: AgentErrorDetails = {
+ *   code: 'VALIDATION_FAILED',
+ *   message: 'Invalid input',
+ *   details: null,
+ *   recoverable: false
+ * };
+ * ```
+ *
  * Provides structured error details for failed provider operations.
  * Used in ProviderResult when status is 'error'.
+ *
+ * @see {@link AgentErrorDetails | New error details type}
  */
 export interface ProviderErrorDetails {
   /**
@@ -224,8 +276,39 @@ export interface ProviderErrorDetails {
 /**
  * Metadata about provider operation execution
  *
+ * @deprecated Since v1.5.0. Will be removed in v2.0.0.
+ * Use {@link AgentResponseMetadata} instead.
+ *
+ * Field mapping:
+ * - `providerId` → `agentId`
+ * - All other fields are identical
+ *
+ * ## Migration Guide
+ *
+ * **Quick migration**: Replace `ProviderResponseMetadata` with `AgentResponseMetadata` and rename `providerId` to `agentId`
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import { ProviderResponseMetadata } from 'groundswell';
+ * const metadata: ProviderResponseMetadata = {
+ *   providerId: 'anthropic',
+ *   timestamp: Date.now(),
+ *   duration: 1523
+ * };
+ *
+ * // AFTER (v1.5+)
+ * import { AgentResponseMetadata } from 'groundswell';
+ * const metadata: AgentResponseMetadata = {
+ *   agentId: 'anthropic',  // Note: providerId → agentId
+ *   timestamp: Date.now(),
+ *   duration: 1523
+ * };
+ * ```
+ *
  * Contains execution context information for provider operations.
  * Always present in ProviderResult regardless of status.
+ *
+ * @see {@link AgentResponseMetadata | New response metadata type}
  */
 export interface ProviderResponseMetadata {
   /**
@@ -268,6 +351,29 @@ export interface ProviderResponseMetadata {
 /**
  * Provider execution result wrapper
  *
+ * @deprecated Since v1.5.0. Will be removed in v2.0.0.
+ * Use {@link AgentResponse} instead.
+ *
+ * ## Migration Guide
+ *
+ * **Quick migration**: Replace `ProviderResult<T>` with `AgentResponse<T>`
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import { ProviderResult } from 'groundswell';
+ * const result: ProviderResult<Data> = await provider.execute(...);
+ *
+ * // AFTER (v1.5+)
+ * import { AgentResponse } from 'groundswell';
+ * const result: AgentResponse<Data> = await provider.execute(...);
+ * ```
+ *
+ * The structure is identical - only the type name changes:
+ * - `status: 'success' | 'error' | 'partial'` (same)
+ * - `data: T | null` (same)
+ * - `error: ErrorDetails | null` (same structure)
+ * - `metadata: ResponseMetadata` (same structure, with `providerId` → `agentId`)
+ *
  * Wraps the result of provider execution with status, data, error,
  * and metadata. Uses discriminated union pattern for type safety.
  *
@@ -288,6 +394,7 @@ export interface ProviderResponseMetadata {
  * - status='partial' → data is T (not null), error may be null
  *
  * @template T - The type of data returned on success (unknown by default)
+ * @see {@link AgentResponse | New response type}
  * @see {@link ProviderResponseStatus}, {@link ProviderErrorDetails}
  *
  * @example
