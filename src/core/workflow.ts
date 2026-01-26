@@ -102,10 +102,12 @@ export class Workflow<T = unknown> {
    *
    * @overload Class-based pattern: constructor(name?: string, parent?: Workflow)
    * @overload Functional pattern: constructor(config: WorkflowConfig, executor?: WorkflowExecutor)
-   * @param name For class-based pattern, human-readable name (default: class name).
+   * @param name For class-based pattern, human-readable name. Allowed characters: alphanumeric (a-z, A-Z, 0-9), spaces, hyphens (-), underscores (_). (default: class name).
    * For functional pattern, config object with workflow settings.
    * @param parentOrExecutor For class-based pattern, optional parent workflow.
    * For functional pattern, executor function.
+   *
+   * @remarks Security validation rejects names containing control characters, HTML tags, JavaScript patterns, path traversal sequences (..), and file system special characters (/ \ : * ? " < > |). This prevents XSS attacks, injection attacks, and path traversal vulnerabilities.
    */
   constructor(name?: string | WorkflowConfig, parentOrExecutor?: Workflow | WorkflowExecutor<T>) {
     this.id = generateId();
@@ -130,6 +132,31 @@ export class Workflow<T = unknown> {
       }
       if (this.config.name.length > 100) {
         throw new Error('Workflow name cannot exceed 100 characters');
+      }
+
+      // Security validation: control characters (ASCII 0x00-0x1F, 0x7F)
+      if (/[\x00-\x1F\x7F]/.test(trimmedName)) {
+        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+      }
+
+      // Security validation: HTML/JavaScript injection patterns
+      if (/<[^>]*>/.test(trimmedName) || /javascript:/i.test(trimmedName)) {
+        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+      }
+
+      // Security validation: path traversal patterns
+      if (/\.\./.test(trimmedName)) {
+        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+      }
+
+      // Security validation: file system special characters
+      if (/[\/\\:*?"<>|]/.test(trimmedName)) {
+        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+      }
+
+      // Security validation: allowed characters (allowlist - defense in depth)
+      if (!/^[a-zA-Z0-9 _-]+$/.test(trimmedName)) {
+        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
       }
     }
 

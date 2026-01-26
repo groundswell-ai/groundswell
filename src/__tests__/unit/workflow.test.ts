@@ -82,6 +82,148 @@ describe('Workflow Name Validation', () => {
     const wf = new Workflow({ name: 'ValidFunctionalWorkflow' }, async () => 'done');
     expect(wf.getNode().name).toBe('ValidFunctionalWorkflow');
   });
+
+  // Security validation tests
+  const INVALID_NAME_MESSAGE = 'Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.';
+
+  describe('Security - Control Characters', () => {
+    it('should reject names with null byte', () => {
+      expect(() => new SimpleWorkflow('test\x00name')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with bell character', () => {
+      expect(() => new SimpleWorkflow('test\x07name')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with escape character', () => {
+      expect(() => new SimpleWorkflow('test\x1bname')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with delete character', () => {
+      expect(() => new SimpleWorkflow('test\x7fname')).toThrow(INVALID_NAME_MESSAGE);
+    });
+  });
+
+  describe('Security - HTML/JavaScript Injection', () => {
+    it('should reject names with script tags', () => {
+      expect(() => new SimpleWorkflow('<script>alert("xss")</script>')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with iframe tags', () => {
+      expect(() => new SimpleWorkflow('<iframe>evil</iframe>')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with javascript: protocol', () => {
+      expect(() => new SimpleWorkflow('javascript:alert(1)')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with JAVASCRIPT: (uppercase)', () => {
+      expect(() => new SimpleWorkflow('JAVASCRIPT:alert(1)')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with JavaScript event handlers', () => {
+      expect(() => new SimpleWorkflow('<img onerror=alert(1)>')).toThrow(INVALID_NAME_MESSAGE);
+    });
+  });
+
+  describe('Security - Path Traversal', () => {
+    it('should reject names with ../ pattern', () => {
+      expect(() => new SimpleWorkflow('../etc/passwd')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with ..\\ pattern', () => {
+      expect(() => new SimpleWorkflow('..\\windows\\system32')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with multiple .. patterns', () => {
+      expect(() => new SimpleWorkflow('../../etc/passwd')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with .. in the middle', () => {
+      expect(() => new SimpleWorkflow('my../workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+  });
+
+  describe('Security - File System Characters', () => {
+    it('should reject names with forward slash', () => {
+      expect(() => new SimpleWorkflow('my/workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with backslash', () => {
+      expect(() => new SimpleWorkflow('my\\workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with colon', () => {
+      expect(() => new SimpleWorkflow('my:workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with asterisk', () => {
+      expect(() => new SimpleWorkflow('my*workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with question mark', () => {
+      expect(() => new SimpleWorkflow('my?workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with double quote', () => {
+      expect(() => new SimpleWorkflow('my"workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with angle brackets', () => {
+      expect(() => new SimpleWorkflow('my<wor>flow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with pipe', () => {
+      expect(() => new SimpleWorkflow('my|workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+  });
+
+  describe('Security - Allowed Characters (Positive Cases)', () => {
+    it('should accept alphanumeric names', () => {
+      expect(() => new SimpleWorkflow('Workflow123')).not.toThrow();
+      expect(new SimpleWorkflow('Workflow123').getNode().name).toBe('Workflow123');
+    });
+
+    it('should accept names with spaces', () => {
+      expect(() => new SimpleWorkflow('My Workflow')).not.toThrow();
+      expect(new SimpleWorkflow('My Workflow').getNode().name).toBe('My Workflow');
+    });
+
+    it('should accept names with hyphens', () => {
+      expect(() => new SimpleWorkflow('my-workflow')).not.toThrow();
+      expect(new SimpleWorkflow('my-workflow').getNode().name).toBe('my-workflow');
+    });
+
+    it('should accept names with underscores', () => {
+      expect(() => new SimpleWorkflow('my_workflow')).not.toThrow();
+      expect(new SimpleWorkflow('my_workflow').getNode().name).toBe('my_workflow');
+    });
+
+    it('should accept names with mixed allowed characters', () => {
+      expect(() => new SimpleWorkflow('My_Workflow-123 Test')).not.toThrow();
+      expect(new SimpleWorkflow('My_Workflow-123 Test').getNode().name).toBe('My_Workflow-123 Test');
+    });
+  });
+
+  describe('Security - Both Constructor Patterns', () => {
+    it('should reject invalid names in class-based pattern', () => {
+      expect(() => new SimpleWorkflow('<script>alert(1)</script>')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject invalid names in functional pattern', () => {
+      const executor = async () => {};
+      expect(() => new Workflow({ name: '../etc/passwd' }, executor)).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should accept valid names in class-based pattern', () => {
+      expect(() => new SimpleWorkflow('My-Workflow_123')).not.toThrow();
+    });
+
+    it('should accept valid names in functional pattern', () => {
+      const executor = async () => {};
+      expect(() => new Workflow({ name: 'My-Workflow_123' }, executor)).not.toThrow();
+    });
+  });
 });
 
 describe('Workflow', () => {
