@@ -343,14 +343,14 @@
           "type": "Milestone",
           "id": "P2.M1",
           "title": "Milestone 2.1: Provider Interface Type Consistency",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Fix type system inconsistency where Provider interface specifies ProviderResult<T> but implementations return AgentResponse<T>. This breaks polymorphic usage.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M1.T1",
               "title": "Align Provider Interface Return Type with Implementations",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Update Provider interface to return AgentResponse<T> consistently with actual implementations, deprecating unused ProviderResult<T> type.",
               "subtasks": [
                 {
@@ -377,7 +377,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S3",
                   "title": "Add type compatibility tests for Provider interface",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T1.S1"
