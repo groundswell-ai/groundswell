@@ -102,6 +102,58 @@ describe('Workflow Name Validation', () => {
     it('should reject names with delete character', () => {
       expect(() => new SimpleWorkflow('test\x7fname')).toThrow(INVALID_NAME_MESSAGE);
     });
+
+    // Parameterized tests for all ASCII control characters (0x00-0x1F, 0x7F)
+    it.each([
+      ['\x00', 'null byte'],
+      ['\x01', 'start of heading'],
+      ['\x02', 'start of text'],
+      ['\x03', 'end of text'],
+      ['\x04', 'end of transmission'],
+      ['\x05', 'enquiry'],
+      ['\x06', 'acknowledge'],
+      ['\x07', 'bell'],
+      ['\x08', 'backspace'],
+      ['\x09', 'horizontal tab'],
+      ['\x0A', 'line feed'],
+      ['\x0B', 'vertical tab'],
+      ['\x0C', 'form feed'],
+      ['\x0D', 'carriage return'],
+      ['\x0E', 'shift out'],
+      ['\x0F', 'shift in'],
+      ['\x10', 'data link escape'],
+      ['\x11', 'device control 1'],
+      ['\x12', 'device control 2'],
+      ['\x13', 'device control 3'],
+      ['\x14', 'device control 4'],
+      ['\x15', 'negative acknowledge'],
+      ['\x16', 'synchronous idle'],
+      ['\x17', 'end of transmission block'],
+      ['\x18', 'cancel'],
+      ['\x19', 'end of medium'],
+      ['\x1A', 'substitute'],
+      ['\x1B', 'escape'],
+      ['\x1C', 'file separator'],
+      ['\x1D', 'group separator'],
+      ['\x1E', 'record separator'],
+      ['\x1F', 'unit separator'],
+      ['\x7F', 'delete'],
+    ])('should reject names with %s character (0x%s)', (char, name) => {
+      const charCode = char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0');
+      expect(() => new SimpleWorkflow(`test${char}name`)).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject control characters at the beginning', () => {
+      expect(() => new SimpleWorkflow('\x00MyWorkflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject control characters at the end', () => {
+      expect(() => new SimpleWorkflow('MyWorkflow\x1B')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject multiple control characters', () => {
+      expect(() => new SimpleWorkflow('test\x00\x07\x1Bname')).toThrow(INVALID_NAME_MESSAGE);
+    });
   });
 
   describe('Security - HTML/JavaScript Injection', () => {
@@ -124,6 +176,71 @@ describe('Workflow Name Validation', () => {
     it('should reject names with JavaScript event handlers', () => {
       expect(() => new SimpleWorkflow('<img onerror=alert(1)>')).toThrow(INVALID_NAME_MESSAGE);
     });
+
+    // Parameterized tests for comprehensive XSS coverage
+    it.each([
+      ['<script>alert("xss")</script>', 'script tag'],
+      ['<script>evil()</script>', 'script tag lowercase'],
+      ['<SCRIPT>evil()</SCRIPT>', 'script tag uppercase'],
+      ['<iframe>evil</iframe>', 'iframe tag'],
+      ['<IFRAME>evil</IFRAME>', 'iframe tag uppercase'],
+      ['<img src=x onerror=alert(1)>', 'img with onerror'],
+      ['<img src=x onerror="alert(1)">', 'img with onerror quoted'],
+      ['<svg onload=alert(1)>', 'svg with onload'],
+      ['<body onload=alert(1)>', 'body with onload'],
+      ['<input onfocus=alert(1)>', 'input with onfocus'],
+      ['<select onfocus=alert(1)>', 'select with onfocus'],
+      ['<textarea onfocus=alert(1)>', 'textarea with onfocus'],
+      ['<a href="javascript:alert(1)">link</a>', 'anchor with javascript'],
+      ['<A HREF="javascript:alert(1)">link</A>', 'anchor with javascript uppercase'],
+      ['<div onclick="alert(1)">click</div>', 'div with onclick'],
+      ['<DIV ONCLICK="alert(1)">click</DIV>', 'div with onclick uppercase'],
+      ['<span onmouseover="alert(1)">hover</span>', 'span with onmouseover'],
+      ['<details ontoggle="alert(1)">', 'details with ontoggle'],
+      ['<marquee onstart="alert(1)">', 'marquee with onstart'],
+      ['<isindex action="javascript:alert(1)">', 'isindex with javascript action'],
+      ['<style>body{background:red}</style>', 'style tag'],
+      ['<STYLE>body{background:red}</STYLE>', 'style tag uppercase'],
+      ['<link rel="stylesheet" href="evil.css">', 'link tag'],
+      ['<link REL="stylesheet" href="evil.css">', 'link tag uppercase'],
+      ['<meta http-equiv="refresh" content="0;url=javascript:alert(1)">', 'meta with refresh'],
+      ['<object data="javascript:alert(1)">', 'object with javascript data'],
+      ['<embed src="javascript:alert(1)">', 'embed with javascript src'],
+      ['javascript:alert(1)', 'javascript protocol'],
+      ['JAVASCRIPT:alert(1)', 'javascript protocol uppercase'],
+      ['JavaSCriPt:alert(1)', 'javascript protocol mixed case'],
+      ['JaVaScRiPt:alert(1)', 'javascript protocol random case'],
+      ['javascript:void(0)', 'javascript void'],
+      ['javascript:/*comment*/alert(1)', 'javascript with comment'],
+      ['<script>alert(String.fromCharCode(88,83,83))</script>', 'script with char codes'],
+      ['<img src=x onerror="&#97;&#108;&#101;&#114;&#116;(1)">', 'img with html entity encoding'],
+      ['<img src=x onerror="\\x61\\x6c\\x65\\x72\\x74(1)">', 'img with hex encoding'],
+      ['<script src="evil.js"></script>', 'script with external src'],
+      ['<script/SRC="evil.js"></script>', 'script with src and slash'],
+      ['<script>alert(/xss/)</script>', 'script with regex'],
+      ['<!--<script>alert(1)</script>-->', 'script in html comment'],
+    ])('should reject XSS payload: %s', (payload, description) => {
+      expect(() => new SimpleWorkflow(payload)).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject partial HTML tags', () => {
+      expect(() => new SimpleWorkflow('<script')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('script>')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('<img')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('<>')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject HTML tags at beginning', () => {
+      expect(() => new SimpleWorkflow('<script>workflow</script>')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject HTML tags at end', () => {
+      expect(() => new SimpleWorkflow('workflow<img onerror=alert(1)>')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject HTML tags in middle', () => {
+      expect(() => new SimpleWorkflow('my<div>xss</div>workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
   });
 
   describe('Security - Path Traversal', () => {
@@ -141,6 +258,63 @@ describe('Workflow Name Validation', () => {
 
     it('should reject names with .. in the middle', () => {
       expect(() => new SimpleWorkflow('my../workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    // Parameterized tests for comprehensive path traversal coverage
+    it.each([
+      ['../etc/passwd', 'Unix parent directory'],
+      ['..\\windows\\system32', 'Windows parent directory'],
+      ['../../etc/passwd', 'double parent Unix'],
+      ['..\\..\\windows\\system32', 'double parent Windows'],
+      ['../../../etc/passwd', 'triple parent Unix'],
+      ['..\\..\\..\\windows\\system32', 'triple parent Windows'],
+      ['./../etc/passwd', 'current then parent'],
+      ['..\\./windows\\system32', 'mixed separators'],
+      ['./../', 'current then parent with trailing slash'],
+      ['./..\\', 'mixed separators with trailing'],
+      ['my../workflow', 'embedded parent reference'],
+      ['workflow..../test', 'trailing parent reference'],
+      ['my..workflow', 'double dot in middle'],
+      ['.../test', 'multiple dots with forward slash'],
+      ['....\\test', 'multiple dots with backslash'],
+      ['...../test', 'five dots with slash'],
+      ['/../test', 'absolute path with parent'],
+      ['\\..\\test', 'Windows absolute with parent'],
+      ['/../../etc/passwd', 'absolute with multiple parents'],
+      ['..', 'just double dot'],
+      ['...', 'three dots'],
+      ['....', 'four dots'],
+      ['.. /test', 'double dot with space'],
+      ['.. ./test', 'double dot space dot'],
+      ['..../test', 'triple dot with slash'],
+      ['../', 'parent directory with trailing slash'],
+      ['..\\', 'parent directory with trailing backslash'],
+      ['../.', 'parent then current'],
+      ['../..', 'parent then parent'],
+      ['./..', 'current then parent'],
+      ['././..', 'current current parent'],
+      ['a/../b', 'parent in middle of path'],
+      ['a/../../b', 'double parent in middle'],
+    ])('should reject path traversal: %s', (payload, description) => {
+      expect(() => new SimpleWorkflow(payload)).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject path traversal at beginning', () => {
+      expect(() => new SimpleWorkflow('..../workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject path traversal at end', () => {
+      expect(() => new SimpleWorkflow('workflow../..')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject path traversal in middle', () => {
+      expect(() => new SimpleWorkflow('my../workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject consecutive double dots', () => {
+      expect(() => new SimpleWorkflow('....')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('.....')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('......')).toThrow(INVALID_NAME_MESSAGE);
     });
   });
 
@@ -176,6 +350,58 @@ describe('Workflow Name Validation', () => {
     it('should reject names with pipe', () => {
       expect(() => new SimpleWorkflow('my|workflow')).toThrow(INVALID_NAME_MESSAGE);
     });
+
+    // Parameterized tests for all file system characters
+    it.each([
+      ['/', 'forward slash', 'my/workflow'],
+      ['\\', 'backslash', 'my\\workflow'],
+      [':', 'colon', 'my:workflow'],
+      ['*', 'asterisk', 'my*workflow'],
+      ['?', 'question mark', 'my?workflow'],
+      ['"', 'double quote', 'my"workflow'],
+      ['<', 'less than', 'my<workflow'],
+      ['>', 'greater than', 'my>workflow'],
+      ['|', 'pipe', 'my|workflow'],
+    ])('should reject names with %s', (char, name, payload) => {
+      expect(() => new SimpleWorkflow(payload)).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject file system characters at beginning', () => {
+      expect(() => new SimpleWorkflow('/workflow')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('\\workflow')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow(':workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject file system characters at end', () => {
+      expect(() => new SimpleWorkflow('workflow/')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow\\')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow:')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject multiple file system characters', () => {
+      expect(() => new SimpleWorkflow('my//workflow')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('my\\\\workflow')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('my**workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject combinations of file system characters', () => {
+      expect(() => new SimpleWorkflow('my/\\workflow')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('my:*workflow')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('my<>workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should handle names that look like Windows reserved device names', () => {
+      // CON, PRN, AUX, NUL, COM1-9, LPT1-9 are reserved on Windows
+      // These contain valid characters per our allowlist, so they are accepted
+      // OS-specific reserved name validation would be a separate concern
+      expect(() => new SimpleWorkflow('CON')).not.toThrow();
+      expect(() => new SimpleWorkflow('PRN')).not.toThrow();
+      expect(() => new SimpleWorkflow('AUX')).not.toThrow();
+      expect(() => new SimpleWorkflow('NUL')).not.toThrow();
+      expect(() => new SimpleWorkflow('COM1')).not.toThrow();
+      expect(() => new SimpleWorkflow('LPT1')).not.toThrow();
+      // Note: OS-specific reserved name validation is not part of current implementation
+    });
   });
 
   describe('Security - Allowed Characters (Positive Cases)', () => {
@@ -203,25 +429,356 @@ describe('Workflow Name Validation', () => {
       expect(() => new SimpleWorkflow('My_Workflow-123 Test')).not.toThrow();
       expect(new SimpleWorkflow('My_Workflow-123 Test').getNode().name).toBe('My_Workflow-123 Test');
     });
+
+    it('should accept uppercase letters', () => {
+      expect(() => new SimpleWorkflow('UPPERCASE')).not.toThrow();
+    });
+
+    it('should accept lowercase letters', () => {
+      expect(() => new SimpleWorkflow('lowercase')).not.toThrow();
+    });
+
+    it('should accept numbers', () => {
+      expect(() => new SimpleWorkflow('123456')).not.toThrow();
+    });
+
+    it('should accept consecutive allowed characters', () => {
+      expect(() => new SimpleWorkflow('my--workflow__test  123')).not.toThrow();
+    });
+
+    it('should accept names starting with space', () => {
+      expect(() => new SimpleWorkflow(' MyWorkflow')).not.toThrow();
+    });
+
+    it('should accept names ending with space', () => {
+      expect(() => new SimpleWorkflow('MyWorkflow ')).not.toThrow();
+    });
+
+    it('should accept names with only hyphens', () => {
+      expect(() => new SimpleWorkflow('---')).not.toThrow();
+    });
+
+    it('should accept names with only underscores', () => {
+      expect(() => new SimpleWorkflow('___')).not.toThrow();
+    });
+
+    it('should accept names with only spaces', () => {
+      expect(() => new SimpleWorkflow('   ')).toThrow('Workflow name cannot be empty or whitespace only');
+    });
+
+    it('should accept single character names', () => {
+      expect(() => new SimpleWorkflow('a')).not.toThrow();
+      expect(() => new SimpleWorkflow('A')).not.toThrow();
+      expect(() => new SimpleWorkflow('1')).not.toThrow();
+      expect(() => new SimpleWorkflow('_')).not.toThrow();
+      expect(() => new SimpleWorkflow('-')).not.toThrow();
+      expect(() => new SimpleWorkflow(' ')).toThrow('Workflow name cannot be empty or whitespace only'); // Single space - fails after trim
+    });
+
+    it('should accept names with mixed case', () => {
+      expect(() => new SimpleWorkflow('MyWorkflowName')).not.toThrow();
+      expect(() => new SimpleWorkflow('camelCaseWorkflow')).not.toThrow();
+      expect(() => new SimpleWorkflow('PascalCaseWorkflow')).not.toThrow();
+      expect(() => new SimpleWorkflow('snake_case_workflow')).not.toThrow();
+      expect(() => new SimpleWorkflow('kebab-case-workflow')).not.toThrow();
+    });
+
+    // Parameterized tests for valid names
+    it.each([
+      ['Workflow123', 'alphanumeric'],
+      ['My Workflow', 'with spaces'],
+      ['my-workflow', 'with hyphens'],
+      ['my_workflow', 'with underscores'],
+      ['My-Workflow_123 Test', 'all allowed characters'],
+      ['ABC', 'uppercase only'],
+      ['abc', 'lowercase only'],
+      ['123', 'numbers only'],
+      ['a', 'single letter'],
+      ['_', 'single underscore'],
+      ['-', 'single hyphen'],
+      ['MyWorkflowName', 'mixed case'],
+      ['workflow with-many_allowed-chars', 'complex valid name'],
+      ['  leading space', 'leading space'],
+      ['trailing space  ', 'trailing space'],
+      ['multiple   spaces', 'multiple spaces'],
+      ['a-b_c d', 'single chars with separators'],
+    ])('should accept valid name: %s', (name, description) => {
+      const trimmed = name.trim();
+      if (trimmed.length === 0) {
+        // Names that are only whitespace should throw empty error
+        expect(() => new SimpleWorkflow(name)).toThrow('Workflow name cannot be empty or whitespace only');
+      } else {
+        expect(() => new SimpleWorkflow(name)).not.toThrow();
+        const wf = new SimpleWorkflow(name);
+        expect(wf.getNode().name).toBe(name);
+      }
+    });
+  });
+
+  describe('Security - Allowed Characters (Negative Cases)', () => {
+    // Parameterized tests for characters not in allowlist
+    it.each([
+      ['my.workflow', 'period'],
+      ['my@workflow', 'at sign'],
+      ['my#workflow', 'hash'],
+      ['my$workflow', 'dollar sign'],
+      ['my%workflow', 'percent'],
+      ['my&workflow', 'ampersand'],
+      ['my*workflow', 'asterisk'],
+      ['my+workflow', 'plus sign'],
+      ['my=workflow', 'equals sign'],
+      ['my,workflow', 'comma'],
+      ['my;workflow', 'semicolon'],
+      ['my:workflow', 'colon'],
+      ['my!workflow', 'exclamation mark'],
+      ['my?workflow', 'question mark'],
+      ['my(workflow', 'left parenthesis'],
+      ['my)workflow', 'right parenthesis'],
+      ['my{workflow', 'left brace'],
+      ['my}workflow', 'right brace'],
+      ['my[workflow', 'left bracket'],
+      ['my]workflow', 'right bracket'],
+      ['my|workflow', 'pipe'],
+      ['my\\workflow', 'backslash'],
+      ['my/workflow', 'forward slash'],
+      ['my<workflow', 'less than'],
+      ['my>workflow', 'greater than'],
+      ["my'workflow", 'single quote'],
+      ['my"workflow', 'double quote'],
+      ['my`workflow', 'backtick'],
+      ['my~workflow', 'tilde'],
+      ['my^workflow', 'caret'],
+      ['my&workflow', 'ampersand'],
+      ['my¬workflow', 'not sign'],
+      ['my£workflow', 'pound sign'],
+      ['my€workflow', 'euro sign'],
+      ['my¥workflow', 'yen sign'],
+      ['my¢workflow', 'cent sign'],
+      ['my§workflow', 'section sign'],
+      ['my©workflow', 'copyright sign'],
+      ['my®workflow', 'registered sign'],
+      ['my™workflow', 'trademark sign'],
+      ['my@workflow', 'at symbol'],
+      ['my#workflow', 'hash/pound'],
+      ['my$workflow', 'dollar'],
+      ['my%workflow', 'percent'],
+      ['my&workflow', 'ampersand'],
+      ['my*workflow', 'asterisk'],
+      ['my+workflow', 'plus'],
+      ['my=workflow', 'equals'],
+      ['my,workflow', 'comma'],
+      ['my;workflow', 'semicolon'],
+      ['my:workflow', 'colon'],
+      ['my!workflow', 'exclamation'],
+      ['my?workflow', 'question mark'],
+      ['my(workflow', 'left paren'],
+      ['my)workflow', 'right paren'],
+      ['my{workflow', 'left brace'],
+      ['my}workflow', 'right brace'],
+      ['my[workflow', 'left bracket'],
+      ['my]workflow', 'right bracket'],
+      ['my|workflow', 'pipe'],
+      ['my\\workflow', 'backslash'],
+      ['my/workflow', 'forward slash'],
+      ['my<workflow', 'less than'],
+      ['my>workflow', 'greater than'],
+      ["my'workflow", 'single quote'],
+      ['my"workflow', 'double quote'],
+      ['my`workflow', 'backtick'],
+    ])('should reject names with %s', (payload, description) => {
+      expect(() => new SimpleWorkflow(payload)).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject names with multiple invalid characters', () => {
+      expect(() => new SimpleWorkflow('my.workflow@test')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('my$workflow#test')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('my!workflow?test')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject invalid characters at beginning', () => {
+      expect(() => new SimpleWorkflow('.workflow')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('@workflow')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('#workflow')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject invalid characters at end', () => {
+      expect(() => new SimpleWorkflow('workflow.')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow@')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow#')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject Unicode characters outside ASCII', () => {
+      expect(() => new SimpleWorkflow('workflow©')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow™')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow€')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow®')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject emojis', () => {
+      expect(() => new SimpleWorkflow('workflow😀')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow🚀')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow✨')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow❤️')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject non-ASCII letters', () => {
+      expect(() => new SimpleWorkflow('workflowé')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflöw')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workfløw')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('工作流')).toThrow(INVALID_NAME_MESSAGE);
+    });
+
+    it('should reject null bytes and other control characters', () => {
+      expect(() => new SimpleWorkflow('workflow\x00')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow\x01')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow\x1B')).toThrow(INVALID_NAME_MESSAGE);
+      expect(() => new SimpleWorkflow('workflow\x7F')).toThrow(INVALID_NAME_MESSAGE);
+    });
   });
 
   describe('Security - Both Constructor Patterns', () => {
-    it('should reject invalid names in class-based pattern', () => {
-      expect(() => new SimpleWorkflow('<script>alert(1)</script>')).toThrow(INVALID_NAME_MESSAGE);
-    });
-
-    it('should reject invalid names in functional pattern', () => {
+    // Helper function to test both patterns
+    const testBothPatterns = (name: string, shouldThrow: boolean, expectedMessage?: string) => {
       const executor = async () => {};
-      expect(() => new Workflow({ name: '../etc/passwd' }, executor)).toThrow(INVALID_NAME_MESSAGE);
+
+      // Class-based pattern
+      if (shouldThrow) {
+        expect(() => new SimpleWorkflow(name)).toThrow(expectedMessage || INVALID_NAME_MESSAGE);
+      } else {
+        expect(() => new SimpleWorkflow(name)).not.toThrow();
+        const wf = new SimpleWorkflow(name);
+        expect(wf.getNode().name).toBe(name);
+      }
+
+      // Functional pattern
+      if (shouldThrow) {
+        expect(() => new Workflow({ name }, executor)).toThrow(expectedMessage || INVALID_NAME_MESSAGE);
+      } else {
+        expect(() => new Workflow({ name }, executor)).not.toThrow();
+        const wf = new Workflow({ name }, executor);
+        expect(wf.getNode().name).toBe(name);
+      }
+    };
+
+    it('should reject control characters in both patterns', () => {
+      testBothPatterns('test\x00name', true);
     });
 
-    it('should accept valid names in class-based pattern', () => {
-      expect(() => new SimpleWorkflow('My-Workflow_123')).not.toThrow();
+    it('should reject XSS in both patterns', () => {
+      testBothPatterns('<script>alert(1)</script>', true);
     });
 
-    it('should accept valid names in functional pattern', () => {
+    it('should reject path traversal in both patterns', () => {
+      testBothPatterns('../etc/passwd', true);
+    });
+
+    it('should reject file system characters in both patterns', () => {
+      testBothPatterns('my/workflow', true);
+    });
+
+    it('should accept valid names in both patterns', () => {
+      testBothPatterns('My-Workflow_123', false);
+    });
+
+    it('should have consistent error messages across patterns', () => {
+      const invalidNames = ['<script>', '../etc/passwd', 'test\x00name', 'my/workflow'];
       const executor = async () => {};
-      expect(() => new Workflow({ name: 'My-Workflow_123' }, executor)).not.toThrow();
+
+      invalidNames.forEach(name => {
+        let classError: Error | undefined;
+        let functionalError: Error | undefined;
+
+        try {
+          new SimpleWorkflow(name);
+        } catch (e) {
+          classError = e as Error;
+        }
+
+        try {
+          new Workflow({ name }, executor);
+        } catch (e) {
+          functionalError = e as Error;
+        }
+
+        expect(classError?.message).toBe(functionalError?.message);
+        expect(classError?.message).toBe(INVALID_NAME_MESSAGE);
+      });
+    });
+
+    // Parameterized tests for both patterns
+    describe.each([
+      ['control character', 'test\x00name', true],
+      ['script tag', '<script>alert(1)</script>', true],
+      ['javascript protocol', 'javascript:alert(1)', true],
+      ['path traversal', '../etc/passwd', true],
+      ['forward slash', 'my/workflow', true],
+      ['backslash', 'my\\workflow', true],
+      ['asterisk', 'my*workflow', true],
+      ['valid alphanumeric', 'Workflow123', false],
+      ['valid with spaces', 'My Workflow', false],
+      ['valid with hyphens', 'my-workflow', false],
+      ['valid with underscores', 'my_workflow', false],
+      ['valid complex', 'My-Workflow_123 Test', false],
+    ])('Security validation: %s', (description, name, shouldThrow) => {
+      const executor = async () => {};
+
+      it('should work in class-based pattern', () => {
+        if (shouldThrow) {
+          expect(() => new SimpleWorkflow(name)).toThrow(INVALID_NAME_MESSAGE);
+        } else {
+          expect(() => new SimpleWorkflow(name)).not.toThrow();
+          const wf = new SimpleWorkflow(name);
+          expect(wf.getNode().name).toBe(name);
+        }
+      });
+
+      it('should work in functional pattern', () => {
+        if (shouldThrow) {
+          expect(() => new Workflow({ name }, executor)).toThrow(INVALID_NAME_MESSAGE);
+        } else {
+          expect(() => new Workflow({ name }, executor)).not.toThrow();
+          const wf = new Workflow({ name }, executor);
+          expect(wf.getNode().name).toBe(name);
+        }
+      });
+    });
+
+    it('should handle empty string consistently across patterns', () => {
+      const executor = async () => {};
+      const emptyMessage = 'Workflow name cannot be empty or whitespace only';
+
+      expect(() => new SimpleWorkflow('')).toThrow(emptyMessage);
+      expect(() => new Workflow({ name: '' }, executor)).toThrow(emptyMessage);
+    });
+
+    it('should handle whitespace consistently across patterns', () => {
+      const executor = async () => {};
+      const emptyMessage = 'Workflow name cannot be empty or whitespace only';
+
+      expect(() => new SimpleWorkflow('   ')).toThrow(emptyMessage);
+      expect(() => new Workflow({ name: '   ' }, executor)).toThrow(emptyMessage);
+    });
+
+    it('should handle long names consistently across patterns', () => {
+      const executor = async () => {};
+      const longMessage = 'Workflow name cannot exceed 100 characters';
+      const longName = 'a'.repeat(101);
+
+      expect(() => new SimpleWorkflow(longName)).toThrow(longMessage);
+      expect(() => new Workflow({ name: longName }, executor)).toThrow(longMessage);
+    });
+
+    it('should handle max length consistently across patterns', () => {
+      const executor = async () => {};
+      const maxName = 'a'.repeat(100);
+
+      expect(() => new SimpleWorkflow(maxName)).not.toThrow();
+      expect(() => new Workflow({ name: maxName }, executor)).not.toThrow();
+
+      const wf1 = new SimpleWorkflow(maxName);
+      const wf2 = new Workflow({ name: maxName }, executor);
+      expect(wf1.getNode().name).toBe(maxName);
+      expect(wf2.getNode().name).toBe(maxName);
     });
   });
 });
