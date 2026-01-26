@@ -196,7 +196,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Milestone 1.2: Workflow-Level Agent Response Validation",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Add workflow-level validation for AgentResponse to ensure data integrity when agents are used within workflows. Addresses PRD Section 6.6 requirements.",
           "tasks": [
             {
@@ -252,7 +252,7 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Integrate Validation into Workflow Step Execution",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Automatically validate agent responses when agents are used within workflow steps, with proper error handling and recovery.",
               "subtasks": [
                 {
@@ -281,7 +281,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S3",
                   "title": "Document workflow-level validation behavior",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T2.S2"

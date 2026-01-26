@@ -11,6 +11,7 @@ Workflows are hierarchical task containers with built-in logging, state observat
 - [Observers](#observers)
 - [Tree Debugger](#tree-debugger)
 - [Error Handling](#error-handling)
+- [Agent Response Validation](#agent-response-validation)
 - [Concurrent Execution](#concurrent-execution)
 - [API Reference](#api-reference)
 
@@ -318,6 +319,7 @@ await workflow.run();
 | `childAttached` | Child workflow attached |
 | `stateSnapshot` | State snapshot captured |
 | `error` | Error occurred |
+| `invalidResponse` | Agent response validation failed |
 | `treeUpdated` | Tree structure changed |
 
 ## Tree Debugger
@@ -455,6 +457,472 @@ class ResilientParent extends Workflow {
 
 **Advanced Retry Logic:** For intelligent retry patterns with state preservation, parent-driven restart decisions, and error analysis, see [Restart Pattern](./restart-pattern.md).
 
+## Agent Response Validation
+
+Workflows can validate agent responses to ensure they conform to expected schemas before processing. This is particularly useful when working with LLMs that may return malformed or unexpected data structures.
+
+**PRD Requirement:** As specified in [PRD Section 6.6](../../PRD.md#66-validation), workflows receiving agent responses should validate against the `AgentResponse` schema to catch format errors early.
+
+### Automatic vs Manual Validation
+
+| Feature | Automatic Validation | Manual Validation |
+|---------|---------------------|-------------------|
+| **Used in** | Functional workflows (`createWorkflow`) | Class-based workflows (extend `Workflow`) |
+| **Trigger** | `ctx.step()` automatically validates `AgentResponse` results | Call `this.validateAgentResponse()` explicitly |
+| **Configuration** | `autoValidateResponses` option | N/A (opt-in per call) |
+| **Error handling** | Throws `WorkflowError` automatically | Returns `boolean` (check return value) |
+| **Event emission** | Emits `invalidResponse` event | Emits `invalidResponse` event |
+
+### Automatic Validation (Functional Workflows)
+
+When using functional workflows with `createWorkflow()`, you can enable automatic validation of `AgentResponse` objects returned by steps.
+
+**Enabling Automatic Validation:**
+
+```typescript
+import { createWorkflow, type AgentResponse } from 'groundswell';
+import { z } from 'zod';
+
+const workflow = createWorkflow(
+  {
+    name: 'ValidationWorkflow',
+    autoValidateResponses: true,  // Enable automatic validation
+  },
+  async (ctx) => {
+    // This step returns an AgentResponse - validation happens automatically
+    const result = await ctx.step('analyze', async () => {
+      // Simulated agent call
+      const response: AgentResponse<{ analysis: string }> = {
+        status: 'success',
+        data: { analysis: 'Complete' },
+        error: null,
+        metadata: {
+          agentId: 'agent-123',
+          timestamp: Date.now(),
+        },
+      };
+      return response;
+    });
+
+    // If validation failed, WorkflowError is thrown before reaching this point
+    return result.data;
+  }
+);
+
+const result = await workflow.run();
+```
+
+**Default Behavior:**
+
+- `autoValidateResponses` defaults to `true` for functional workflows
+- Only validates values that match the `AgentResponse` structure
+- Non-agent response values pass through unchanged
+- Emits `invalidResponse` event before throwing `WorkflowError`
+
+**Disabling Validation:**
+
+```typescript
+const workflow = createWorkflow(
+  {
+    name: 'NoValidationWorkflow',
+    autoValidateResponses: false,  // Disable automatic validation
+  },
+  async (ctx) => {
+    const result = await ctx.step('analyze', async () => {
+      return { status: 'invalid', data: 'bypasses validation' };
+    });
+    return result;
+  }
+);
+```
+
+### Manual Validation (Class-Based Workflows)
+
+For class-based workflows using the `@Step` decorator, use the `validateAgentResponse()` method to manually validate agent responses.
+
+```typescript
+import { Workflow, Step, type AgentResponse } from 'groundswell';
+import { z } from 'zod';
+
+class AnalysisWorkflow extends Workflow {
+  @Step({ name: 'analyze' })
+  async analyzeData(): Promise<AgentResponse<{ result: string }>> {
+    // Simulated agent response
+    return {
+      status: 'success',
+      data: { result: 'Analysis complete' },
+      error: null,
+      metadata: {
+        agentId: 'agent-123',
+        timestamp: Date.now(),
+      },
+    };
+  }
+
+  async run(): Promise<string> {
+    this.setStatus('running');
+
+    const response = await this.analyzeData();
+
+    // Manually validate the response
+    const isValid = this.validateAgentResponse(
+      response,
+      'agent-123',
+      z.object({
+        result: z.string(),
+      })
+    );
+
+    if (!isValid) {
+      this.logger.error('Response validation failed');
+      throw new Error('Invalid agent response');
+    }
+
+    this.setStatus('completed');
+    return response.data.result;
+  }
+}
+```
+
+**Method Signature:**
+
+```typescript
+validateAgentResponse<T>(
+  response: AgentResponse<T>,
+  agentId: string,
+  dataSchema?: z.ZodTypeAny
+): boolean
+```
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `response` | `AgentResponse<T>` | The agent response to validate |
+| `agentId` | `string` | ID of the agent that produced the response |
+| `dataSchema` | `z.ZodTypeAny` | Optional schema for the `data` field (defaults to `z.unknown()`) |
+
+**Returns:** `true` if validation passes, `false` if validation fails
+
+**Side Effects:**
+
+- Emits `invalidResponse` event on validation failure
+- Does NOT throw - you must check the return value
+
+### Validation Events
+
+When validation fails (either automatic or manual), an `invalidResponse` event is emitted with detailed error information.
+
+**Event Structure:**
+
+```typescript
+interface InvalidResponseEvent {
+  type: 'invalidResponse';
+  node: WorkflowNode;
+  response: AgentResponse<unknown>;
+  agentId: string;
+  errors: z.ZodError;
+  timestamp: number;
+}
+```
+
+**Observing Validation Events:**
+
+```typescript
+import { createWorkflow, type WorkflowEvent, type WorkflowObserver } from 'groundswell';
+
+const observer: WorkflowObserver = {
+  onLog: () => {},
+  onEvent: (event: WorkflowEvent) => {
+    if (event.type === 'invalidResponse') {
+      console.error('Validation failed:', {
+        agentId: event.agentId,
+        errors: event.errors.errors,
+        timestamp: event.timestamp,
+      });
+    }
+  },
+  onStateUpdated: () => {},
+  onTreeChanged: () => {},
+};
+
+const workflow = createWorkflow(
+  { name: 'MonitoredWorkflow' },
+  async (ctx) => {
+    return await ctx.step('analyze', async () => {
+      return { status: 'invalid', data: null, error: null, metadata: {} };
+    });
+  }
+);
+
+workflow.addObserver(observer);
+```
+
+### Error Handling
+
+When automatic validation fails, a `WorkflowError` is thrown with detailed context about the validation failure.
+
+**Error Structure:**
+
+```typescript
+interface WorkflowError {
+  message: string;
+  original: z.ZodError;
+  workflowId: string;
+  stack?: string;
+  state: Record<string, unknown>;
+  logs: LogEntry[];
+}
+```
+
+**Handling Validation Errors:**
+
+```typescript
+try {
+  await workflow.run();
+} catch (error) {
+  const workflowError = error as WorkflowError;
+
+  // Check if it's a validation error
+  if (workflowError.original && 'errors' in workflowError.original) {
+    const zodError = workflowError.original as z.ZodError;
+
+    console.error('Validation failed:');
+    zodError.errors.forEach((issue) => {
+      console.error(`  ${issue.path.join('.')}: ${issue.message}`);
+    });
+
+    // Decide whether to retry or abort
+    if (isRecoverable(zodError)) {
+      // Retry with improved prompt
+      return await retryWithBetterPrompt();
+    }
+  }
+
+  throw error;
+}
+```
+
+**ZodError Format:**
+
+```typescript
+interface ZodError {
+  errors: Array<{
+    path: (string | number)[];
+    message: string;
+    code: string;
+  }>;
+}
+```
+
+### Common Scenarios
+
+#### Scenario 1: Validate in Production Only
+
+Enable validation in production but skip it during development for faster iteration.
+
+```typescript
+const workflow = createWorkflow(
+  {
+    name: 'SmartWorkflow',
+    autoValidateResponses: process.env.NODE_ENV === 'production',
+  },
+  async (ctx) => {
+    const result = await ctx.step('analyze', async () => {
+      return await agent.prompt(prompt);
+    });
+    return result.data;
+  }
+);
+```
+
+#### Scenario 2: Event-Driven Monitoring
+
+Track validation failures for monitoring and alerting.
+
+```typescript
+import { createWorkflow, type WorkflowObserver } from 'groundswell';
+
+class ValidationMonitor implements WorkflowObserver {
+  private failures: Map<string, number> = new Map();
+
+  onLog() {}
+  onStateUpdated() {}
+  onTreeChanged() {}
+
+  onEvent(event: WorkflowEvent): void {
+    if (event.type === 'invalidResponse') {
+      const key = `${event.agentId}:${event.node.name}`;
+
+      this.failures.set(key, (this.failures.get(key) || 0) + 1);
+
+      // Alert on repeated failures
+      if (this.failures.get(key)! > 3) {
+        this.sendAlert(`Repeated validation failures for ${key}`);
+      }
+    }
+  }
+
+  private sendAlert(message: string): void {
+    // Send to monitoring service
+    console.error('ALERT:', message);
+  }
+}
+
+const monitor = new ValidationMonitor();
+workflow.addObserver(monitor);
+```
+
+#### Scenario 3: Retry with Validation Feedback
+
+Improve prompts based on validation errors and retry.
+
+```typescript
+const workflow = createWorkflow(
+  { name: 'RetryWorkflow' },
+  async (ctx) => {
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        const result = await ctx.step('analyze', async () => {
+          return await agent.prompt(prompt);
+        });
+        return result.data;
+      } catch (error) {
+        attempts++;
+
+        const workflowError = error as WorkflowError;
+
+        if (workflowError.original && 'errors' in workflowError.original) {
+          // Extract validation errors to improve prompt
+          const zodError = workflowError.original as z.ZodError;
+          const errorDetails = zodError.errors
+            .map((e) => `- ${e.path.join('.')}: ${e.message}`)
+            .join('\n');
+
+          // Update prompt with validation feedback
+          prompt = createPrompt({
+            user: `Previous attempt had validation errors:\n${errorDetails}\n\nPlease fix and retry.`,
+            responseFormat: schema,
+          });
+        } else {
+          throw error; // Not a validation error
+        }
+      }
+    }
+
+    throw new Error('Max retry attempts exceeded');
+  }
+);
+```
+
+#### Scenario 4: Conditional Schema Validation
+
+Validate different data shapes based on response status.
+
+```typescript
+import { z } from 'zod';
+
+const SuccessSchema = z.object({
+  result: z.string(),
+  confidence: z.number().min(0).max(1),
+});
+
+const ErrorSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  recoverable: z.boolean(),
+});
+
+const workflow = createWorkflow(
+  { name: 'ConditionalValidation' },
+  async (ctx) => {
+    const response = await ctx.step('analyze', async () => {
+      return await agent.prompt(prompt);
+    });
+
+    // Validate based on response status
+    if (response.status === 'success') {
+      const isValid = this.validateAgentResponse(response, 'agent-123', SuccessSchema);
+      if (!isValid) throw new Error('Invalid success response');
+    } else if (response.status === 'error') {
+      const isValid = this.validateAgentResponse(response, 'agent-123', ErrorSchema);
+      if (!isValid) throw new Error('Invalid error response');
+    }
+
+    return response;
+  }
+);
+```
+
+### Configuration Reference
+
+**WorkflowConfig Options:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `autoValidateResponses` | `boolean` | `true` | Enable automatic validation of `AgentResponse` objects in functional workflows |
+
+**Notes:**
+
+- Only applies to functional workflows created with `createWorkflow()`
+- Class-based workflows must use manual validation via `validateAgentResponse()`
+- Validation only applies to values matching the `AgentResponse` structure
+- Non-agent response values pass through unchanged
+
+### API Reference
+
+**validateAgentResponse()**
+
+```typescript
+validateAgentResponse<T>(
+  response: AgentResponse<T>,
+  agentId: string,
+  dataSchema?: z.ZodTypeAny
+): boolean
+```
+
+Validates an `AgentResponse` against the `AgentResponse` schema and optional data schema.
+
+**Parameters:**
+
+- `response: AgentResponse<T>` - The agent response to validate
+- `agentId: string` - ID of the agent that produced the response
+- `dataSchema?: z.ZodTypeAny` - Optional schema for validating the `data` field (defaults to `z.unknown()`)
+
+**Returns:** `boolean` - `true` if validation passes, `false` if validation fails
+
+**Side Effects:**
+
+- Emits `invalidResponse` event on validation failure
+- Event includes: `node`, `response`, `agentId`, `errors` (ZodError), `timestamp`
+- Does NOT throw - caller must check return value
+
+**Example:**
+
+```typescript
+const isValid = this.validateAgentResponse(
+  response,
+  'my-agent',
+  z.object({
+    result: z.string(),
+    score: z.number().min(0).max(100),
+  })
+);
+
+if (!isValid) {
+  // Handle validation failure
+}
+```
+
+**Related:**
+
+- [Agent Validation Documentation](./agent.md#validation) - Agent-level validation
+- [Prompt Schema Validation](./prompt.md#schema-validation) - Using Zod schemas with prompts
+- [WorkflowError Type](#api-reference) - Error structure for validation failures
+
 ## Concurrent Execution
 
 ### Sequential (default)
@@ -540,6 +1008,7 @@ class Workflow<T = unknown> {
   snapshotState(): void;
   getNode(): WorkflowNode;
   emitEvent(event: WorkflowEvent): void;
+  validateAgentResponse<T>(response: AgentResponse<T>, agentId: string, dataSchema?: z.ZodTypeAny): boolean;
 }
 ```
 
@@ -553,6 +1022,7 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 interface WorkflowConfig {
   name?: string;
   enableReflection?: boolean;
+  autoValidateResponses?: boolean;
 }
 
 interface WorkflowResult<T> {
