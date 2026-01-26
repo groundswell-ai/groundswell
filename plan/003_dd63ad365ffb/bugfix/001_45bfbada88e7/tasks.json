@@ -270,7 +270,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S2",
                   "title": "Write integration tests for automatic validation",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S1"
