@@ -245,6 +245,10 @@ export class AnthropicProvider implements Provider {
       request.options.model ?? "claude-sonnet-4-20250514",
     );
 
+    // PATTERN: Convert Provider hooks to SDK hooks
+    // Adapts ProviderHookEvents to SDK-compatible format for use in query()
+    const sdkHooks = this.buildAgentSDKHooks(hooks);
+
     // PATTERN: AgentSDKOptions construction (EXACT pattern from src/core/agent.ts:397-426)
     // CRITICAL: Map ProviderRequest fields to SDK Options format
     const sdkOptions = {
@@ -270,8 +274,11 @@ export class AnthropicProvider implements Provider {
         },
       }),
 
-      // Hooks (placeholder for P2.M1.T2.S1)
-      // hooks: undefined,
+      // Hooks integration (from P2.M1.T2.S1)
+      // Include converted hooks if any were mapped
+      ...(Object.keys(sdkHooks).length > 0 && {
+        hooks: sdkHooks,
+      }),
     };
 
     // PATTERN: Start time tracking for duration calculation
@@ -534,6 +541,105 @@ ${this.skillsPrompt}
 When responding, leverage the available skills above.
 Each skill provides specific capabilities and guidelines.
 `;
+  }
+
+  /**
+   * Build Agent SDK hooks from Provider hook events
+   *
+   * Adapts ProviderHookEvents to Anthropic Agent SDK-compatible hook format.
+   * Transforms signatures between Provider and SDK hook formats and handles
+   * async/sync hook execution.
+   *
+   * @param hooks - Optional provider hook events to adapt
+   * @returns SDK-compatible hooks object with HookCallbackMatcher arrays
+   * @internal
+   * @remarks
+   * Hook mapping:
+   * - onToolStart → PreToolUse
+   * - onToolEnd → PostToolUse
+   * - onSessionStart → SessionStart
+   * - onSessionEnd → SessionEnd
+   *
+   * Each adapter returns { continue: true } for SDK compatibility.
+   * Duration values are set to 0 as SDK doesn't provide them in hook input.
+   */
+  private buildAgentSDKHooks(
+    hooks?: ProviderHookEvents,
+  ): Partial<
+    Record<
+      typeof this.sdk extends null ? never : import("@anthropic-ai/claude-agent-sdk").HookEvent,
+      import("@anthropic-ai/claude-agent-sdk").HookCallbackMatcher[]
+    >
+  > {
+    // Early return: no hooks to convert
+    if (!hooks) {
+      return {};
+    }
+
+    const sdkHooks: Partial<
+      Record<
+        typeof this.sdk extends null ? never : import("@anthropic-ai/claude-agent-sdk").HookEvent,
+        import("@anthropic-ai/claude-agent-sdk").HookCallbackMatcher[]
+      >
+    > = {};
+
+    // Map onToolStart → PreToolUse
+    if (hooks.onToolStart) {
+      sdkHooks['PreToolUse' as import("@anthropic-ai/claude-agent-sdk").HookEvent] = [{
+        hooks: [async (input, _toolUseID, _options) => {
+          const preInput = input as import("@anthropic-ai/claude-agent-sdk").PreToolUseHookInput;
+          const toolRequest = {
+            name: preInput.tool_name,
+            input: preInput.tool_input,
+          };
+          await hooks.onToolStart!(toolRequest);
+          return { continue: true };
+        }],
+      }];
+    }
+
+    // Map onToolEnd → PostToolUse
+    if (hooks.onToolEnd) {
+      sdkHooks['PostToolUse' as import("@anthropic-ai/claude-agent-sdk").HookEvent] = [{
+        hooks: [async (input, _toolUseID, _options) => {
+          const postInput = input as import("@anthropic-ai/claude-agent-sdk").PostToolUseHookInput;
+          const toolRequest = {
+            name: postInput.tool_name,
+            input: postInput.tool_input,
+          };
+          const toolResult = {
+            content: postInput.tool_response,
+            isError: false, // SDK limitation - always false
+          };
+          const duration = 0; // SDK limitation - duration not available
+          await hooks.onToolEnd!(toolRequest, toolResult, duration);
+          return { continue: true };
+        }],
+      }];
+    }
+
+    // Map onSessionStart → SessionStart
+    if (hooks.onSessionStart) {
+      sdkHooks['SessionStart' as import("@anthropic-ai/claude-agent-sdk").HookEvent] = [{
+        hooks: [async (_input, _toolUseID, _options) => {
+          await hooks.onSessionStart!();
+          return { continue: true };
+        }],
+      }];
+    }
+
+    // Map onSessionEnd → SessionEnd
+    if (hooks.onSessionEnd) {
+      sdkHooks['SessionEnd' as import("@anthropic-ai/claude-agent-sdk").HookEvent] = [{
+        hooks: [async (_input, _toolUseID, _options) => {
+          const totalDuration = 0; // SDK limitation - duration not available
+          await hooks.onSessionEnd!(totalDuration);
+          return { continue: true };
+        }],
+      }];
+    }
+
+    return sdkHooks;
   }
 
   /**

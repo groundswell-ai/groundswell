@@ -238,7 +238,7 @@
           "type": "Milestone",
           "id": "P2.M1",
           "title": "Milestone 2.1: Anthropic Provider Core",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Implement AnthropicProvider class that wraps the existing Agent SDK integration",
           "tasks": [
             {
@@ -343,14 +343,14 @@
               "type": "Task",
               "id": "P2.M1.T2",
               "title": "Task: Implement Anthropic Hooks Adapter",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Create hooks-adapter.ts to convert between ProviderHookEvents and Agent SDK hooks",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M1.T2.S1",
                   "title": "Implement buildAgentSDKHooks() adapter function",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T1.S4"
