@@ -36,6 +36,16 @@ export interface RestartStepOptions {
 }
 
 /**
+ * Options for replaying historical events
+ */
+interface ReplayEventsOptions {
+  /** Only replay events after this timestamp (milliseconds since epoch) */
+  since?: number;
+  /** Maximum number of events to replay */
+  limit?: number;
+}
+
+/**
  * Base class for all workflows
  * Supports both class-based (subclass with run()) and functional (executor) patterns
  *
@@ -90,6 +100,9 @@ export class Workflow<T = unknown> {
 
   /** Error collection state for workflow-level error merge */
   private collectedErrors: WorkflowError[] = [];
+
+  /** Event history for replay functionality (ES2022 private field) */
+  #eventHistory: WorkflowEvent[] = [];
 
   /** Total operations count for error merge context */
   private totalOperations: number = 0;
@@ -481,6 +494,9 @@ export class Workflow<T = unknown> {
    * May trigger treeUpdated notifications for specific event types.
    */
   public emitEvent(event: WorkflowEvent): void {
+    // Store event in history FIRST (for replay functionality)
+    this.#eventHistory.push(event);
+
     this.node.events.push(event);
 
     const observers = this.getRootObservers();
@@ -496,6 +512,122 @@ export class Workflow<T = unknown> {
         this.logger.error('Observer onEvent error', { error: err, eventType: event.type });
       }
     }
+  }
+
+  /**
+   * Replay historical events to an observer
+   *
+   * **Strategy:**
+   * 1. Start with event history array
+   * 2. Filter by timestamp if `since` is provided
+   * 3. Limit events if `limit` is provided
+   * 4. Call observer.onEvent() for each event
+   * 5. Handle observer errors gracefully
+   *
+   * **Performance:** O(n) where n = number of events in history
+   *
+   * **Timestamp Handling:**
+   * - Events with timestamps: stepRetry, stepRestarted, invalidResponse
+   * - Events without timestamps: Always included (considered timeless)
+   * - Filter applies only to events with timestamp field
+   *
+   * **Order of Operations:** Filter first, then limit (more efficient)
+   *
+   * **Use Case:**
+   * - Catch up new observers to current state
+   * - Debug by replaying events to diagnostic observers
+   * - Test scenarios by replaying historical events
+   *
+   * @param observer - The observer to replay events to
+   * @param options - Optional replay configuration
+   * @param options.since - Only replay events after this timestamp (ms since epoch)
+   * @param options.limit - Maximum number of events to replay
+   *
+   * @example Replay all events to new observer
+   * ```ts
+   * const observer = {
+   *   onLog: () => {},
+   *   onEvent: (e) => console.log(e.type),
+   *   onStateUpdated: () => {},
+   *   onTreeChanged: () => {},
+   * };
+   * workflow.replayEvents(observer);
+   * ```
+   *
+   * @example Replay last 10 events
+   * ```ts
+   * workflow.replayEvents(observer, { limit: 10 });
+   * ```
+   *
+   * @example Replay events from last 5 minutes
+   * ```ts
+   * const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+   * workflow.replayEvents(observer, { since: fiveMinutesAgo });
+   * ```
+   */
+  public replayEvents(
+    observer: WorkflowObserver,
+    options?: ReplayEventsOptions
+  ): void {
+    // Start with full history
+    let events = this.#eventHistory;
+
+    // Filter by timestamp if provided
+    if (options?.since !== undefined) {
+      events = events.filter(event => {
+        // Extract timestamp from events that have it
+        const timestamp =
+          event.type === 'stepRetry' ? event.timestamp :
+          event.type === 'stepRestarted' ? event.timestamp :
+          event.type === 'invalidResponse' ? event.timestamp :
+          undefined;
+
+        // Include events without timestamp or events after since
+        return timestamp === undefined || timestamp >= options.since!;
+      });
+    }
+
+    // Apply limit if provided
+    if (options?.limit !== undefined) {
+      events = events.slice(0, options.limit);
+    }
+
+    // Replay events to observer
+    for (const event of events) {
+      try {
+        observer.onEvent(event);
+      } catch (err) {
+        this.logger.error('Observer replay error', { error: err, eventType: event.type });
+      }
+    }
+  }
+
+  /**
+   * Clear the event history array
+   *
+   * **Strategy:**
+   * - Reassign #eventHistory to empty array
+   * - Frees memory by discarding all stored events
+   * - Events in node.events are preserved
+   *
+   * **Use Case:**
+   * - Free memory after workflow completes
+   * - Reset history between test runs
+   * - Prevent memory leaks in long-running workflows
+   *
+   * **Side Effects:**
+   * - Frees memory for discarded events
+   * - Future replayEvents() calls will return empty
+   * - Does NOT affect node.events array
+   *
+   * @example Clear history after workflow completes
+   * ```ts
+   * await workflow.run();
+   * workflow.clearEventHistory();  // Free memory
+   * ```
+   */
+  public clearEventHistory(): void {
+    this.#eventHistory = [];
   }
 
   /**

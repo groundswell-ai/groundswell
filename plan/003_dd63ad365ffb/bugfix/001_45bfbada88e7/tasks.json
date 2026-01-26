@@ -755,7 +755,7 @@
                   "type": "Subtask",
                   "id": "P3.M3.T1.S1",
                   "title": "Implement event history storage",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Issue 12 - WorkflowEventReplayer exists in tests but not integrated into Workflow class. No API to request event replay.\n2. INPUT: Workflow class in src/core/workflow.ts, WorkflowEvent type.\n3. LOGIC: Add private eventHistory: WorkflowEvent[] array to Workflow class. In emit() method, push events to history before notifying observers. Add replayEvents(observer: WorkflowObserver, options?: { since?: number, limit?: number }) method that iterates through history and calls observer.onEvent() for each event. Add clearEventHistory() method.\n4. OUTPUT: Modified Workflow class with event history storage and replay capability."
@@ -764,7 +764,7 @@
                   "type": "Subtask",
                   "id": "P3.M3.T1.S2",
                   "title": "Add event history configuration",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M3.T1.S1"
