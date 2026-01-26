@@ -605,7 +605,7 @@
               "type": "Task",
               "id": "P3.M1.T1",
               "title": "Add Provider Capability Query Helpers",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Add convenience methods to Provider class for checking capabilities at runtime, improving developer experience.",
               "subtasks": [
                 {
@@ -621,7 +621,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T1.S2",
                   "title": "Write tests for capability helpers",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M1.T1.S1"
@@ -641,7 +641,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T2.S1",
                   "title": "Update Step decorator JSDoc for trackTiming default",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 0.5,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Issue 9 notes that trackTiming defaults to true but JSDoc doesn't clearly state this. Step decorator in src/decorators/step.ts line 94 has unclear comment.\n2. INPUT: Step decorator JSDoc comments.\n3. LOGIC: Update trackTiming JSDoc from 'Track and emit step duration' to 'Track and emit step duration (default: true, tracked unless explicitly set to false)'. Make the default crystal clear.\n4. OUTPUT: Improved JSDoc clarity in src/decorators/step.ts."
