@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { generateId } from '../utils/id.js';
 import { validateAgentResponse } from '../utils/agent-validation.js';
 import { analyzeErrorForRestart } from '../utils/restart-analysis.js';
+import { mergeWorkflowErrors } from '../utils/workflow-error-utils.js';
 import { WorkflowLogger } from './logger.js';
 import { getObservedState } from '../decorators/observed-state.js';
 import { createWorkflowContext } from './workflow-context.js';
@@ -86,6 +87,15 @@ export class Workflow<T = unknown> {
 
   /** Workflow configuration */
   private config: WorkflowConfig;
+
+  /** Error collection state for workflow-level error merge */
+  private collectedErrors: WorkflowError[] = [];
+
+  /** Total operations count for error merge context */
+  private totalOperations: number = 0;
+
+  /** Operation counter for error merge context */
+  private operationCounter: number = 0;
 
   /**
    * Create a new workflow instance
@@ -824,16 +834,50 @@ export class Workflow<T = unknown> {
     const startTime = Date.now();
     this.setStatus('running');
 
-    // Create workflow context
+    // Reset error collection state
+    this.collectedErrors = [];
+    this.operationCounter = 0;
+
+    // Create workflow context with error merge strategy
     const ctx = createWorkflowContext(
       this as unknown as Parameters<typeof createWorkflowContext>[0],
       this.parent?.id,
       this.config.enableReflection ? { enabled: true } : undefined,
-      this.config.autoValidateResponses ?? true
+      this.config.autoValidateResponses ?? true,
+      this.config.errorMergeStrategy
     );
 
     try {
       const result = await this.executor(ctx);
+
+      // Check if we should merge collected errors
+      if (this.collectedErrors.length > 0) {
+        if (this.config.errorMergeStrategy?.enabled) {
+          // Merge errors
+          const mergedError = this.config.errorMergeStrategy?.combine
+            ? this.config.errorMergeStrategy.combine(this.collectedErrors)
+            : mergeWorkflowErrors(
+                this.collectedErrors,
+                this.config.name || this.id,
+                this.id,
+                this.operationCounter
+              );
+
+          // Emit error event with merged error
+          this.emitEvent({
+            type: 'error',
+            node: this.node,
+            error: mergedError,
+          });
+
+          // Throw merged error
+          throw mergedError;
+        } else {
+          // Throw first error (backward compatibility)
+          throw this.collectedErrors[0];
+        }
+      }
+
       this.setStatus('completed');
 
       return {
@@ -842,22 +886,28 @@ export class Workflow<T = unknown> {
         duration: Date.now() - startTime,
       };
     } catch (error) {
-      this.setStatus('failed');
+      // Handle errors thrown directly (not collected)
+      if (!this.config.errorMergeStrategy?.enabled) {
+        this.setStatus('failed');
 
-      // Emit error event
-      this.emitEvent({
-        type: 'error',
-        node: this.node,
-        error: {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          original: error,
-          workflowId: this.id,
-          stack: error instanceof Error ? error.stack : undefined,
-          state: getObservedState(this),
-          logs: [...this.node.logs] as LogEntry[],
-        },
-      });
+        this.emitEvent({
+          type: 'error',
+          node: this.node,
+          error: {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            original: error,
+            workflowId: this.id,
+            stack: error instanceof Error ? error.stack : undefined,
+            state: getObservedState(this),
+            logs: [...this.node.logs] as LogEntry[],
+          },
+        });
 
+        throw error;
+      }
+
+      // If in collection mode, error should have been collected already
+      // Re-throw if it somehow escaped collection
       throw error;
     }
   }

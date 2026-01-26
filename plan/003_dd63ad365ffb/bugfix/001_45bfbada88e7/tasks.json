@@ -336,7 +336,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Phase 2: Major Issues - Next Release",
-      "status": "Planned",
+      "status": "Researching",
       "description": "Address major issues that impact system quality and type safety but do not completely block release. These should be resolved in the next release cycle.",
       "milestones": [
         {
@@ -540,14 +540,14 @@
           "type": "Milestone",
           "id": "P2.M4",
           "title": "Milestone 2.4: Workflow-Level Error Merge Strategy",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Extend error merge strategy from @Task concurrent execution to workflow-level configuration, enabling consistent error handling across the entire workflow.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M4.T1",
               "title": "Add Error Merge Strategy to WorkflowConfig",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Enable error merge strategy configuration at workflow level, not just for @Task concurrent execution.",
               "subtasks": [
                 {
@@ -563,7 +563,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S2",
                   "title": "Implement error collection in workflow execution",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M4.T1.S1"
@@ -574,7 +574,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S3",
                   "title": "Write tests for workflow-level error merge",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M4.T1.S2"

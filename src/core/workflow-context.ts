@@ -20,6 +20,7 @@ import type {
   LogEntry,
   WorkflowError,
 } from '../types/index.js';
+import type { ErrorMergeStrategy } from '../types/error-strategy.js';
 import type { AgentResponse } from '../types/agent.js';
 import type { ZodError } from 'zod';
 import { validateAgentResponse } from '../utils/agent-validation.js';
@@ -78,17 +79,20 @@ export class WorkflowContextImpl implements WorkflowContext {
   private eventTreeImpl: EventTreeHandleImpl;
   private reflectionManager: ReflectionManager;
   private autoValidateResponses: boolean;
+  private errorMergeStrategy?: ErrorMergeStrategy;
 
   constructor(
     workflow: WorkflowLike,
     parentWorkflowId?: string,
     reflectionConfig?: Partial<ReflectionConfig>,
-    autoValidateResponses?: boolean
+    autoValidateResponses?: boolean,
+    errorMergeStrategy?: ErrorMergeStrategy
   ) {
     this.workflowId = workflow.id;
     this.parentWorkflowId = parentWorkflowId;
     this.workflow = workflow;
     this.autoValidateResponses = autoValidateResponses ?? true;
+    this.errorMergeStrategy = errorMergeStrategy;
 
     // Create event tree handle
     this.eventTreeImpl = new EventTreeHandleImpl(workflow.node);
@@ -209,6 +213,36 @@ export class WorkflowContextImpl implements WorkflowContext {
 
         // Update step node status
         stepNode.status = 'failed';
+
+        // Check if we should collect this error
+        if (this.errorMergeStrategy?.enabled) {
+          // Create WorkflowError
+          const workflowError: WorkflowError = {
+            message: error instanceof Error ? error.message : 'Unknown error',
+            original: error,
+            workflowId: this.workflowId,
+            stack: error instanceof Error ? error.stack : undefined,
+            state: getObservedState(this.workflow),
+            logs: [...this.workflow.node.logs] as LogEntry[],
+          };
+
+          // Collect error instead of throwing
+          (this.workflow as any).collectedErrors?.push(workflowError);
+          (this.workflow as any).operationCounter++;
+
+          // Emit error event
+          this.workflow.emitEvent({
+            type: 'error',
+            node: stepNode,
+            error: workflowError,
+          });
+
+          // Rebuild event tree
+          this.eventTreeImpl.rebuild(this.workflow.node);
+
+          // Return early (don't throw, continue execution)
+          return undefined as T;
+        }
 
         // Emit error event
         this.workflow.emitEvent({
@@ -431,7 +465,8 @@ export function createWorkflowContext(
   workflow: WorkflowLike,
   parentWorkflowId?: string,
   reflectionConfig?: Partial<ReflectionConfig>,
-  autoValidateResponses?: boolean
+  autoValidateResponses?: boolean,
+  errorMergeStrategy?: ErrorMergeStrategy
 ): WorkflowContext {
-  return new WorkflowContextImpl(workflow, parentWorkflowId, reflectionConfig, autoValidateResponses);
+  return new WorkflowContextImpl(workflow, parentWorkflowId, reflectionConfig, autoValidateResponses, errorMergeStrategy);
 }
