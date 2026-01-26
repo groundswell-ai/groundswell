@@ -11,7 +11,7 @@ describe('parseModelSpec', () => {
     it('should parse anthropic model', () => {
       const result = parseModelSpec('anthropic/claude-3-5-sonnet');
 
-      expect(result).toEqual({
+      expect(result).toStrictEqual({
         provider: 'anthropic',
         model: 'claude-3-5-sonnet',
         raw: 'anthropic/claude-3-5-sonnet'
@@ -39,7 +39,7 @@ describe('parseModelSpec', () => {
     it('should use default provider for plain model', () => {
       const result = parseModelSpec('claude-sonnet-4', 'anthropic');
 
-      expect(result).toEqual({
+      expect(result).toStrictEqual({
         provider: 'anthropic',
         model: 'claude-sonnet-4',
         raw: 'claude-sonnet-4'
