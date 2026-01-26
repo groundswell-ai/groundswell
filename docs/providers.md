@@ -17,6 +17,7 @@ Groundswell supports multiple Agent SDK providers through a unified abstraction 
 - [Hooks](#hooks)
 - [Skills](#skills)
 - [Streaming](#streaming)
+- [Usage Examples](#usage-examples)
 - [API Reference](#api-reference)
 
 ## Basic Usage
@@ -1043,6 +1044,249 @@ controller.abort();
 ```
 
 See `src/providers/anthropic-provider.ts:473-676` for executeStreaming implementation (lazy SDK loading via dynamic import).
+
+## Usage Examples
+
+This section provides executable examples demonstrating key provider system concepts and patterns. Each example is a complete, runnable TypeScript file that you can execute directly.
+
+### Overview
+
+The examples are organized by complexity and cover:
+
+- **Basic Provider Usage** - Minimal setup and execution
+- **Provider Configuration** - Global, agent, and prompt-level configuration
+- **Provider Switching** - Runtime provider switching patterns
+- **Multi-Provider Scenarios** - Cost optimization, fallback, A/B testing
+- **Provider Sessions** - Multi-turn conversation management
+- **Provider Features** - MCP integration, skills, and hooks
+
+All examples are located in `/examples/providers/` and can be run with `npx tsx`.
+
+### Quick Start
+
+```bash
+# Set required environment variable
+export ANTHROPIC_API_KEY=sk-...
+
+# Run individual examples
+npx tsx examples/providers/01-basic-provider-usage.ts
+npx tsx examples/providers/02-provider-configuration.ts
+npx tsx examples/providers/03-provider-switching.ts
+npx tsx examples/providers/04-multi-provider-scenarios.ts
+npx tsx examples/providers/05-provider-sessions.ts
+npx tsx examples/providers/06-provider-with-mcp-skills.ts
+
+# Or use npm scripts
+npm run start:provider-basic
+npm run start:provider-config
+npm run start:provider-switching
+npm run start:provider-scenarios
+npm run start:provider-sessions
+npm run start:provider-features
+```
+
+### Example 1: Basic Provider Usage
+
+**Run**: `npx tsx examples/providers/01-basic-provider-usage.ts`
+
+**What you'll learn**:
+- Provider registration with `ProviderRegistry.getInstance()`
+- Provider initialization with `initializeProvider()`
+- Creating Agent with provider configuration
+- Executing prompts via configured providers
+
+**Code snippet**:
+```typescript
+import { Agent, AnthropicProvider, ProviderRegistry } from 'groundswell';
+
+// Register provider
+const registry = ProviderRegistry.getInstance();
+registry.register(new AnthropicProvider());
+
+// Initialize provider
+await registry.initializeProvider('anthropic', {
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
+// Create agent
+const agent = new Agent({
+  name: 'BasicAgent',
+  provider: 'anthropic',
+  model: 'claude-sonnet-4-20250514'
+});
+
+// Execute prompt
+const response = await agent.prompt(prompt);
+```
+
+### Example 2: Provider Configuration
+
+**Run**: `npx tsx examples/providers/02-provider-configuration.ts`
+
+**What you'll learn**:
+- Global configuration with `configureProviders()`
+- Agent-level configuration in `new Agent({ provider })`
+- Prompt-level overrides in `agent.prompt(prompt, { provider })`
+- Configuration cascade priority (Prompt > Agent > Global)
+
+**Code snippet**:
+```typescript
+import { configureProviders, Agent } from 'groundswell';
+
+// Set global defaults
+configureProviders({
+  defaultProvider: 'anthropic',
+  providerDefaults: {
+    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
+  }
+});
+
+// Agent-level configuration
+const agent = new Agent({
+  provider: 'anthropic',
+  providerOptions: { timeout: 10000 }
+});
+
+// Prompt-level override (highest priority)
+await agent.prompt(prompt, {
+  provider: 'opencode',
+  providerOptions: { endpoint: 'http://localhost:4096' }
+});
+```
+
+### Example 3: Provider Switching
+
+**Run**: `npx tsx examples/providers/03-provider-switching.ts`
+
+**What you'll learn**:
+- Agent-level switching for different agent instances
+- Prompt-level switching for temporary changes
+- Verifying which provider is being used
+- Choosing the right switching pattern
+
+**Code snippet**:
+```typescript
+// Agent-level switching
+const anthropicAgent = new Agent({ provider: 'anthropic' });
+const opencodeAgent = new Agent({ provider: 'opencode' });
+
+// Prompt-level switching
+const flexibleAgent = new Agent({ provider: 'anthropic' });
+
+// Use agent default
+await flexibleAgent.prompt(prompt);
+
+// Switch for this call only
+await flexibleAgent.prompt(prompt, { provider: 'opencode' });
+
+// Back to default
+await flexibleAgent.prompt(prompt);
+```
+
+### Example 4: Multi-Provider Scenarios
+
+**Run**: `npx tsx examples/providers/04-multi-provider-scenarios.ts`
+
+**What you'll learn**:
+- Cost optimization based on task complexity
+- Fallback patterns for resilience
+- A/B testing between providers
+- Production architecture patterns
+
+**Code snippet**:
+```typescript
+// Cost optimization
+const complexity = analyzeTask(task);
+const provider = complexity === 'simple' ? 'opencode' : 'anthropic';
+await agent.prompt(prompt, { provider });
+
+// Fallback pattern
+try {
+  return await agent.prompt(prompt, { provider: 'anthropic' });
+} catch (error) {
+  return await agent.prompt(prompt, { provider: 'opencode' });
+}
+
+// A/B testing
+const results = {};
+for (const provider of ['anthropic', 'opencode']) {
+  results[provider] = await agent.prompt(prompt, { provider });
+}
+```
+
+### Example 5: Provider Sessions
+
+**Run**: `npx tsx examples/providers/05-provider-sessions.ts`
+
+**What you'll learn**:
+- Creating sessions with `sessionId`
+- Continuing existing sessions
+- Retrieving session state with `getSession()`
+- Provider session model differences
+
+**Code snippet**:
+```typescript
+const sessionId = `session-${Date.now()}`;
+
+// Create session
+await agent.prompt(prompt1, {
+  providerOptions: { sessionId }
+});
+
+// Continue session
+await agent.prompt(prompt2, {
+  providerOptions: { sessionId }
+});
+
+// Retrieve session state
+const provider = registry.get('anthropic');
+const session = provider.getSession(sessionId);
+console.log(session.history);
+```
+
+### Example 6: Provider Features
+
+**Run**: `npx tsx examples/providers/06-provider-with-mcp-skills.ts`
+
+**What you'll learn**:
+- MCP server registration (AnthropicProvider)
+- Using MCP tools in agent prompts
+- Loading skills from SKILL.md files
+- Provider hooks for observability
+- Feature comparison across providers
+
+**Code snippet**:
+```typescript
+// Register MCP server
+const provider = registry.get('anthropic');
+await provider.registerMCPs([{
+  name: 'demo-server',
+  transport: 'inprocess',
+  tools: [/* tool definitions */]
+}]);
+
+// Load skills
+await provider.loadSkills([
+  { name: 'code-review', content: '/* skill content */' }
+]);
+
+// Use hooks
+await agent.prompt(prompt, {
+  hooks: {
+    onToolStart: (toolName, input) => console.log(`Tool: ${toolName}`),
+    onToolEnd: (toolName, output) => console.log(`Done: ${toolName}`)
+  }
+});
+```
+
+### See Also
+
+- [Provider Examples README](../examples/providers/README.md) - Detailed examples documentation
+- [Examples Index](../examples/index.ts) - Main examples runner
+- [Architecture](#architecture) - Provider system architecture overview
+- [Configuration Cascade](#configuration-cascade) - Configuration priority system
+
+---
 
 ## API Reference
 

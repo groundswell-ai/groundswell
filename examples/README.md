@@ -150,6 +150,84 @@ Workflow reparenting with detach-then-attach pattern:
 - Dual-tree synchronization (workflow tree + node tree)
 - Error handling for invalid reparenting operations
 
+## Provider Examples
+
+Comprehensive examples demonstrating Groundswell's multi-provider system.
+
+**Quick Start:**
+```bash
+export ANTHROPIC_API_KEY=sk-...
+npm run start:provider-basic
+npm run start:provider-config
+npm run start:provider-switching
+npm run start:provider-scenarios
+npm run start:provider-sessions
+npm run start:provider-features
+```
+
+### 12. Basic Provider Usage (`providers/01-basic-provider-usage.ts`)
+
+Run: `npx tsx examples/providers/01-basic-provider-usage.ts`
+
+Minimal provider setup and usage:
+- Provider registration with ProviderRegistry
+- Provider initialization before use
+- Creating Agent with provider configuration
+- Executing prompts through configured providers
+
+### 13. Provider Configuration (`providers/02-provider-configuration.ts`)
+
+Run: `npx tsx examples/providers/02-provider-configuration.ts`
+
+Three levels of provider configuration:
+- Global configuration with `configureProviders()`
+- Agent-level configuration in `new Agent({ provider })`
+- Prompt-level overrides in `agent.prompt(prompt, { provider })`
+- Configuration cascade priority (Prompt > Agent > Global)
+
+### 14. Provider Switching (`providers/03-provider-switching.ts`)
+
+Run: `npx tsx examples/providers/03-provider-switching.ts`
+
+Switching between providers at runtime:
+- Agent-level switching for different agent instances
+- Prompt-level switching for temporary provider changes
+- Verifying which provider is being used
+- Choosing the right switching pattern
+
+### 15. Multi-Provider Scenarios (`providers/04-multi-provider-scenarios.ts`)
+
+Run: `npx tsx examples/providers/04-multi-provider-scenarios.ts`
+
+Real-world multi-provider use cases:
+- Cost optimization based on task complexity
+- Fallback patterns for resilience
+- A/B testing between providers
+- Production architecture patterns
+
+### 16. Provider Sessions (`providers/05-provider-sessions.ts`)
+
+Run: `npx tsx examples/providers/05-provider-sessions.ts`
+
+Session management for multi-turn conversations:
+- Creating sessions with sessionId
+- Continuing existing sessions
+- Retrieving session state and history
+- Provider session model differences
+
+### 17. Provider Features (`providers/06-provider-with-mcp-skills.ts`)
+
+Run: `npx tsx examples/providers/06-provider-with-mcp-skills.ts`
+
+Advanced provider features:
+- MCP server registration (AnthropicProvider)
+- Using MCP tools in agent prompts
+- Loading skills from SKILL.md files
+- Provider hooks for observability
+- Feature comparison across providers
+
+See [providers/README.md](./providers/README.md) for detailed provider examples documentation.
+
 ## Project Structure
 
 ```
@@ -166,6 +244,14 @@ examples/
 │   ├── 09-reflection.ts
 │   ├── 10-introspection.ts
 │   └── 11-reparenting-workflows.ts
+├── providers/
+│   ├── 01-basic-provider-usage.ts
+│   ├── 02-provider-configuration.ts
+│   ├── 03-provider-switching.ts
+│   ├── 04-multi-provider-scenarios.ts
+│   ├── 05-provider-sessions.ts
+│   ├── 06-provider-with-mcp-skills.ts
+│   └── README.md
 ├── utils/
 │   └── helpers.ts
 ├── index.ts
