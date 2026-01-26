@@ -1046,12 +1046,139 @@ See `src/providers/anthropic-provider.ts:473-676` for executeStreaming implement
 
 ## API Reference
 
-### Provider Interface
+This section provides comprehensive documentation for all public provider system APIs, including type definitions, configuration functions, model specification utilities, and the ProviderRegistry class.
 
+### Overview
+
+The provider system API consists of:
+
+- **Type Definitions**: Core interfaces and types for provider abstraction
+- **Configuration Functions**: Global configuration management with cascade support
+- **Model Specification Functions**: Model string parsing and formatting utilities
+- **ProviderRegistry Class**: Singleton registry for provider lifecycle management
+
+---
+
+### Type Definitions
+
+#### ProviderId
+
+Provider identifier union type defining supported Agent SDK providers.
+
+**Type Signature:**
 ```typescript
-/**
- * Provider interface for LLM backend abstraction
- */
+type ProviderId = 'anthropic' | 'opencode';
+```
+
+**Description:**
+- `'anthropic'`: Anthropic Claude provider via `@anthropic-ai/claude-agent-sdk`
+- `'opencode'`: OpenCode multi-provider gateway via `@opencode-ai/sdk`
+
+**Example:**
+```typescript
+import type { ProviderId } from 'groundswell';
+
+const provider: ProviderId = 'anthropic';  // Valid
+const invalid: ProviderId = 'openai';      // TypeScript error
+```
+
+**See Also:**
+- [Provider Interface](#provider-interface)
+- [GlobalProviderConfig](#globalproviderconfig)
+
+---
+
+#### ProviderCapabilities
+
+Provider capability flags indicating which features a provider supports.
+
+**Type Signature:**
+```typescript
+interface ProviderCapabilities {
+  mcp: boolean;
+  skills: boolean;
+  lsp: boolean;
+  streaming: boolean;
+  sessions: boolean;
+  extendedThinking: boolean;
+}
+```
+
+**Properties:**
+- `mcp`: `boolean` - MCP server connections support
+- `skills`: `boolean` - Skill loading support
+- `lsp`: `boolean` - Language Server Protocol integration support
+- `streaming`: `boolean` - Streaming responses support
+- `sessions`: `boolean` - Session-based state management support
+- `extendedThinking`: `boolean` - Extended thinking/reasoning tokens support
+
+**Example:**
+```typescript
+import { AnthropicProvider } from 'groundswell';
+
+const provider = new AnthropicProvider();
+console.log(provider.capabilities.mcp);           // true
+console.log(provider.capabilities.streaming);     // true
+console.log(provider.capabilities.extendedThinking); // true
+```
+
+**See Also:**
+- [Provider Interface](#provider-interface)
+- [Supported Providers](#supported-providers)
+
+---
+
+#### ProviderOptions
+
+Configuration options for provider initialization and runtime behavior.
+
+**Type Signature:**
+```typescript
+interface ProviderOptions {
+  endpoint?: string;
+  apiKey?: string;
+  sessionId?: string;
+  timeout?: number;
+  headers?: Record<string, string>;
+}
+```
+
+**Properties:**
+- `endpoint`: `string` (optional) - Override the default API endpoint for the provider
+- `apiKey`: `string` (optional) - API key for authentication (if not set via environment variable)
+- `sessionId`: `string` (optional) - Session identifier for session-based providers
+- `timeout`: `number` (optional) - Request timeout in milliseconds
+- `headers`: `Record<string, string>` (optional) - Custom HTTP headers to include in requests
+
+**Example:**
+```typescript
+import type { ProviderOptions } from 'groundswell';
+
+const options: ProviderOptions = {
+  apiKey: 'sk-ant-...',
+  endpoint: 'https://api.anthropic.com',
+  timeout: 30000,
+  headers: {
+    'X-Custom-Header': 'custom-value'
+  }
+};
+
+await provider.initialize(options);
+```
+
+**See Also:**
+- [GlobalProviderConfig](#globalproviderconfig)
+- [configureProviders()](#configureproviders)
+- [Configuration Cascade](#configuration-cascade)
+
+---
+
+#### Provider Interface
+
+Provider interface for LLM backend abstraction. Defines the contract all providers must implement.
+
+**Type Signature:**
+```typescript
 interface Provider {
   readonly id: ProviderId;
   readonly capabilities: ProviderCapabilities;
@@ -1071,8 +1198,844 @@ interface Provider {
 }
 ```
 
+**Properties:**
+- `id`: `ProviderId` (readonly) - Unique provider identifier used for provider selection and model qualification
+- `capabilities`: `ProviderCapabilities` (readonly) - Provider capability flags for feature detection
+
+**Methods:**
+
+##### initialize(options?)
+
+Initialize the provider with optional configuration. Called when provider is first instantiated or registered.
+
+**Parameters:**
+- `options`: `ProviderOptions` (optional) - Provider-specific configuration
+
+**Returns:** `Promise<void>`
+
+**Throws:** `Error` if initialization fails
+
+**Example:**
+```typescript
+const provider = new AnthropicProvider();
+await provider.initialize({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  endpoint: 'https://api.anthropic.com',
+  timeout: 30000
+});
+```
+
+---
+
+##### terminate()
+
+Terminate the provider and cleanup resources. Called when provider is being shut down or unregistered.
+
+**Returns:** `Promise<void>`
+
+**Example:**
+```typescript
+await provider.terminate();
+```
+
+---
+
+##### execute(request, toolExecutor, hooks?)
+
+Execute a prompt request with type-safe response. Core method for LLM execution.
+
+**Type Parameters:**
+- `T` - The expected response data type
+
+**Parameters:**
+- `request`: `ProviderRequest` - The prompt request with options
+- `toolExecutor`: `ToolExecutor` - Callback for executing tools (delegated to MCPHandler)
+- `hooks`: `ProviderHookEvents` (optional) - Optional lifecycle hooks for events
+
+**Returns:** `Promise<AgentResponse<T>>` or `AsyncGenerator<StreamEvent, AgentResponse<T>>` for streaming
+
+**Example:**
+```typescript
+// Non-streaming
+const response = await provider.execute<{ answer: string }>(
+  { prompt: 'What is 2+2?', options: {} },
+  toolExecutor
+);
+if (response.status === 'success') {
+  console.log(response.data.answer);
+}
+
+// Streaming
+const stream = await provider.execute(
+  { prompt: 'Tell me a story', options: { streaming: true } },
+  toolExecutor
+);
+if (Symbol.asyncIterator in stream) {
+  for await (const event of stream) {
+    // Handle streaming events
+  }
+}
+```
+
+---
+
+##### registerMCPs(servers)
+
+Register MCP servers and return available tools. Providers connect to MCP servers and discover all available tools.
+
+**Parameters:**
+- `servers`: `MCPServer[]` - Array of MCP server configurations
+
+**Returns:** `Promise<Tool[]>` - Array of discovered Tool definitions
+
+**Example:**
+```typescript
+const tools = await provider.registerMCPs([
+  { name: 'filesystem', transport: 'stdio', command: 'python', args: ['mcp_server.py'] }
+]);
+console.log(`Registered ${tools.length} tools`);
+```
+
+---
+
+##### loadSkills(skills)
+
+Load skills into the provider. Skills are reusable prompt templates or capabilities.
+
+**Parameters:**
+- `skills`: `Skill[]` - Array of skill definitions to load
+
+**Returns:** `Promise<void>`
+
+**Example:**
+```typescript
+await provider.loadSkills([
+  { name: 'web-search', path: '/skills/web-search' }
+]);
+```
+
+---
+
+##### normalizeModel(model)
+
+Normalize a model string to a ModelSpec. Parses model strings in plain or qualified format.
+
+**Parameters:**
+- `model`: `string` - Model string to parse
+
+**Returns:** `ModelSpec` with provider, model, and raw string
+
+**Example:**
+```typescript
+provider.normalizeModel('claude-sonnet-4');
+// Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
+
+provider.normalizeModel('anthropic/claude-opus-4');
+// Returns: { provider: 'anthropic', model: 'claude-opus-4', raw: 'anthropic/claude-opus-4' }
+```
+
+**See Also:**
+- [ProviderId](#providerid)
+- [ProviderCapabilities](#providercapabilities)
+- [ModelSpec](#modelspec)
+
+---
+
+#### ProviderRequest
+
+Provider request interface wrapping prompt and execution options.
+
+**Type Signature:**
+```typescript
+interface ProviderRequest {
+  prompt: string;
+  options: ProviderExecutionOptions;
+}
+```
+
+**Properties:**
+- `prompt`: `string` - The user prompt/message
+- `options`: `ProviderExecutionOptions` - Execution options
+
+**See Also:**
+- [ProviderExecutionOptions](#providerexecutionoptions)
+
+---
+
+#### ProviderExecutionOptions
+
+Provider execution options wrapping parameters for provider execution requests.
+
+**Type Signature:**
+```typescript
+interface ProviderExecutionOptions {
+  model?: string;
+  systemPrompt?: string;
+  tools?: Tool[];
+  hooks?: ProviderHookEvents;
+  sessionId?: string;
+  streaming?: boolean;
+}
+```
+
+**Properties:**
+- `model`: `string` (optional) - Model identifier
+- `systemPrompt`: `string` (optional) - System prompt override
+- `tools`: `Tool[]` (optional) - Available tools
+- `hooks`: `ProviderHookEvents` (optional) - Lifecycle hooks
+- `sessionId`: `string` (optional) - Session identifier for session-based providers
+- `streaming`: `boolean` (optional) - Enable streaming mode (returns AsyncGenerator)
+
+---
+
+#### ToolExecutionRequest
+
+Tool execution request for delegating tool execution to the MCPHandler.
+
+**Type Signature:**
+```typescript
+interface ToolExecutionRequest {
+  name: string;
+  input: unknown;
+}
+```
+
+**Properties:**
+- `name`: `string` - Tool name (may be namespaced: "server__tool")
+- `input`: `unknown` - Tool input parameters
+
+**See Also:**
+- [ToolExecutionResult](#toolexecutionresult)
+- [ToolExecutor](#toolexecutor)
+
+---
+
+#### ToolExecutionResult
+
+Tool execution result returned by the ToolExecutor callback.
+
+**Type Signature:**
+```typescript
+interface ToolExecutionResult {
+  content: string | unknown;
+  isError: boolean;
+}
+```
+
+**Properties:**
+- `content`: `string | unknown` - Result content
+- `isError`: `boolean` - Whether the execution resulted in an error
+
+**See Also:**
+- [ToolExecutionRequest](#toolexecutionrequest)
+- [ToolExecutor](#toolexecutor)
+
+---
+
+#### ToolExecutor
+
+Tool executor callback function type that delegates tool execution to the MCPHandler.
+
+**Type Signature:**
+```typescript
+type ToolExecutor = (
+  request: ToolExecutionRequest
+) => Promise<ToolExecutionResult>;
+```
+
+**Parameters:**
+- `request`: `ToolExecutionRequest` - Tool execution request with name and input
+
+**Returns:** `Promise<ToolExecutionResult>` - Tool execution result
+
+**Description:**
+Provider implementations receive this callback and use it to execute tools. The provider does not create or manage its own MCPHandler instance.
+
+**See Also:**
+- [ToolExecutionRequest](#toolexecutionrequest)
+- [ToolExecutionResult](#toolexecutionresult)
+
+---
+
+#### ProviderHookEvents
+
+Provider hook events mapping from AgentHooks to provider-specific events.
+
+**Type Signature:**
+```typescript
+interface ProviderHookEvents {
+  onToolStart?: (tool: ToolExecutionRequest) => Promise<void> | void;
+  onToolEnd?: (
+    tool: ToolExecutionRequest,
+    result: ToolExecutionResult,
+    duration: number
+  ) => Promise<void> | void;
+  onSessionStart?: () => Promise<void> | void;
+  onSessionEnd?: (totalDuration: number) => Promise<void> | void;
+  onStream?: (chunk: string) => void;
+}
+```
+
+**Properties:**
+- `onToolStart`: `(tool: ToolExecutionRequest) => Promise<void> | void` (optional) - Called before tool execution
+- `onToolEnd`: `(tool, result, duration) => Promise<void> | void` (optional) - Called after tool execution
+- `onSessionStart`: `() => Promise<void> | void` (optional) - Called when provider session starts
+- `onSessionEnd`: `(totalDuration: number) => Promise<void> | void` (optional) - Called when provider session ends
+- `onStream`: `(chunk: string) => void` (optional) - Called for each streaming chunk
+
+**Example:**
+```typescript
+const hooks: ProviderHookEvents = {
+  onToolStart: async (tool) => {
+    console.log(`Starting tool: ${tool.name}`);
+  },
+  onToolEnd: async (tool, result, duration) => {
+    console.log(`Tool ${tool.name} completed in ${duration}ms`);
+  }
+};
+```
+
+**See Also:**
+- [Hooks](#hooks)
+
+---
+
+#### ModelSpec
+
+Model specification representing a parsed model identifier with provider and model name.
+
+**Type Signature:**
+```typescript
+interface ModelSpec {
+  provider: ProviderId;
+  model: string;
+  raw: string;
+}
+```
+
+**Properties:**
+- `provider`: `ProviderId` - Provider identifier
+- `model`: `string` - Model name (without provider prefix)
+- `raw`: `string` - Original raw model string (preserves user input)
+
+**Description:**
+Supports both plain ("claude-sonnet-4") and qualified ("anthropic/claude-opus-4") formats per PRD 7.8.
+
+**Example:**
+```typescript
+// Plain format (uses default provider)
+parseModelSpec('claude-sonnet-4', 'anthropic')
+// Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
+
+// Qualified format (explicit provider)
+parseModelSpec('opencode/gpt-4')
+// Returns: { provider: 'opencode', model: 'gpt-4', raw: 'opencode/gpt-4' }
+```
+
+**See Also:**
+- [parseModelSpec()](#parsemodelspec)
+- [formatModelForProvider()](#formatmodelforprovider)
+- [Model Specification](#model-specification)
+
+---
+
+#### GlobalProviderConfig
+
+Global provider configuration for default provider and per-provider options.
+
+**Type Signature:**
+```typescript
+interface GlobalProviderConfig {
+  defaultProvider: ProviderId;
+  providerDefaults?: Partial<Record<ProviderId, ProviderOptions>>;
+}
+```
+
+**Properties:**
+- `defaultProvider`: `ProviderId` - Default provider to use when none specified
+- `providerDefaults`: `Partial<Record<ProviderId, ProviderOptions>>` (optional) - Per-provider default options mapped by provider ID
+
+**Description:**
+Configures default provider and per-provider options that cascade to all agents unless explicitly overridden. Part of the configuration cascade (PRD 7.7).
+
+**Example:**
+```typescript
+import { configureProviders } from 'groundswell';
+
+configureProviders({
+  defaultProvider: 'anthropic',
+  providerDefaults: {
+    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
+    opencode: { endpoint: 'http://localhost:8080' }
+  }
+});
+```
+
+**See Also:**
+- [configureProviders()](#configureproviders)
+- [ProviderOptions](#provideroptions)
+- [Configuration Cascade](#configuration-cascade)
+
+---
+
+#### ProviderResult
+
+Provider execution result wrapper using discriminated union pattern for type safety.
+
+**Type Signature:**
+```typescript
+interface ProviderResult<T = unknown> {
+  status: ProviderResponseStatus;
+  data: T | null;
+  error: ProviderErrorDetails | null;
+  metadata: ProviderResponseMetadata;
+}
+```
+
+**Properties:**
+- `status`: `ProviderResponseStatus` - Response status discriminator ('success' | 'error' | 'partial')
+- `data`: `T | null` - Response data (present on success and partial, null on error)
+- `error`: `ProviderErrorDetails | null` - Error details (present on error, null on success)
+- `metadata`: `ProviderResponseMetadata` - Response metadata (always present)
+
+**Type Narrowing:**
+The status field is a discriminant. Use type guards to narrow:
+- `status='success'` → data is T (not null), error is null
+- `status='error'` → data is null, error is ProviderErrorDetails (not null)
+- `status='partial'` → data is T (not null), error may be null
+
+**Example:**
+```typescript
+const result: ProviderResult<{ answer: string }> = {
+  status: 'success',
+  data: { answer: '42' },
+  error: null,
+  metadata: { providerId: 'anthropic', timestamp: Date.now() }
+};
+
+// Type narrowing
+if (result.status === 'success') {
+  console.log(result.data.answer);  // Type-safe access
+}
+```
+
+**See Also:**
+- [ProviderResponseStatus](#providerresponsestatus)
+- [ProviderErrorDetails](#providererrordetails)
+- [ProviderResponseMetadata](#providerresponsemetadata)
+
+---
+
+#### ProviderResponseStatus
+
+Provider response status indicating the outcome of a provider operation.
+
+**Type Signature:**
+```typescript
+type ProviderResponseStatus = 'success' | 'error' | 'partial';
+```
+
+**Values:**
+- `'success'`: Operation completed successfully with valid data
+- `'error'`: Operation failed with error details
+- `'partial'`: Operation partially completed (streaming, incremental)
+
+**See Also:**
+- [ProviderResult](#providerresult)
+
+---
+
+#### ProviderErrorDetails
+
+Detailed error information for provider operations.
+
+**Type Signature:**
+```typescript
+interface ProviderErrorDetails {
+  code: string;
+  message: string;
+  details?: Record<string, unknown> | null;
+  recoverable: boolean;
+}
+```
+
+**Properties:**
+- `code`: `string` - Machine-readable error code (e.g., VALIDATION_FAILED, EXECUTION_FAILED)
+- `message`: `string` - Human-readable error description
+- `details`: `Record<string, unknown> | null` (optional) - Additional error context for debugging
+- `recoverable`: `boolean` - Whether the error is recoverable (hint for retry logic)
+
+**See Also:**
+- [ProviderResult](#providerresult)
+
+---
+
+#### ProviderResponseMetadata
+
+Metadata about provider operation execution.
+
+**Type Signature:**
+```typescript
+interface ProviderResponseMetadata {
+  providerId: string;
+  timestamp: number;
+  duration?: number | null;
+  requestId?: string | null;
+  usage?: TokenUsage;
+  toolCalls?: number;
+}
+```
+
+**Properties:**
+- `providerId`: `string` - ID of the provider that generated this response
+- `timestamp`: `number` - Unix timestamp in milliseconds
+- `duration`: `number | null` (optional) - Execution duration in milliseconds
+- `requestId`: `string | null` (optional) - Request correlation ID for tracing
+- `usage`: `TokenUsage` (optional) - Token usage breakdown from the API
+- `toolCalls`: `number` (optional) - Number of tool invocations
+
+**See Also:**
+- [ProviderResult](#providerresult)
+
+---
+
+### Configuration Functions
+
+#### configureProviders()
+
+Configure global provider settings for the application.
+
+**Type Signature:**
+```typescript
+function configureProviders(config: GlobalProviderConfig): void
+```
+
+**Parameters:**
+- `config`: `GlobalProviderConfig` - Configuration object containing default provider and optional provider-specific defaults
+
+**Throws:**
+- `Error` - If `defaultProvider` is not a valid ProviderId ('anthropic' | 'opencode')
+- `Error` - If `providerDefaults` contains invalid provider IDs
+
+**Returns:** `void`
+
+**Description:**
+Validates the configuration and stores it in the module-private globalConfig variable. This function should be called once at application startup. This global config is the lowest priority in the configuration cascade.
+
+**Example:**
+```typescript
+import { configureProviders } from 'groundswell';
+
+// Basic configuration with default provider
+configureProviders({
+  defaultProvider: 'anthropic'
+});
+
+// Configuration with provider-specific defaults
+configureProviders({
+  defaultProvider: 'opencode',
+  providerDefaults: {
+    anthropic: {
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: 30000
+    },
+    opencode: {
+      endpoint: 'http://localhost:8080',
+      timeout: 60000
+    }
+  }
+});
+```
+
+**See Also:**
+- [GlobalProviderConfig](#globalproviderconfig)
+- [getGlobalProviderConfig()](#getglobalproviderconfig)
+- [resolveProviderConfig()](#resolveproviderconfig)
+- [Configuration Cascade](#configuration-cascade)
+
+---
+
+#### getGlobalProviderConfig()
+
+Get the current global provider configuration.
+
+**Type Signature:**
+```typescript
+function getGlobalProviderConfig(): GlobalProviderConfig
+```
+
+**Returns:** `GlobalProviderConfig` - Current global provider configuration (never null)
+
+**Description:**
+Provides controlled access to the module-private globalConfig variable. Guarantees a non-null return by providing sensible defaults when no configuration has been set.
+
+**Behavior:**
+- If `configureProviders()` was called: returns the configured value
+- If never configured: returns default configuration
+- **Never returns null**: Always returns a valid `GlobalProviderConfig`
+
+**Example:**
+```typescript
+import { getGlobalProviderConfig } from 'groundswell';
+
+// Get default configuration
+const config = getGlobalProviderConfig();
+console.log(config.defaultProvider); // 'anthropic'
+
+// Use for provider initialization
+const providerOptions = config.providerDefaults?.[config.defaultProvider];
+
+// After configuration
+configureProviders({ defaultProvider: 'opencode' });
+const config2 = getGlobalProviderConfig();
+console.log(config2.defaultProvider); // 'opencode'
+```
+
+**See Also:**
+- [configureProviders()](#configureproviders)
+- [resolveProviderConfig()](#resolveproviderconfig)
+- [GlobalProviderConfig](#globalproviderconfig)
+
+---
+
+#### resolveProviderConfig()
+
+Resolve provider configuration with cascade priority.
+
+**Type Signature:**
+```typescript
+function resolveProviderConfig(
+  globalConfig: GlobalProviderConfig,
+  agentProvider?: ProviderId,
+  agentOptions?: ProviderOptions,
+  promptProvider?: ProviderId,
+  promptOptions?: ProviderOptions
+): { provider: ProviderId; options: ProviderOptions }
+```
+
+**Parameters:**
+- `globalConfig`: `GlobalProviderConfig` - Global provider configuration from configureProviders()
+- `agentProvider`: `ProviderId` (optional) - Agent-level provider override
+- `agentOptions`: `ProviderOptions` (optional) - Agent-level options override
+- `promptProvider`: `ProviderId` (optional) - Prompt-level provider override
+- `promptOptions`: `ProviderOptions` (optional) - Prompt-level options override
+
+**Returns:** `{ provider: ProviderId; options: ProviderOptions }` - Resolved provider and merged options
+
+**Description:**
+Implements the PRD 7.7 configuration cascade with nullish coalescing for provider resolution and object spread for options merge.
+
+**Provider Resolution Priority (highest to lowest):**
+1. Prompt-level provider override
+2. Agent-level provider override
+3. Global default provider
+
+**Options Merge Priority (highest to lowest):**
+1. Prompt-level options (override everything)
+2. Agent-level options (override global defaults)
+3. Global provider-specific defaults (base layer)
+
+**Immutability:**
+Creates a new options object and does not mutate any input parameters.
+
+**Example:**
+```typescript
+import { resolveProviderConfig, getGlobalProviderConfig } from 'groundswell';
+
+// Setup global config
+configureProviders({
+  defaultProvider: 'anthropic',
+  providerDefaults: {
+    anthropic: { timeout: 30000, apiKey: 'sk-global' },
+    opencode: { endpoint: 'http://localhost:8080' }
+  }
+});
+
+// Agent configured with opencode override
+const agentProvider = 'opencode';
+const agentOptions = { timeout: 10000 };
+
+// Prompt with anthropic override
+const promptProvider = 'anthropic';
+const promptOptions = { temperature: 0.5 };
+
+const global = getGlobalProviderConfig();
+const { provider, options } = resolveProviderConfig(
+  global,
+  agentProvider,
+  agentOptions,
+  promptProvider,
+  promptOptions
+);
+
+console.log(provider); // 'anthropic' (prompt wins)
+console.log(options);
+// { timeout: 30000, apiKey: 'sk-global', temperature: 0.5 }
+// timeout from anthropic global defaults (agent's timeout was for opencode)
+// apiKey from anthropic global defaults
+// temperature from prompt options
+```
+
+**See Also:**
+- [configureProviders()](#configureproviders)
+- [getGlobalProviderConfig()](#getglobalproviderconfig)
+- [ProviderOptions](#provideroptions)
+- [Configuration Cascade](#configuration-cascade)
+
+---
+
+### Model Specification Functions
+
+#### parseModelSpec()
+
+Parse a model specification string into a ModelSpec object.
+
+**Type Signature:**
+```typescript
+function parseModelSpec(
+  model: string,
+  defaultProvider?: ProviderId
+): ModelSpec
+```
+
+**Parameters:**
+- `model`: `string` - Model specification string to parse
+- `defaultProvider`: `ProviderId` (optional) - Default provider to use when none specified (default: 'anthropic')
+
+**Returns:** `ModelSpec` - Parsed ModelSpec object with provider, model, and raw string
+
+**Throws:**
+- `Error` - When model specification is empty or whitespace-only
+- `Error` - When provider is invalid (not 'anthropic' or 'opencode')
+- `Error` - When provider or model parts are empty
+
+**Description:**
+Parses model specification strings in two formats:
+
+**Qualified Format (provider/model):**
+Explicit provider specification with "/" separator.
+- Input: `"anthropic/claude-3-5-sonnet"`
+- Output: `{ provider: 'anthropic', model: 'claude-3-5-sonnet', raw: 'anthropic/claude-3-5-sonnet' }`
+
+**Plain Format (model only):**
+Uses default provider when no provider specified.
+- Input: `"claude-sonnet-4"` with defaultProvider: `'anthropic'`
+- Output: `{ provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }`
+
+**Validation Rules:**
+1. Input cannot be empty or whitespace-only
+2. Provider must be one of: `'anthropic'`, `'opencode'`
+3. Model name cannot be empty after provider split
+4. Only the first slash is considered the provider/model separator
+5. Input is trimmed before parsing, original preserved in `raw` field
+
+**Example:**
+```typescript
+import { parseModelSpec } from 'groundswell';
+
+// Qualified format with explicit provider
+const spec1 = parseModelSpec('anthropic/claude-3-5-sonnet');
+// Returns: { provider: 'anthropic', model: 'claude-3-5-sonnet', raw: 'anthropic/claude-3-5-sonnet' }
+
+// Qualified format with opencode
+const spec2 = parseModelSpec('opencode/gpt-4');
+// Returns: { provider: 'opencode', model: 'gpt-4', raw: 'opencode/gpt-4' }
+
+// Plain format with explicit default provider
+const spec3 = parseModelSpec('gpt-4', 'opencode');
+// Returns: { provider: 'opencode', model: 'gpt-4', raw: 'gpt-4' }
+
+// Plain format with default provider (anthropic)
+const spec4 = parseModelSpec('claude-sonnet-4');
+// Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
+
+// Error case: invalid provider
+try {
+  parseModelSpec('invalid/model');
+} catch (error) {
+  console.error((error as Error).message);
+  // "Invalid provider: "invalid". Supported providers: "anthropic", "opencode""
+}
+```
+
+**See Also:**
+- [ModelSpec](#modelspec)
+- [formatModelForProvider()](#formatmodelforprovider)
+- [Model Specification](#model-specification)
+
+---
+
+#### formatModelForProvider()
+
+Format a ModelSpec for a specific target provider.
+
+**Type Signature:**
+```typescript
+function formatModelForProvider(
+  spec: ModelSpec,
+  targetProvider: ProviderId
+): string
+```
+
+**Parameters:**
+- `spec`: `ModelSpec` - ModelSpec from parseModelSpec() or Provider.normalizeModel()
+- `targetProvider`: `ProviderId` - The provider to format the model for
+
+**Returns:** `string` - Formatted model string for target provider (model name only)
+
+**Throws:**
+- `Error` - When providers differ with message: "Cannot translate {source}/{model} to {target} provider. Cross-provider model translation is not supported."
+
+**Description:**
+
+**Same Provider (Pass-Through):**
+When `spec.provider` matches `targetProvider`, returns the model name only.
+
+**Different Providers (Error):**
+When providers differ, throws an error. Cross-provider model translation is not supported in the MVP.
+
+**Use Cases:**
+1. Model Validation: Validate that a model spec is compatible with a target provider
+2. API Preparation: Format model names for provider-specific API requests
+3. Configuration: Prepare model strings for provider initialization
+
+**Example:**
+```typescript
+import { formatModelForProvider, parseModelSpec } from 'groundswell';
+
+// Same provider: pass-through
+const spec = parseModelSpec('anthropic/claude-3-5-sonnet');
+const model = formatModelForProvider(spec, 'anthropic');
+console.log(model); // "claude-3-5-sonnet"
+
+// Different provider: error
+const spec = parseModelSpec('anthropic/claude-3-5-sonnet');
+try {
+  formatModelForProvider(spec, 'opencode');
+} catch (error) {
+  console.error((error as Error).message);
+  // "Cannot translate anthropic/claude-3-5-sonnet to opencode provider. Cross-provider model translation is not supported."
+}
+
+// Use with Provider.normalizeModel()
+const provider = new AnthropicProvider();
+const spec = provider.normalizeModel('claude-opus-4');
+const model = formatModelForProvider(spec, 'anthropic');
+console.log(model); // "claude-opus-4"
+```
+
+**See Also:**
+- [parseModelSpec()](#parsemodelspec)
+- [ModelSpec](#modelspec)
+- [ProviderId](#providerid)
+
+---
+
 ### ProviderRegistry Class
 
+Singleton registry for managing provider instances throughout the application lifecycle.
+
+**Type Signature:**
 ```typescript
 class ProviderRegistry {
   static getInstance(): ProviderRegistry;
@@ -1090,125 +2053,461 @@ class ProviderRegistry {
 
   terminateAll(): Promise<void>;
 
-  // Testing utilities
+  // Testing utilities (internal use only)
   static _resetForTesting(): void;
   _resetInitStateForTesting(): void;
 }
 ```
 
-### Configuration Functions
+**Description:**
+Maintains a single instance of itself and stores provider instances in a Map for efficient lookup by ProviderId. Uses private constructor with static getInstance() for singleton pattern.
 
+**Example:**
 ```typescript
-// Configure global provider settings
-function configureProviders(config: GlobalProviderConfig): void;
+import { ProviderRegistry } from 'groundswell';
+import { AnthropicProvider, OpenCodeProvider } from 'groundswell';
 
-// Get current global configuration
-function getGlobalProviderConfig(): GlobalProviderConfig;
+// Get registry instance
+const registry = ProviderRegistry.getInstance();
 
-// Resolve provider with cascade
-function resolveProviderConfig(
-  globalConfig: GlobalProviderConfig,
-  agentProvider?: ProviderId,
-  agentOptions?: ProviderOptions,
-  promptProvider?: ProviderId,
-  promptOptions?: ProviderOptions
-): { provider: ProviderId; options: ProviderOptions };
+// Register providers
+registry.register(new AnthropicProvider());
+registry.register(new OpenCodeProvider());
+
+// Retrieve providers
+const anthropic = registry.get('anthropic');
+if (anthropic) {
+  await anthropic.initialize();
+}
 ```
 
-### Type Definitions
+---
 
+#### getInstance()
+
+Get the singleton ProviderRegistry instance.
+
+**Type Signature:**
 ```typescript
-// Provider identifier
-export type ProviderId = 'anthropic' | 'opencode';
+static getInstance(): ProviderRegistry
+```
 
-// Provider capabilities
-export interface ProviderCapabilities {
-  mcp: boolean;
-  skills: boolean;
-  lsp: boolean;
-  streaming: boolean;
-  sessions: boolean;
-  extendedThinking: boolean;
+**Returns:** `ProviderRegistry` - The singleton ProviderRegistry instance
+
+**Description:**
+Creates the instance on first call (lazy initialization). Returns the same instance on subsequent calls.
+
+**Example:**
+```typescript
+const registry1 = ProviderRegistry.getInstance();
+const registry2 = ProviderRegistry.getInstance();
+console.log(registry1 === registry2); // true
+```
+
+**See Also:**
+- [Provider Registry](#provider-registry)
+
+---
+
+#### register()
+
+Register a provider instance.
+
+**Type Signature:**
+```typescript
+register(provider: Provider): void
+```
+
+**Parameters:**
+- `provider`: `Provider` - The provider instance to register
+
+**Throws:**
+- `Error` - If a provider with the same id is already registered
+
+**Description:**
+Stores the provider in the registry using its id as the key.
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+const anthropic = new AnthropicProvider();
+registry.register(anthropic);
+```
+
+**See Also:**
+- [get()](#getid)
+- [has()](#hasid)
+
+---
+
+#### get()
+
+Get a registered provider by id.
+
+**Type Signature:**
+```typescript
+get(id: ProviderId): Provider | undefined
+```
+
+**Parameters:**
+- `id`: `ProviderId` - The provider id to look up
+
+**Returns:** `Provider | undefined` - The provider instance, or undefined if not registered
+
+**Description:**
+Returns the provider instance if registered, otherwise returns undefined. Does NOT throw for missing providers.
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+const anthropic = registry.get('anthropic');
+if (anthropic) {
+  console.log('Provider found:', anthropic.id);
 }
+```
 
-// Provider options
-export interface ProviderOptions {
-  endpoint?: string;
-  apiKey?: string;
-  sessionId?: string;
-  timeout?: number;
-  headers?: Record<string, string>;
+**See Also:**
+- [register()](#registerprovider)
+- [has()](#hasid)
+
+---
+
+#### has()
+
+Check if a provider is registered.
+
+**Type Signature:**
+```typescript
+has(id: ProviderId): boolean
+```
+
+**Parameters:**
+- `id`: `ProviderId` - The provider id to check
+
+**Returns:** `boolean` - true if the provider is registered, false otherwise
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+if (registry.has('anthropic')) {
+  console.log('Anthropic provider is available');
 }
+```
 
-// Global configuration
-export interface GlobalProviderConfig {
-  defaultProvider: ProviderId;
-  providerDefaults?: Partial<Record<ProviderId, ProviderOptions>>;
+**See Also:**
+- [register()](#registerprovider)
+- [get()](#getid)
+
+---
+
+#### initializeProvider()
+
+Initialize a single provider with promise caching.
+
+**Type Signature:**
+```typescript
+initializeProvider(id: ProviderId, options?: ProviderOptions): Promise<void>
+```
+
+**Parameters:**
+- `id`: `ProviderId` - The provider id to initialize
+- `options`: `ProviderOptions` (optional) - Configuration options for initialization
+
+**Returns:** `Promise<void>` - Resolves when initialization completes
+
+**Throws:**
+- `Error` - If provider is not registered
+- `Error` - If provider initialization fails
+
+**Description:**
+Initializes a provider with the given options. Multiple concurrent calls to initialize the same provider will share the same promise (no duplicate initialization). Already initialized providers return immediately.
+
+**Promise Caching:**
+The initialization promise is cached in the provider's state. Concurrent calls to initialize the same provider will await the same promise.
+
+**State Transitions:**
+- UNINITIALIZED → INITIALIZING → INITIALIZED (success)
+- UNINITIALIZED → INITIALIZING → FAILED (error)
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+await registry.initializeProvider('anthropic', { apiKey: 'sk-...' });
+console.log(registry.isReady('anthropic')); // true
+
+// Concurrent calls share the same promise
+const promise1 = registry.initializeProvider('anthropic');
+const promise2 = registry.initializeProvider('anthropic');
+await Promise.all([promise1, promise2]);
+// Only one initialization actually occurs
+```
+
+**See Also:**
+- [initializeAll()](#initializeallconfig)
+- [getStatus()](#getstatusid)
+- [isReady()](#isreadyid)
+
+---
+
+#### initializeAll()
+
+Initialize all registered providers in parallel.
+
+**Type Signature:**
+```typescript
+initializeAll(config: GlobalProviderConfig): Promise<BatchInitResult>
+```
+
+**Parameters:**
+- `config`: `GlobalProviderConfig` - Global provider configuration with provider defaults
+
+**Returns:** `Promise<BatchInitResult>` - Promise resolving to success/failure lists
+
+**Description:**
+Uses Promise.allSettled to allow partial success - if one provider fails, others continue initialization. Errors are aggregated in the return value. Provider options are resolved from config.providerDefaults[providerId].
+
+**Parallel Initialization:**
+All providers initialize concurrently for faster startup. The method waits for all initialization attempts to complete before returning.
+
+**Error Aggregation:**
+This method never throws - all errors are collected in the returned BatchInitResult.failed array.
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+const config = getGlobalProviderConfig();
+const result = await registry.initializeAll(config);
+
+console.log(`Initialized: ${result.success.join(', ')}`);
+if (result.failed.length > 0) {
+  console.error(`Failed: ${result.failed.map(f => f.providerId).join(', ')}`);
+  for (const failure of result.failed) {
+    console.error(`  ${failure.providerId}: ${failure.error.message}`);
+  }
 }
+```
 
-// Model specification
-export interface ModelSpec {
-  provider: ProviderId;
-  model: string;
-  raw: string;
+**See Also:**
+- [initializeProvider()](#initializeproviderid-options)
+- [BatchInitResult](#batchinitresult)
+
+---
+
+#### getStatus()
+
+Get initialization status for a provider.
+
+**Type Signature:**
+```typescript
+getStatus(id: ProviderId): InitializationStatus
+```
+
+**Parameters:**
+- `id`: `ProviderId` - The provider id to check
+
+**Returns:** `InitializationStatus` - Current initialization status
+
+**Description:**
+Returns the current initialization status for the given provider ID. Unknown providers return UNINITIALIZED status.
+
+**Possible Values:**
+- `'uninitialized'`: Provider not yet initialized
+- `'initializing'`: Currently initializing (in progress)
+- `'initialized'`: Successfully initialized
+- `'failed'`: Initialization failed
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+const status = registry.getStatus('anthropic');
+console.log(status); // 'initialized' | 'initializing' | 'failed' | 'uninitialized'
+```
+
+**See Also:**
+- [isReady()](#isreadyid)
+- [getAllStatuses()](#getallstatuses)
+- [InitializationStatus](#initializationstatus)
+
+---
+
+#### isReady()
+
+Check if a provider is ready to use.
+
+**Type Signature:**
+```typescript
+isReady(id: ProviderId): boolean
+```
+
+**Parameters:**
+- `id`: `ProviderId` - The provider id to check
+
+**Returns:** `boolean` - true if provider is initialized and ready, false otherwise
+
+**Description:**
+Returns true only if the provider has successfully initialized. Use this method to check provider readiness before use.
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+if (registry.isReady('anthropic')) {
+  const provider = registry.get('anthropic');
+  // Use provider
 }
+```
 
-// Tool execution
-export interface ToolExecutionRequest {
-  name: string;
-  input: unknown;
+**See Also:**
+- [getStatus()](#getstatusid)
+- [getAllStatuses()](#getallstatuses)
+
+---
+
+#### getAllStatuses()
+
+Get all provider initialization states.
+
+**Type Signature:**
+```typescript
+getAllStatuses(): Map<ProviderId, ProviderInitState>
+```
+
+**Returns:** `Map<ProviderId, ProviderInitState>` - Map of provider ID to initialization state
+
+**Description:**
+Returns a copy of the internal states Map for health checks, monitoring, and debugging. The returned Map is a shallow copy - modifications to it won't affect internal state.
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+const statuses = registry.getAllStatuses();
+
+for (const [id, state] of statuses.entries()) {
+  console.log(`${id}: ${state.status}`);
+  if (state.error) {
+    console.error(`  Error: ${state.error.message}`);
+  }
 }
+```
 
-export interface ToolExecutionResult {
-  content: string | unknown;
-  isError: boolean;
-}
+**See Also:**
+- [getStatus()](#getstatusid)
+- [isReady()](#isreadyid)
+- [ProviderInitState](#providerinitstate)
 
-export type ToolExecutor = (
-  request: ToolExecutionRequest
-) => Promise<ToolExecutionResult>;
+---
 
-// Provider request
-export interface ProviderRequest {
-  prompt: string;
-  options: ProviderExecutionOptions;
-}
+#### terminateAll()
 
-export interface ProviderExecutionOptions {
-  model?: string;
-  systemPrompt?: string;
-  tools?: Tool[];
-  hooks?: ProviderHookEvents;
-  sessionId?: string;
-  streaming?: boolean;
-}
+Terminate all registered providers with error tolerance.
 
-// Provider hooks
-export interface ProviderHookEvents {
-  onToolStart?: (tool: ToolExecutionRequest) => Promise<void> | void;
-  onToolEnd?: (
-    tool: ToolExecutionRequest,
-    result: ToolExecutionResult,
-    duration: number
-  ) => Promise<void> | void;
-  onSessionStart?: () => Promise<void> | void;
-  onSessionEnd?: (totalDuration: number) => Promise<void> | void;
-  onStream?: (chunk: string) => void;
-}
+**Type Signature:**
+```typescript
+terminateAll(): Promise<void>
+```
 
-// Initialization status
-export enum InitializationStatus {
+**Returns:** `Promise<void>` - Resolves when all termination attempts complete
+
+**Description:**
+Terminates all providers in parallel, ensuring each gets a chance to clean up resources even if some fail. Errors are logged but not thrown. After termination completes, clears the providers and states maps.
+
+**Parallel Termination:**
+All providers terminate concurrently using Promise.allSettled. This ensures fast shutdown while allowing partial success.
+
+**Error Handling:**
+If a provider's terminate() throws, the error is logged but other providers continue terminating. The method never throws.
+
+**State Cleanup:**
+After all termination attempts complete, the providers and states maps are cleared. This releases references and allows re-initialization.
+
+**Example:**
+```typescript
+const registry = ProviderRegistry.getInstance();
+
+// Register and initialize providers
+registry.register(anthropicProvider);
+registry.register(opencodeProvider);
+await registry.initializeAll(config);
+
+// Later, during shutdown
+await registry.terminateAll();
+
+// All providers terminated, maps cleared
+console.log(registry.has('anthropic')); // false
+```
+
+**See Also:**
+- [Provider Lifecycle](#provider-lifecycle)
+
+---
+
+#### Related Types
+
+##### InitializationStatus
+
+Provider initialization status enum defining all possible initialization states.
+
+**Type Signature:**
+```typescript
+enum InitializationStatus {
   UNINITIALIZED = 'uninitialized',
   INITIALIZING = 'initializing',
   INITIALIZED = 'initialized',
-  FAILED = 'failed'
+  FAILED = 'failed',
 }
+```
 
-// Batch initialization result
+**Values:**
+- `UNINITIALIZED`: Provider not yet initialized
+- `INITIALIZING`: Currently initializing (in progress)
+- `INITIALIZED`: Successfully initialized
+- `FAILED`: Initialization failed
+
+**See Also:**
+- [getStatus()](#getstatusid)
+- [isReady()](#isreadyid)
+
+---
+
+##### ProviderInitState
+
+Provider initialization state with metadata.
+
+**Type Signature:**
+```typescript
+interface ProviderInitState {
+  status: InitializationStatus;
+  initPromise?: Promise<void>;
+  error?: Error;
+  initializedAt?: number;
+}
+```
+
+**Properties:**
+- `status`: `InitializationStatus` - Current initialization status
+- `initPromise`: `Promise<void>` (optional) - Cached initialization promise (prevents duplicate init)
+- `error`: `Error` (optional) - Error from failed initialization
+- `initializedAt`: `number` (optional) - Timestamp when initialization completed
+
+**See Also:**
+- [getAllStatuses()](#getallstatuses)
+
+---
+
+##### BatchInitResult
+
+Batch initialization result with aggregated status.
+
+**Type Signature:**
+```typescript
 interface BatchInitResult {
   success: ProviderId[];
   failed: Array<{ providerId: ProviderId; error: Error }>;
 }
 ```
 
-See [examples/08-sdk-features.ts](../examples/examples/08-sdk-features.ts) for tools and hooks usage.
+**Properties:**
+- `success`: `ProviderId[]` - Successfully initialized provider IDs
+- `failed`: `Array<{ providerId: ProviderId; error: Error }>` - Failed providers with errors
+
+**See Also:**
+- [initializeAll()](#initializeallconfig)
