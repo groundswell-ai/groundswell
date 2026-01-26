@@ -1,88 +1,150 @@
-# PRP: Modify Step Decorator to Implement Retry Loop
+# Product Requirement Prompt (PRP): Write Tests for AgentResponse Schema Validation
 
 ---
 
 ## Goal
 
-**Feature Goal**: Implement retry loop logic in the `@Step` decorator to automatically retry failed steps based on configuration options, emitting retry events and preserving error context throughout the retry process.
+**Feature Goal**: Extend the existing `agent-response.test.ts` file with comprehensive test coverage for the strengthened `AgentResponseSchema` validation with `.superRefine()` refinements added in P3.M2.T1.S2.
 
-**Deliverable**: Modified `src/decorators/step.ts` with:
-- Retry loop wrapping existing try-catch logic
-- `stepRetry` event emission on each retry attempt
-- Delay between retries using configurable `retryDelayMs`
-- Support for `restartable`, `maxRetries`, `retryDelayMs`, and `retryOn` options
-- Proper error context preservation across retry attempts
+**Deliverable**: New test cases added to `src/__tests__/unit/agent-response.test.ts` that verify runtime validation catches invalid state combinations (e.g., `status='success'` with `error!=null`).
 
 **Success Definition**:
-1. Retry loop wraps existing error handling in while loop checking `retryCount <= maxRetries`
-2. On error, checks `opts.restartable` - if false or max retries exceeded, throws WorkflowError immediately
-3. If restartable and under max retries, emits `stepRetry` event with structure: `{ stepName: string, retryCount: number, error: WorkflowError }`
-4. Waits for `opts.retryDelayMs` using delay utility before retry
-5. Increments retryCount and continues loop
-6. All existing tests pass: `npm run test`
-7. Type checking passes: `npm run lint`
-8. Build succeeds: `npm run build`
+- [ ] Tests verify `status='success'` with `error!=null` fails validation with descriptive error
+- [ ] Tests verify `status='success'` with `data=null` fails validation
+- [ ] Tests verify `status='error'` with `data!=null` fails validation with descriptive error
+- [ ] Tests verify `status='error'` with `error=null` fails validation
+- [ ] Tests verify `status='partial'` with `error!=null` fails validation with descriptive error
+- [ ] Tests verify `status='partial'` with `data=null` fails validation
+- [ ] All error assertions verify error path points to correct field (`['error']` or `['data']`)
+- [ ] All error assertions verify error code is `z.ZodIssueCode.custom`
+- [ ] All valid combinations continue to pass validation
+- [ ] All existing tests continue to pass (no regressions)
+- [ ] Test organization follows existing patterns in the codebase
+
+---
+
+## User Persona
+
+**Target User**: Implementation agent working on P3.M2.T1.S3 (test coverage for schema validation).
+
+**Use Case**: Writing comprehensive tests for runtime validation of `AgentResponseSchema` discriminated union with `.superRefine()` refinements.
+
+**User Journey**:
+1. Review existing `agent-response.test.ts` test structure and patterns
+2. Review the strengthened schema from P3.M2.T1.S2 (assumed complete)
+3. Study Zod refinement testing patterns from research documents
+4. Add new test suite for refinement validation
+5. Verify all tests pass including existing ones
+
+**Pain Points Addressed**:
+- **Test Coverage Gap**: Existing tests don't verify invalid combinations are caught at runtime
+- **Regression Prevention**: Ensure refinements work correctly and catch intended invalid states
+- **Documentation**: Tests serve as living documentation of validation behavior
+- **Error Quality**: Verify error messages are clear and actionable
 
 ---
 
 ## Why
 
-- **PRD Compliance**: PRD Section 11 requires "Restartability is opt-in at the step method level" - this implementation provides the runtime retry mechanism for the configuration options added in P1.M1.T1.S1
-- **Foundation for Restart Logic**: This retry loop is the core runtime behavior that enables step-level restartability when `restartable: true` is set
-- **Error Resilience**: Automatically handles transient errors (network timeouts, rate limits) without requiring manual intervention
-- **Observability**: `stepRetry` events provide visibility into retry attempts for monitoring and debugging
+**Business Value and User Impact**:
+- Ensures runtime validation actually catches invalid state combinations
+- Prevents regressions if refinements are accidentally modified or removed
+- Documents expected validation behavior through executable tests
+- Provides confidence that the strengthened schema works as intended
 
 **Integration with Existing Features**:
-- Builds on type definitions from P1.M1.T1.S1 (`restartable`, `maxRetries`, `retryDelayMs`, `retryOn`)
-- Extends existing event system by adding new `stepRetry` event type
-- Uses existing `WorkflowError` creation pattern from current error handling
-- Follows existing decorator wrapper pattern from current `@Step` implementation
+- Extends existing `src/__tests__/unit/agent-response.test.ts` file
+- Uses existing test framework (Vitest) and patterns
+- Follows existing test organization and assertion patterns
+- Maintains compatibility with all existing tests
 
-**Problems This Solves**:
-- Enables automatic retry of failed steps without manual error handling
-- Provides configurable retry behavior (max attempts, delay, error criteria)
-- Emits events for observability during retry loops
-- Preserves error context across retry attempts
+**Problems Solved**:
+- **Coverage Gap**: Current tests don't verify runtime refinement validation
+- **Invalid State Detection**: Tests ensure invalid combinations are actually caught
+- **Error Message Quality**: Tests verify errors are descriptive and actionable
+- **Regression Prevention**: Tests catch if refinements are accidentally weakened
 
 ---
 
 ## What
 
-### User-Visible Behavior
+**User-Visible Behavior and Technical Requirements**:
 
-When a step is decorated with `@Step({ restartable: true })` and throws an error:
+### Current Test Coverage Gap
 
-1. **First Attempt**: Step executes normally
-2. **On Error**: If `restartable: true` and `retryCount < maxRetries`:
-   - `stepRetry` event is emitted with retry context
-   - Execution waits for `retryDelayMs` milliseconds
-   - Step is re-executed with same arguments and context
-3. **On Success**: Step completes normally, `stepEnd` event emitted
-4. **On Max Retries Exceeded**: `WorkflowError` is thrown immediately without further retry
-5. **If Not Restartable**: Error is thrown immediately (existing behavior)
+The existing `agent-response.test.ts` file (lines 1-873) tests:
+- Valid success, error, and partial responses
+- Discriminated union validation
+- Type guard validation
+- Factory function validation
+- JSON serialization
+- PRD 6.4.4 null compliance
 
-### Technical Requirements
+**BUT** it does NOT test:
+- Invalid state combinations that refinements should catch
+- Runtime validation of status/data/error consistency
+- Error path and code verification for refinement failures
 
-1. **While Loop**: Wrap existing try-catch in `while (retryCount <= maxRetries)` loop
-2. **Event Emission**: Add `stepRetry` event type to `src/types/events.ts`
-3. **Delay Utility**: Create or use existing delay function for `retryDelayMs`
-4. **Error Criterion Matching**: Implement `matchesCriterion()` function to check if error matches `retryOn` criteria
-5. **State Preservation**: Maintain retry state across loop iterations
-6. **Backward Compatibility**: Existing `@Step()` behavior unchanged when `restartable` is false/undefined
+### Solution: Add Refinement Validation Tests
+
+Add a new describe block to `agent-response.test.ts`:
+
+```typescript
+describe('AgentResponse Refinement Validation (P3.M2.T1.S3)', () => {
+  describe('success status refinements', () => {
+    it('should reject status=success with error!=null', () => {
+      // Test that refinement catches this invalid combination
+    });
+
+    it('should reject status=success with data=null', () => {
+      // Test that refinement catches this invalid combination
+    });
+
+    it('should accept valid success response', () => {
+      // Ensure valid responses still pass
+    });
+  });
+
+  describe('error status refinements', () => {
+    it('should reject status=error with data!=null', () => {
+      // Test that refinement catches this invalid combination
+    });
+
+    it('should reject status=error with error=null', () => {
+      // Test that refinement catches this invalid combination
+    });
+
+    it('should accept valid error response', () => {
+      // Ensure valid responses still pass
+    });
+  });
+
+  describe('partial status refinements', () => {
+    it('should reject status=partial with error!=null', () => {
+      // Test that refinement catches this invalid combination
+    });
+
+    it('should reject status=partial with data=null', () => {
+      // Test that refinement catches this invalid combination
+    });
+
+    it('should accept valid partial response', () => {
+      // Ensure valid responses still pass
+    });
+  });
+});
+```
 
 ### Success Criteria
 
-- [ ] Retry loop implemented in `src/decorators/step.ts`
-- [ ] `stepRetry` event type added to `src/types/events.ts`
-- [ ] Delay utility created/imported in `src/decorators/step.ts`
-- [ ] Error criterion matching function implemented
-- [ ] All existing tests pass: `npm run test`
-- [ ] Type checking passes: `npm run lint`
-- [ ] Build succeeds: `npm run build`
-- [ ] New events emitted during retry attempts
-- [ ] Retry respects `maxRetries` limit
-- [ ] Retry respects `retryDelayMs` delay
-- [ ] Retry only occurs when `restartable: true`
+- [ ] New test suite added to `agent-response.test.ts`
+- [ ] Tests for all invalid combinations specified in contract
+- [ ] Error path assertions verify correct field path
+- [ ] Error code assertions verify `custom` code
+- [ ] Error message assertions verify descriptive messages
+- [ ] Valid combination tests ensure no false positives
+- [ ] All existing tests continue to pass
+- [ ] New tests fail when refinements are removed (prove they test the refinements)
 
 ---
 
@@ -90,92 +152,66 @@ When a step is decorated with `@Step({ restartable: true })` and throws an error
 
 ### Context Completeness Check
 
-✓ **Passes "No Prior Knowledge" test**: A developer unfamiliar with the codebase has everything needed to implement the retry loop successfully.
+**"No Prior Knowledge" Test**: If someone knew nothing about this codebase, would they have everything needed to implement this successfully?
 
-✓ **All YAML references are specific and accessible**: All file paths, line numbers, and patterns are provided.
-
-✓ **Implementation tasks include exact naming and placement guidance**: Specific function names, file locations, and patterns specified.
-
-✓ **Validation commands are project-specific and verified working**: Using actual npm scripts from package.json.
+**Answer**: YES - This PRP provides:
+- Exact existing test file structure and patterns
+- Previous PRP output defining what the strengthened schema looks like
+- Research on Zod refinement testing patterns
+- Research on discriminated union testing patterns
+- Research on codebase test patterns
+- Complete test implementation blueprint
+- Validation commands and expected outputs
+- Helper function patterns to follow
 
 ---
 
 ### Documentation & References
 
 ```yaml
-# MUST READ - Previous Subtask (Type Definitions)
-- file: /home/dustin/projects/groundswell/plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P1M1T1S1/PRP.md
-  why: Complete type definitions from P1.M1.T1.S1 - StepOptions extension with restartable, maxRetries, retryDelayMs, retryOn, ErrorCriterion type
-  critical: "Type definitions are complete - this task implements the runtime behavior for those types"
+# MUST READ - Previous PRP defining strengthened schema
+- docfile: plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P3M2T1S2/PRP.md
+  why: Defines what P3.M2.T1.S2 produces (strengthened schema with refinements)
+  section: Goal, Success Definition, Implementation Blueprint
+  critical: This PRP consumes the output from P3.M2.T1.S2
+  note: P3.M2.T1.S2 adds .superRefine() to each union member
 
-# MUST READ - Current Step Decorator Implementation
-- file: /home/dustin/projects/groundswell/src/decorators/step.ts
-  lines: 1-140
-  why: Current @Step decorator structure - MUST understand existing wrapper pattern, error handling, event emission
-  pattern: "Regular function (not arrow) for descriptor.value to preserve 'this' context"
-  gotcha: "Lines 109-134 show current error handling - wraps in WorkflowError and re-throws immediately. This is where retry logic must be added."
+# MUST READ - Existing test file structure
+- file: src/__tests__/unit/agent-response.test.ts
+  why: Contains existing test patterns to follow and extend
+  lines: 1-873 (full file)
+  pattern: Nested describe blocks, Arrange-Act-Assert, helper functions
+  critical: Must add new tests without breaking existing ones
 
-# MUST READ - Event Type Definitions
-- file: /home/dustin/projects/groundswell/src/types/events.ts
-  lines: 1-76
-  why: Current event type structure - discriminated union pattern with 'type' discriminator
-  pattern: "All events include 'node' property for hierarchy tracking"
-  critical: "Must add new 'stepRetry' event type following this pattern"
+# MUST READ - Zod refinement testing research
+- docfile: plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P3M2T1S3/research/zod-refinement-testing-research.md
+  why: Comprehensive research on testing .superRefine() validation
+  section: Section 1 (Testing .superRefine()), Section 4 (Error Assertion Patterns)
+  critical: Contains specific patterns for testing refinements
 
-# MUST READ - WorkflowError Type
-- file: /home/dustin/projects/groundswell/src/types/error.ts
-  lines: 1-21
-  why: WorkflowError structure - must preserve this when creating errors during retry
-  pattern: "message, original, workflowId, stack, state, logs fields"
-  critical: "Original error must be preserved in 'original' property"
+# MUST READ - Discriminated union testing research
+- docfile: plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P3M2T1S3/research/discriminated-union-testing-research.md
+  why: Testing patterns specific to discriminated unions with refinements
+  section: Section 2 (Testing Refinements on Union Variants), Section 3 (Error Path Validation)
+  critical: Contains patterns for variant-specific refinement testing
 
-# MUST READ - Existing Delay Utility
-- file: /home/dustin/projects/groundswell/examples/utils/helpers.ts
-  lines: 6-10
-  why: Sleep utility pattern - Promise-based delay for retry pause
-  pattern: "return new Promise((resolve) => setTimeout(resolve, ms));"
-  gotcha: "This is in examples/ - must create similar utility in src/ or import appropriately"
+# MUST READ - Codebase test patterns research
+- docfile: plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P3M2T1S3/research/codebase-test-patterns-research.md
+  why: Existing test patterns in the codebase to follow
+  section: Section 3 (Schema Validation Test Patterns), Section 4 (Error Assertion Patterns)
+  critical: Contains codebase-specific patterns and conventions
 
-# MUST READ - Test Patterns
-- file: /home/dustin/projects/groundswell/src/__tests__/unit/decorators.test.ts
-  lines: 1-101
-  why: Testing pattern for @Step decorator - Vitest with describe/it, event capture with observers
-  pattern: "wf.addObserver({ onEvent: (e) => events.push(e) }) to capture events"
-  gotcha: "Events are captured in array and then filtered/checked with .find()"
+# REFERENCE - Zod source tests for refinement patterns
+- file: node_modules/.ignored/zod/src/v3/tests/refine.test.ts
+  why: Examples of .superRefine() testing from Zod itself
+  section: Lines 1-100 (basic patterns), Lines 200-300 (error assertions)
+  pattern: Using ctx.addIssue() and testing custom error codes
 
-# MUST READ - Architecture Analysis
-- file: /home/dustin/projects/groundswell/plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/architecture/restart_logic_analysis.md
-  lines: 244-314
-  why: Detailed architecture for retry loop implementation - shows exact while loop structure required
-  critical: "Lines 264-314 show the exact retry loop pattern to implement"
-
-# MUST READ - ErrorCriterion Type Definition
-- file: /home/dustin/projects/groundswell/src/types/decorators.ts
-  lines: 37-40
-  why: ErrorCriterion discriminated union - must implement matching logic for this type
-  pattern: "{ code: string | RegExp } | { recoverable: boolean } | ((error: WorkflowError) => boolean)"
-  critical: "Function type must come LAST in union for proper type narrowing"
-
-# MUST READ - StepOptions Interface
-- file: /home/dustin/projects/groundswell/src/types/decorators.ts
-  lines: 45-64
-  why: Complete StepOptions with all restart fields - these are the configuration options to implement
-  critical: "restartable?: boolean (default: false), maxRetries?: number (default: 3), retryDelayMs?: number (default: 1000), retryOn?: ErrorCriterion[]"
-
-# EXTERNAL REFERENCES - TypeScript Decorator Patterns
-- url: https://www.typescriptlang.org/docs/handbook/decorators.html#decorator-composition
-  why: Understanding decorator wrapper patterns and 'this' context preservation
-  critical: "Use regular function not arrow function for descriptor.value to preserve 'this' binding"
-
-- url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
-  why: Promise-based delay patterns for async retry loops
-  critical: "Use setTimeout wrapped in Promise for non-blocking delays"
-
-# RESEARCH - Retry Loop Best Practices
-- docfile: /home/dustin/projects/groundswell/plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/research/retry_loop_patterns.md
-  section: "While Loop Patterns for Retry"
-  why: Best practices for implementing retry loops - counter-based while loops, delay strategies
-  critical: "Always have max attempts to prevent infinite loops, preserve error context across retries"
+# REFERENCE - Zod discriminated union tests
+- file: node_modules/.ignored/zod/src/v3/tests/discriminated-unions.test.ts
+  why: Examples of discriminated union testing
+  section: Full file for patterns
+  pattern: Testing each variant separately, error path validation
 ```
 
 ---
@@ -184,38 +220,90 @@ When a step is decorated with `@Step({ restartable: true })` and throws an error
 
 ```bash
 src/
-├── decorators/
-│   ├── step.ts                 # TARGET FILE - Modify to add retry loop
-│   ├── task.ts                 # Reference for decorator patterns
-│   ├── observed-state.ts       # State snapshot utilities
-│   └── index.ts                # Exports Step decorator
+├── __tests__/
+│   └── unit/
+│       └── agent-response.test.ts           # EXTEND: Add refinement tests
+│           ├── Lines 1-873: Existing tests
+│           ├── Lines 34-118: Success response tests
+│           ├── Lines 120-254: Error response tests
+│           ├── Lines 256-313: Partial response tests
+│           ├── Lines 578-650: Discriminated union tests
+│           └── PATTERN: Nested describe, Arrange-Act-Assert, helper functions
 ├── types/
-│   ├── decorators.ts           # StepOptions with restartable, maxRetries, retryDelayMs, retryOn
-│   ├── events.ts               # TARGET FILE - Add stepRetry event type
-│   ├── error.ts                # WorkflowError type definition
-│   └── index.ts                # Re-exports all types
-├── utils/
-│   ├── id.ts                   # generateId utility
-│   ├── index.ts                # TARGET FILE - Export delay utility
-│   └── workflow-error-utils.ts # Error utilities
-└── __tests__/
-    └── unit/
-        └── decorators.test.ts  # Test patterns for @Step decorator
+│   └── agent.ts                              # REFERENCE: Contains AgentResponseSchema
+│       ├── Lines 970-1010+: AgentResponseSchema with .superRefine() (from P3.M2.T1.S2)
+│       ├── successSchema with refinement
+│       ├── errorSchema with refinement
+│       └── partialSchema with refinement
 ```
 
 ---
 
-### Desired Codebase Tree (changes only)
+### Desired Codebase Tree with Changes
 
 ```bash
-src/
-├── decorators/
-│   └── step.ts                 # MODIFIED - Add retry loop with while, event emission, delay
-├── types/
-│   └── events.ts               # MODIFIED - Add stepRetry event type
-└── utils/
-    ├── delay.ts                # NEW FILE - Delay utility function
-    └── index.ts                # MODIFIED - Export delay utility
+# MODIFIED FILE: src/__tests__/unit/agent-response.test.ts
+
+# ADD TO END OF FILE (after line 872):
+
+describe('AgentResponse Refinement Validation (P3.M2.T1.S3)', () => {
+  // Helper function to create test responses
+  function createTestResponse<T>(
+    status: 'success' | 'error' | 'partial',
+    data: T | null,
+    error: any,
+    metadata?: any
+  ): any {
+    return {
+      status,
+      data,
+      error,
+      metadata: metadata || { agentId: 'test', timestamp: Date.now() }
+    };
+  }
+
+  describe('success status refinements', () => {
+    it('should reject status=success with error!=null', () => {
+      // Test implementation
+    });
+
+    it('should reject status=success with data=null', () => {
+      // Test implementation
+    });
+
+    it('should accept valid success response', () => {
+      // Test implementation
+    });
+  });
+
+  describe('error status refinements', () => {
+    it('should reject status=error with data!=null', () => {
+      // Test implementation
+    });
+
+    it('should reject status=error with error=null', () => {
+      // Test implementation
+    });
+
+    it('should accept valid error response', () => {
+      // Test implementation
+    });
+  });
+
+  describe('partial status refinements', () => {
+    it('should reject status=partial with error!=null', () => {
+      // Test implementation
+    });
+
+    it('should reject status=partial with data=null', () => {
+      // Test implementation
+    });
+
+    it('should accept valid partial response', () => {
+      // Test implementation
+    });
+  });
+});
 ```
 
 ---
@@ -223,88 +311,75 @@ src/
 ### Known Gotchas of Our Codebase & Library Quirks
 
 ```typescript
-// CRITICAL: Use regular function, not arrow function, for descriptor.value
-// BAD: Loses 'this' binding
-descriptor.value = async (...args) => { /* ... */ };
-// GOOD: Preserves 'this' binding
-descriptor.value = async function (this: Workflow, ...args) { /* ... */ };
+// CRITICAL: Use .safeParse() not .parse() for refinement testing
+// .safeParse() returns { success: boolean, data?: T, error?: ZodError }
+// .parse() throws ZodError on failure (harder to test error properties)
 
-// CRITICAL: ErrorCriterion discriminated union ordering
-// Function types MUST come AFTER object types for proper type narrowing
-type ErrorCriterion =
-  | { code: string | RegExp }              // Object type 1
-  | { recoverable: boolean }               // Object type 2
-  | ((error: WorkflowError) => boolean);  // Function type LAST
+// CRITICAL: Always check result.success before accessing error properties
+// TypeScript doesn't narrow based on result.success
+// Use if (!result.success) { ... } to access result.error
 
-// CRITICAL: Event emission pattern
-// All workflow events use discriminated union with 'type' field
-export type WorkflowEvent =
-  | { type: 'stepStart'; node: WorkflowNode; step: string }
-  | { type: 'stepRetry'; node: WorkflowNode; step: string; retryCount: number; error: WorkflowError }  // NEW
-  | { type: 'stepEnd'; node: WorkflowNode; step: string; duration: number };
+// CRITICAL: Refinement errors have code: 'custom'
+// Not 'invalid_type' or other built-in codes
+// Check result.error.errors[0].code === 'custom'
 
-// CRITICAL: WorkflowError creation pattern
-// From src/decorators/step.ts lines 116-123
-const workflowError: WorkflowError = {
-  message: error?.message ?? 'Unknown error',
-  original: err,  // MUST preserve original error
-  workflowId: wf.id,
-  stack: error?.stack,
-  state: snap,
-  logs: [...wf.node.logs] as LogEntry[],
-};
+// CRITICAL: Error path depends on refinement
+// successSchema refinement on error field: path is ['error']
+// errorSchema refinement on data field: path is ['data']
+// partialSchema refinement on error field: path is ['error']
 
-// CRITICAL: Retry loop must use while loop, not for loop
-// Allows checking restartable and maxRetries dynamically each iteration
-// Pattern from architecture/restart_logic_analysis.md lines 269-306
-let retryCount = 0;
-while (retryCount <= (opts.maxRetries ?? 3)) {
-  try {
-    // ... execute step
-    return result;  // Exit on success
-  } catch (error) {
-    // Check if should retry
-    if (!opts.restartable || retryCount >= (opts.maxRetries ?? 3)) {
-      throw error;  // Exit on non-retryable error
-    }
-    // Emit retry event, wait, increment retryCount
-    retryCount++;
-  }
-}
+// CRITICAL: Existing tests MUST continue to pass
+// New tests should only add coverage, not break existing tests
+// Run full test suite after adding tests
 
-// CRITICAL: Delay utility must be Promise-based
-// Use setTimeout wrapped in Promise for non-blocking async delays
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+// CRITICAL: Test framework is Vitest
+// Import from 'vitest': describe, it, expect
+// Use describe, it (not test)
+// Use expect().toBe() not expect().to.equal()
 
-// CRITICAL: Error criterion matching must handle all three variants
-// Use type narrowing with typeof check for function type first
-function matchesCriterion(error: WorkflowError, criterion: ErrorCriterion): boolean {
-  if (typeof criterion === 'function') {
-    return criterion(error);  // Function variant
-  }
-  if ('code' in criterion) {
-    return typeof criterion.code === 'string'
-      ? error.message === criterion.code  // String code match
-      : criterion.code.test(error.message);  // Regex code match
-  }
-  if ('recoverable' in criterion) {
-    // Note: WorkflowError doesn't have recoverable field - this may need special handling
-    return true;  // Placeholder - may need to check error.original or add recoverable to WorkflowError
-  }
-  return false;
-}
+// CRITICAL: Test file location
+// Add to src/__tests__/unit/agent-response.test.ts
+// Do NOT create new test file
+// Extend existing file
 
-// CRITICAL: Type imports use .js extension even for TypeScript files
-// This project uses "type": "module" in package.json
-import type { StepOptions } from '../types/decorators.js';
-import type { WorkflowError } from '../types/error.js';
+// CRITICAL: Test organization
+// Follow existing pattern: nested describe blocks
+// Group tests by status type (success, error, partial)
+// Use descriptive test names
 
-// CRITICAL: All decorator options have defaults documented in JSDoc
-// Follow this pattern for restart options:
-/** If true, step can be restarted on failure (default: false) */
-restartable?: boolean;
+// CRITICAL: Error message format from P3.M2.T1.S2
+// "Invalid state: status='success' but error is non-null (must be null)"
+// "Invalid state: status='error' but data is non-null (must be null)"
+// "Invalid state: status='partial' but error is non-null (must be null)"
+
+// CRITICAL: Discriminated union optimization
+// Zod validates discriminator first
+// Only matched variant's refinements run
+// This means status='success' only runs successSchema refinements
+
+// CRITICAL: Helper function pattern
+// Follow existing pattern: createTestResponse<T>()
+// Provide default values for optional parameters
+// Use descriptive names
+
+// CRITICAL: Data schema choice
+// Use simple schemas for tests: z.string(), z.number()
+// Don't test data schema validation (already covered)
+// Focus on refinement validation only
+
+// CRITICAL: Metadata is optional
+// Tests can include or exclude metadata
+// Refinements don't validate metadata
+
+// CRITICAL: Zod version is 3.25.76
+// Has full .superRefine() support
+// No workarounds needed
+
+// CRITICAL: Previous PRP (P3.M2.T1.S2) defines the schema
+// Assume it's implemented exactly as specified
+// .superRefine() on each union member
+// Error messages as specified
+// Error paths as specified
 ```
 
 ---
@@ -313,20 +388,58 @@ restartable?: boolean;
 
 ### Data Models and Structure
 
-**No new data models** - this task implements runtime behavior for existing types from P1.M1.T1.S1:
-
-- `StepOptions` interface with `restartable`, `maxRetries`, `retryDelayMs`, `retryOn`
-- `ErrorCriterion` discriminated union type
-- `WorkflowError` interface (already exists)
-
-**New Event Type** to add:
+No new data models. Tests use existing `AgentResponseSchema` from P3.M2.T1.S2:
 
 ```typescript
-// Add to src/types/events.ts
-export type WorkflowEvent =
-  // ... existing events
-  | { type: 'stepRetry'; node: WorkflowNode; step: string; retryCount: number; error: WorkflowError }
-  // ... other events
+// From P3.M2.T1.S2 - assumed to be implemented
+export function AgentResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
+  const successSchema = z.object({
+    status: z.literal('success'),
+    data: dataSchema,
+    error: z.null(),
+    metadata: AgentResponseMetadataSchema.optional(),
+  }).superRefine((data, ctx) => {
+    if (data.error !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid state: status='success' but error is non-null (must be null)",
+        path: ['error'],
+      });
+    }
+  });
+
+  const errorSchema = z.object({
+    status: z.literal('error'),
+    data: z.null(),
+    error: AgentErrorDetailsSchema,
+    metadata: AgentResponseMetadataSchema.optional(),
+  }).superRefine((data, ctx) => {
+    if (data.data !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid state: status='error' but data is non-null (must be null)",
+        path: ['data'],
+      });
+    }
+  });
+
+  const partialSchema = z.object({
+    status: z.literal('partial'),
+    data: dataSchema,
+    error: z.null(),
+    metadata: AgentResponseMetadataSchema.optional(),
+  }).superRefine((data, ctx) => {
+    if (data.error !== null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Invalid state: status='partial' but error is non-null (must be null)",
+        path: ['error'],
+      });
+    }
+  });
+
+  return z.discriminatedUnion('status', [successSchema, errorSchema, partialSchema]);
+}
 ```
 
 ---
@@ -334,113 +447,167 @@ export type WorkflowEvent =
 ### Implementation Tasks (ordered by dependencies)
 
 ```yaml
-Task 1: CREATE src/utils/delay.ts
-  - IMPLEMENT: Delay utility function for async pause
-  - PATTERN: Follow examples/utils/helpers.ts sleep function pattern
-  - NAMING: delay function (lowercase, camelCase)
-  - SIGNATURE: function delay(ms: number): Promise<void>
-  - LOGIC: Return Promise that resolves after setTimeout(ms)
-  - PLACEMENT: New file in src/utils/
-  - DEPENDENCIES: None
+Task 1: READ existing test file thoroughly
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - UNDERSTAND: Test structure and organization
+  - UNDERSTAND: Helper function patterns
+  - UNDERSTAND: Assertion patterns
+  - UNDERSTAND: Import statements
+  - IDENTIFY: Where to add new tests (at end of file)
+  - DOCUMENT: Existing test patterns to follow
 
-Task 2: MODIFY src/utils/index.ts
-  - EXPORT: Add delay utility to exports
-  - PATTERN: Follow existing export pattern (generateId, Observable, etc.)
-  - ADD: export { delay } from './delay.js';
-  - PLACEMENT: After existing exports, maintain alphabetical order
-  - DEPENDENCIES: Requires Task 1
+Task 2: READ previous PRP (P3.M2.T1.S2)
+  - FILE: plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P3M2T1S2/PRP.md
+  - SECTION: Goal, Implementation Blueprint
+  - UNDERSTAND: What refinements were added
+  - UNDERSTAND: Error message format
+  - UNDERSTAND: Error path specification
+  - UNDERSTAND: Which combinations should fail
 
-Task 3: MODIFY src/types/events.ts
-  - ADD: New event type for step retry
-  - PATTERN: Follow existing discriminated union pattern
-  - TYPE: { type: 'stepRetry'; node: WorkflowNode; step: string; retryCount: number; error: WorkflowError }
-  - PLACEMENT: After 'stepStart' event, before 'stepEnd' event (logical ordering)
-  - DEPENDENCIES: None (uses existing WorkflowNode and WorkflowError types)
+Task 3: READ research documents
+  - FILE: plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P3M2T1S3/research/zod-refinement-testing-research.md
+  - SECTION: Section 4 (Error Assertion Patterns)
+  - UNDERSTAND: How to test refinement errors
+  - UNDERSTAND: Error structure and properties
 
-Task 4: CREATE error criterion matching function in src/decorators/step.ts
-  - IMPLEMENT: matchesCriterion helper function
-  - SIGNATURE: function matchesCriterion(error: WorkflowError, criterion: ErrorCriterion): boolean
-  - LOGIC:
-    - Check if criterion is function (typeof === 'function')
-    - Check if criterion has 'code' property (string or RegExp)
-    - Check if criterion has 'recoverable' property
-    - Return boolean indicating match
-  - PATTERN: Type narrowing with typeof check first for function type
-  - PLACEMENT: Add inside Step decorator function, before stepWrapper
-  - DEPENDENCIES: Requires ErrorCriterion type from Task 0 (P1.M1.T1.S1)
+  - FILE: plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P3M2T1S3/research/discriminated-union-testing-research.md
+  - SECTION: Section 2 (Testing Refinements on Union Variants)
+  - UNDERSTAND: Variant-specific testing patterns
 
-Task 5: MODIFY src/decorators/step.ts - Import delay utility
-  - ADD: Import statement for delay function
-  - PATTERN: Follow existing import pattern with .js extensions
-  - ADD: import { delay } from '../utils/delay.js';
-  - PLACEMENT: After existing imports (lines 1-4)
-  - DEPENDENCIES: Requires Task 1 and Task 2
+  - FILE: plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/P3M2T1S3/research/codebase-test-patterns-research.md
+  - SECTION: Section 4 (Error Assertion Patterns)
+  - UNDERSTAND: Codebase-specific assertion patterns
 
-Task 6: MODIFY src/decorators/step.ts - Add retry loop to stepWrapper
-  - WRAP: Existing try-catch (lines 77-134) in while loop
-  - LOGIC:
-    - Initialize retryCount = 0 before while loop
-    - while (retryCount <= (opts.maxRetries ?? 3))
-    - Inside catch block (after line 123):
-      - Check if opts.restartable is true/false
-      - Check if retryCount >= maxRetries
-      - If either condition fails, throw workflowError immediately (existing behavior)
-      - If opts.retryOn exists, check if error matches criteria using matchesCriterion
-      - If no match, throw workflowError immediately
-      - Emit stepRetry event with retry context
-      - Await delay(opts.retryDelayMs ?? 1000)
-      - Increment retryCount
-      - Continue loop (retry execution)
-    - On success (after line 82), break loop and return result
-  - PATTERN: Follow while loop pattern from architecture/restart_logic_analysis.md lines 269-306
-  - PRESERVE: All existing event emissions (stepStart, stepEnd, error)
-  - PRESERVE: All existing logging, state snapshots, timing
-  - PLACEMENT: Wrap lines 77-134 in while loop, add retry logic in catch block
-  - DEPENDENCIES: Requires Task 3 (stepRetry event), Task 4 (matchesCriterion), Task 5 (delay import)
+Task 4: CREATE helper function for test responses
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: Inside new describe block
+  - ADD: createTestResponse<T>() helper function
+  - PATTERN: Follow existing helper function pattern
+  - PARAMETERS: status, data, error, metadata (optional)
+  - RETURNS: Test response object
 
-Task 7: CREATE src/__tests__/unit/decorators-retry.test.ts (NEW TEST FILE)
-  - IMPLEMENT: Unit tests for retry logic
-  - PATTERN: Follow src/__tests__/unit/decorators.test.ts structure
-  - TEST CASES:
-    - should not retry when restartable is false
-    - should not retry when restartable is undefined
-    - should retry when restartable is true and under maxRetries
-    - should stop retrying after maxRetries exceeded
-    - should emit stepRetry event on each retry
-    - should respect retryDelayMs delay between retries
-    - should not retry when error does not match retryOn criteria
-    - should retry when error matches retryOn code criterion
-    - should retry when error matches retryOn function criterion
-  - NAMING: describe('@Step decorator with retry options', () => { ... })
-  - PLACEMENT: New test file in src/__tests__/unit/
-  - DEPENDENCIES: Requires Task 6 (retry loop implementation)
+Task 5: WRITE tests for success status refinement - error!=null
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: New describe block for success refinements
+  - ADD: it('should reject status=success with error!=null', ...)
+  - ARRANGE: Create response with status='success', data='test', error={...}
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is false
+  - ASSERT: result.error.errors[0].path is ['error']
+  - ASSERT: result.error.errors[0].code is 'custom'
+  - ASSERT: result.error.errors[0].message contains 'success' and 'error'
+  - PATTERN: Follow codebase test patterns
 
-Task 8: VERIFY type checking
-  - RUN: npm run lint (TypeScript compiler check --noEmit)
-  - VERIFY: No type errors in src/decorators/step.ts
-  - VERIFY: No type errors in src/types/events.ts
-  - VERIFY: No import errors (delay imported correctly)
-  - EXPECTED: Zero type errors
+Task 6: WRITE tests for success status refinement - data=null
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: Same describe block for success refinements
+  - ADD: it('should reject status=success with data=null', ...)
+  - ARRANGE: Create response with status='success', data=null, error=null
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is false
+  - ASSERT: result.error.errors[0].path is ['data']
+  - ASSERT: result.error.errors[0].code is 'invalid_type' (not custom, from z.null())
+  - PATTERN: Follow codebase test patterns
 
-Task 9: VERIFY build
-  - RUN: npm run build (tsc compilation)
-  - VERIFY: Declaration files generated correctly (.d.ts)
-  - VERIFY: stepRetry event type appears in dist/types/events.d.ts
-  - VERIFY: delay function exported in dist/utils/index.d.ts
-  - EXPECTED: Clean build with no errors
+Task 7: WRITE tests for valid success response
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: Same describe block for success refinements
+  - ADD: it('should accept valid success response', ...)
+  - ARRANGE: Create valid response with status='success', data='test', error=null
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is true
+  - ASSERT: result.data.status is 'success'
+  - ASSERT: result.data.data is 'test'
+  - ASSERT: result.data.error is null
+  - PATTERN: Follow codebase test patterns
 
-Task 10: VERIFY existing tests pass
-  - RUN: npm run test
-  - VERIFY: All existing tests in src/__tests__/unit/decorators.test.ts pass
-  - VERIFY: No regressions in other test files
+Task 8: WRITE tests for error status refinement - data!=null
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: New describe block for error refinements
+  - ADD: it('should reject status=error with data!=null', ...)
+  - ARRANGE: Create response with status='error', data='test', error={...}
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is false
+  - ASSERT: result.error.errors[0].path is ['data']
+  - ASSERT: result.error.errors[0].code is 'custom'
+  - ASSERT: result.error.errors[0].message contains 'error' and 'data'
+  - PATTERN: Follow codebase test patterns
+
+Task 9: WRITE tests for error status refinement - error=null
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: Same describe block for error refinements
+  - ADD: it('should reject status=error with error=null', ...)
+  - ARRANGE: Create response with status='error', data=null, error=null
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is false
+  - ASSERT: result.error.errors[0].path is ['error']
+  - ASSERT: result.error.errors[0].code is 'invalid_type' (not custom, from AgentErrorDetailsSchema)
+  - PATTERN: Follow codebase test patterns
+
+Task 10: WRITE tests for valid error response
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: Same describe block for error refinements
+  - ADD: it('should accept valid error response', ...)
+  - ARRANGE: Create valid response with status='error', data=null, error={...}
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is true
+  - ASSERT: result.data.status is 'error'
+  - ASSERT: result.data.data is null
+  - ASSERT: result.data.error is not null
+  - PATTERN: Follow codebase test patterns
+
+Task 11: WRITE tests for partial status refinement - error!=null
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: New describe block for partial refinements
+  - ADD: it('should reject status=partial with error!=null', ...)
+  - ARRANGE: Create response with status='partial', data='test', error={...}
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is false
+  - ASSERT: result.error.errors[0].path is ['error']
+  - ASSERT: result.error.errors[0].code is 'custom'
+  - ASSERT: result.error.errors[0].message contains 'partial' and 'error'
+  - PATTERN: Follow codebase test patterns
+
+Task 12: WRITE tests for partial status refinement - data=null
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: Same describe block for partial refinements
+  - ADD: it('should reject status=partial with data=null', ...)
+  - ARRANGE: Create response with status='partial', data=null, error=null
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is false
+  - ASSERT: result.error.errors[0].path is ['data']
+  - ASSERT: result.error.errors[0].code is 'invalid_type' (not custom, from z.null())
+  - PATTERN: Follow codebase test patterns
+
+Task 13: WRITE tests for valid partial response
+  - FILE: src/__tests__/unit/agent-response.test.ts
+  - LOCATION: Same describe block for partial refinements
+  - ADD: it('should accept valid partial response', ...)
+  - ARRANGE: Create valid response with status='partial', data='test', error=null
+  - ACT: Call schema.safeParse(response)
+  - ASSERT: result.success is true
+  - ASSERT: result.data.status is 'partial'
+  - ASSERT: result.data.data is 'test'
+  - ASSERT: result.data.error is null
+  - PATTERN: Follow codebase test patterns
+
+Task 14: RUN all tests
+  - COMMAND: npm test
   - EXPECTED: All tests pass
+  - VERIFY: New refinement tests fail invalid combinations
+  - VERIFY: New refinement tests pass valid combinations
+  - VERIFY: All existing tests still pass
+  - FIX: Any failures
 
-Task 11: VERIFY backward compatibility
-  - VERIFY: @Step() with no options still works (no retry)
-  - VERIFY: @Step({ trackTiming: true }) still works (no retry)
-  - VERIFY: @Step({ restartable: false }) does not retry
-  - VERIFY: Existing error handling unchanged when restartable is false/undefined
-  - EXPECTED: All existing usage patterns continue to work
+Task 15: RUN specific agent-response tests
+  - COMMAND: npm test -- agent-response.test.ts
+  - EXPECTED: All AgentResponse tests pass
+  - VERIFY: No regressions in schema validation
+
+Task 16: VERIFY test coverage
+  - COMMAND: npm test -- --coverage
+  - EXPECTED: Coverage for refinement code
+  - VERIFY: New tests cover refinement validation
 ```
 
 ---
@@ -448,398 +615,182 @@ Task 11: VERIFY backward compatibility
 ### Implementation Patterns & Key Details
 
 ```typescript
-// ============================================================
-// PATTERN 1: Delay Utility Implementation
-// ============================================================
-// CRITICAL: Must be Promise-based for non-blocking async delays
+// PATTERN 1: Helper function for test responses
+// Location: Inside new describe block
 
-// File: src/utils/delay.ts
-/**
- * Creates a promise that resolves after a specified delay
- * @param ms - Delay in milliseconds
- * @returns Promise that resolves after delay
- */
-export function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// ============================================================
-// PATTERN 2: Event Type Definition
-// ============================================================
-// CRITICAL: Follow discriminated union pattern with 'type' discriminator
-
-// File: src/types/events.ts - Add to WorkflowEvent union
-export type WorkflowEvent =
-  // ... existing events
-  | { type: 'stepStart'; node: WorkflowNode; step: string }
-  | { type: 'stepRetry'; node: WorkflowNode; step: string; retryCount: number; error: WorkflowError }  // NEW
-  | { type: 'stepEnd'; node: WorkflowNode; step: string; duration: number }
-  // ... other events
-
-// ============================================================
-// PATTERN 3: Error Criterion Matching
-// ============================================================
-// CRITICAL: Type narrowing with typeof check for function type FIRST
-
-// File: src/decorators/step.ts - Add inside Step decorator function
-function matchesCriterion(error: WorkflowError, criterion: ErrorCriterion): boolean {
-  // CRITICAL: Check typeof first for function type narrowing
-  if (typeof criterion === 'function') {
-    return criterion(error);  // Custom predicate function
-  }
-
-  // Object type checks (type narrowing works after typeof check)
-  if ('code' in criterion) {
-    // Match by error code (string or regex)
-    const errorCode = error.message;  // Or extract from error.original if available
-    return typeof criterion.code === 'string'
-      ? errorCode === criterion.code
-      : criterion.code.test(errorCode);
-  }
-
-  if ('recoverable' in criterion) {
-    // Match by recoverable flag
-    // NOTE: WorkflowError doesn't have 'recoverable' field
-    // May need to check error.original.recoverable or add field to WorkflowError
-    // For now, assume all errors are recoverable if this criterion is used
-    return true;
-  }
-
-  return false;
-}
-
-// ============================================================
-// PATTERN 4: Retry Loop Structure
-// ============================================================
-// CRITICAL: Use while loop, not for loop - allows dynamic condition checking
-
-// File: src/decorators/step.ts - Replace lines 77-134 with this pattern
-async function stepWrapper(this: This, ...args: Args): Promise<Return> {
-  const wf = this as unknown as WorkflowLike;
-  const stepName = opts.name ?? methodName;
-
-  // NEW: Initialize retry state
-  let retryCount = 0;
-  const maxRetries = opts.maxRetries ?? 3;
-
-  // Log start if requested
-  if (opts.logStart) {
-    wf.logger.info(`STEP START: ${stepName}`);
-  }
-
-  // Emit step start event (only once, not on retry)
-  wf.emitEvent({
-    type: 'stepStart',
-    node: wf.node,
-    step: stepName,
-  });
-
-  // Create step node for hierarchy tracking
-  const stepNode: WorkflowNode = {
-    id: generateId(),
-    name: retryCount > 0 ? `${stepName} (retry ${retryCount})` : stepName,
-    parent: wf.node,
-    children: [],
-    status: 'running',
-    logs: [],
-    events: [],
-    stateSnapshot: null,
+function createTestResponse<T>(
+  status: 'success' | 'error' | 'partial',
+  data: T | null,
+  error: any,
+  metadata?: any
+): any {
+  return {
+    status,
+    data,
+    error,
+    metadata: metadata || { agentId: 'test', timestamp: Date.now() }
   };
-
-  // Create execution context
-  const executionContext: AgentExecutionContext = {
-    workflowNode: stepNode,
-    emitEvent: (event: WorkflowEvent) => {
-      stepNode.events.push(event);
-      wf.emitEvent(event);
-    },
-    workflowId: wf.id,
-  };
-
-  // ============================================================
-  // CRITICAL: Retry loop wraps existing try-catch
-  // ============================================================
-  while (retryCount <= maxRetries) {
-    try {
-      // Execute the original method within the execution context
-      const result = await runInContext(executionContext, async () => {
-        return originalMethod.call(this, ...args);
-      });
-
-      // Update step node status
-      stepNode.status = 'completed';
-
-      // Snapshot state if requested
-      if (opts.snapshotState) {
-        wf.snapshotState();
-      }
-
-      // Calculate duration and emit end event
-      const duration = Date.now() - startTime;
-      if (opts.trackTiming !== false) {
-        wf.emitEvent({
-          type: 'stepEnd',
-          node: wf.node,
-          step: stepName,
-          duration,
-        });
-      }
-
-      // Log finish if requested
-      if (opts.logFinish) {
-        wf.logger.info(`STEP END: ${stepName} (${duration}ms)`);
-      }
-
-      // CRITICAL: Exit loop on success
-      return result;
-
-    } catch (err: unknown) {
-      // Update step node status
-      stepNode.status = 'failed';
-
-      // Create rich error with context
-      const error = err as Error;
-      const snap = getObservedState(this as object);
-
-      const workflowError: WorkflowError = {
-        message: error?.message ?? 'Unknown error',
-        original: err,
-        workflowId: wf.id,
-        stack: error?.stack,
-        state: snap,
-        logs: [...wf.node.logs] as LogEntry[],
-      };
-
-      // ============================================================
-      // CRITICAL: Check if should retry or throw immediately
-      // ============================================================
-      const shouldAttemptRetry = opts.restartable && retryCount < maxRetries;
-
-      // Check retry criteria if specified
-      const matchesRetryCriteria = opts.retryOn
-        ? opts.retryOn.some(criterion => matchesCriterion(workflowError, criterion))
-        : true;  // If no criteria specified, retry all errors when restartable
-
-      if (!shouldAttemptRetry || !matchesRetryCriteria) {
-        // Emit error event and throw
-        wf.emitEvent({
-          type: 'error',
-          node: wf.node,
-          error: workflowError,
-        });
-
-        // Re-throw the enriched error
-        throw workflowError;
-      }
-
-      // ============================================================
-      // CRITICAL: Emit retry event and delay before retry
-      // ============================================================
-      const nextRetryCount = retryCount + 1;
-
-      // Emit step retry event
-      wf.emitEvent({
-        type: 'stepRetry',
-        node: wf.node,
-        step: stepName,
-        retryCount: nextRetryCount,
-        error: workflowError,
-      });
-
-      // Log retry if logging enabled
-      if (opts.logStart || opts.logFinish) {
-        wf.logger.info(`STEP RETRY: ${stepName} (attempt ${nextRetryCount}/${maxRetries})`);
-      }
-
-      // Wait before retry
-      const delayMs = opts.retryDelayMs ?? 1000;
-      await delay(delayMs);
-
-      // Increment retry count and continue loop
-      retryCount = nextRetryCount;
-
-      // Update step node name for retry
-      stepNode.name = `${stepName} (retry ${retryCount})`;
-      stepNode.status = 'running';
-    }
-  }
-
-  // Should not reach here, but TypeScript needs it
-  // This would only happen if loop exits without return or throw
-  throw new Error(`Retry loop exited unexpectedly for step ${stepName}`);
 }
 
-// ============================================================
-// PATTERN 5: Test Pattern for Retry Logic
-// ============================================================
-// CRITICAL: Use Vitest with observer pattern to capture events
+// GOTCHA: Use simple schemas for tests
+// Don't test data schema validation (already covered)
+// Focus on refinement validation only
 
-// File: src/__tests__/unit/decorators-retry.test.ts
-import { describe, it, expect, vi } from 'vitest';
-import { Workflow, Step, WorkflowEvent } from '../../index.js';
+// PATTERN 2: Test for invalid combination (success with error)
+// Location: New describe block for success refinements
 
-describe('@Step decorator with retry options', () => {
-  it('should not retry when restartable is false', async () => {
-    class FailingWorkflow extends Workflow {
-      attemptCount = 0;
+it('should reject status=success with error!=null', () => {
+  // Arrange
+  const schema = AgentResponseSchema(z.string());
+  const response = createTestResponse(
+    'success',
+    'test data',
+    { code: 'ERROR', message: 'test error', recoverable: false }
+  );
 
-      @Step({ restartable: false })
-      async failingStep(): Promise<void> {
-        this.attemptCount++;
-        throw new Error('Step failed');
-      }
+  // Act
+  const result = schema.safeParse(response);
 
-      async run(): Promise<void> {
-        await this.failingStep();
-      }
-    }
+  // Assert
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.errors[0].path).toEqual(['error']);
+    expect(result.error.errors[0].code).toBe('custom');
+    expect(result.error.errors[0].message).toContain('success');
+    expect(result.error.errors[0].message).toContain('error');
+    expect(result.error.errors[0].message).toContain('null');
+  }
+});
 
-    const wf = new FailingWorkflow();
+// PATTERN 3: Test for invalid combination (success with null data)
+// Location: Same describe block for success refinements
 
-    await expect(wf.run()).rejects.toThrow('Step failed');
-    expect(wf.attemptCount).toBe(1);  // Only one attempt
+it('should reject status=success with data=null', () => {
+  // Arrange
+  const schema = AgentResponseSchema(z.string());
+  const response = createTestResponse('success', null, null);
+
+  // Act
+  const result = schema.safeParse(response);
+
+  // Assert
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    // This is a type error, not a refinement error
+    // Error code is 'invalid_type' not 'custom'
+    expect(result.error.errors[0].path).toEqual(['data']);
+    expect(result.error.errors[0].code).toBe('invalid_type');
+  }
+});
+
+// PATTERN 4: Test for valid combination
+// Location: Same describe block for success refinements
+
+it('should accept valid success response', () => {
+  // Arrange
+  const schema = AgentResponseSchema(z.string());
+  const response = createTestResponse('success', 'test data', null);
+
+  // Act
+  const result = schema.safeParse(response);
+
+  // Assert
+  expect(result.success).toBe(true);
+  if (result.success) {
+    expect(result.data.status).toBe('success');
+    expect(result.data.data).toBe('test data');
+    expect(result.data.error).toBeNull();
+  }
+});
+
+// PATTERN 5: Test for error status refinement
+// Location: New describe block for error refinements
+
+it('should reject status=error with data!=null', () => {
+  // Arrange
+  const schema = AgentResponseSchema(z.unknown());
+  const response = createTestResponse(
+    'error',
+    'should be null',
+    { code: 'E', message: 'm', details: null, recoverable: false }
+  );
+
+  // Act
+  const result = schema.safeParse(response);
+
+  // Assert
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.errors[0].path).toEqual(['data']);
+    expect(result.error.errors[0].code).toBe('custom');
+    expect(result.error.errors[0].message).toContain('error');
+    expect(result.error.errors[0].message).toContain('data');
+  }
+});
+
+// PATTERN 6: Test for partial status refinement
+// Location: New describe block for partial refinements
+
+it('should reject status=partial with error!=null', () => {
+  // Arrange
+  const schema = AgentResponseSchema(z.string());
+  const response = createTestResponse(
+    'partial',
+    'test data',
+    { code: 'E', message: 'm', details: null, recoverable: false }
+  );
+
+  // Act
+  const result = schema.safeParse(response);
+
+  // Assert
+  expect(result.success).toBe(false);
+  if (!result.success) {
+    expect(result.error.errors[0].path).toEqual(['error']);
+    expect(result.error.errors[0].code).toBe('custom');
+    expect(result.error.errors[0].message).toContain('partial');
+    expect(result.error.errors[0].message).toContain('error');
+  }
+});
+
+// GOTCHA: Always check result.success before accessing error
+// TypeScript doesn't narrow based on result.success
+// Use if (!result.success) { ... } to access result.error
+
+// GOTCHA: Refinement errors have code: 'custom'
+// Type errors have code: 'invalid_type'
+// Distinguish between refinement failures and type mismatches
+
+// GOTCHA: Error path points to refined field
+// successSchema refinement on error: path is ['error']
+// errorSchema refinement on data: path is ['data']
+// partialSchema refinement on error: path is ['error']
+
+// GOTCHA: Use simple data schemas
+// z.string() for success and partial
+// z.unknown() for error (data is null anyway)
+// Don't test data schema validation
+
+// PATTERN 7: Test organization
+// Location: New top-level describe block
+
+describe('AgentResponse Refinement Validation (P3.M2.T1.S3)', () => {
+  describe('success status refinements', () => {
+    // Success refinement tests
   });
 
-  it('should retry when restartable is true', async () => {
-    class RetryWorkflow extends Workflow {
-      attemptCount = 0;
-
-      @Step({ restartable: true, maxRetries: 3 })
-      async retryableStep(): Promise<void> {
-        this.attemptCount++;
-        if (this.attemptCount < 3) {
-          throw new Error('Temporary failure');
-        }
-      }
-
-      async run(): Promise<void> {
-        await this.retryableStep();
-      }
-    }
-
-    const wf = new RetryWorkflow();
-    await wf.run();
-
-    expect(wf.attemptCount).toBe(3);  // Initial + 2 retries
+  describe('error status refinements', () => {
+    // Error refinement tests
   });
 
-  it('should emit stepRetry event on each retry', async () => {
-    const events: WorkflowEvent[] = [];
-
-    class RetryWorkflow extends Workflow {
-      attemptCount = 0;
-
-      @Step({ restartable: true, maxRetries: 3 })
-      async retryableStep(): Promise<void> {
-        this.attemptCount++;
-        if (this.attemptCount < 2) {
-          throw new Error('Temporary failure');
-        }
-      }
-
-      async run(): Promise<void> {
-        // Add observer to capture events
-        this.addObserver({
-          onLog: () => {},
-          onEvent: (e) => events.push(e),
-          onStateUpdated: () => {},
-          onTreeChanged: () => {},
-        });
-
-        await this.retryableStep();
-      }
-    }
-
-    const wf = new RetryWorkflow();
-    await wf.run();
-
-    const retryEvents = events.filter(e => e.type === 'stepRetry');
-    expect(retryEvents.length).toBe(1);  // One retry event
-
-    if (retryEvents[0]?.type === 'stepRetry') {
-      expect(retryEvents[0].retryCount).toBe(1);
-      expect(retryEvents[0].step).toBe('retryableStep');
-    }
-  });
-
-  it('should stop retrying after maxRetries exceeded', async () => {
-    class MaxRetriesWorkflow extends Workflow {
-      attemptCount = 0;
-
-      @Step({ restartable: true, maxRetries: 2 })
-      async failingStep(): Promise<void> {
-        this.attemptCount++;
-        throw new Error('Persistent failure');
-      }
-
-      async run(): Promise<void> {
-        await this.failingStep();
-      }
-    }
-
-    const wf = new MaxRetriesWorkflow();
-
-    await expect(wf.run()).rejects.toThrow('Persistent failure');
-    expect(wf.attemptCount).toBe(3);  // Initial + 2 retries (maxRetries = 2 means 3 total attempts)
-  });
-
-  it('should respect retryDelayMs delay between retries', async () => {
-    const timestamps: number[] = [];
-
-    class DelayWorkflow extends Workflow {
-      attemptCount = 0;
-
-      @Step({ restartable: true, maxRetries: 2, retryDelayMs: 100 })
-      async delayedStep(): Promise<void> {
-        timestamps.push(Date.now());
-        this.attemptCount++;
-        if (this.attemptCount < 2) {
-          throw new Error('Temporary failure');
-        }
-      }
-
-      async run(): Promise<void> {
-        await this.delayedStep();
-      }
-    }
-
-    const wf = new DelayWorkflow();
-    await wf.run();
-
-    expect(timestamps.length).toBe(2);
-    const delay = timestamps[1] - timestamps[0];
-    expect(delay).toBeGreaterThanOrEqual(100);  // At least 100ms delay
+  describe('partial status refinements', () => {
+    // Partial refinement tests
   });
 });
 
-// ============================================================
-// PATTERN 6: Import Statement Placement
-// ============================================================
-// CRITICAL: All imports use .js extension even for TypeScript files
-
-// File: src/decorators/step.ts - Add delay import after line 4
-import type { StepOptions, WorkflowError, WorkflowNode, LogEntry, WorkflowEvent } from '../types/index.js';
-import { getObservedState } from './observed-state.js';
-import { runInContext, type AgentExecutionContext } from '../core/context.js';
-import { generateId } from '../utils/id.js';
-import { delay } from '../utils/delay.js';  // NEW IMPORT
-
-// ============================================================
-// PATTERN 7: Backward Compatibility Verification
-// ============================================================
-// CRITICAL: Ensure existing behavior unchanged when restartable is false/undefined
-
-// Test cases that MUST continue to work:
-@Step()  // No options - should NOT retry
-async noOptionsStep() { throw new Error('Fail'); }
-
-@Step({ trackTiming: true })  // Old option only - should NOT retry
-async oldOptionsStep() { throw new Error('Fail'); }
-
-@Step({ restartable: false })  // Explicitly not restartable - should NOT retry
-async notRestartableStep() { throw new Error('Fail'); }
-
-// All three should throw immediately without retrying
+// GOTCHA: Add to existing file, don't create new file
+// Add to src/__tests__/unit/agent-response.test.ts
+// Add after existing tests (after line 872)
 ```
 
 ---
@@ -847,34 +798,50 @@ async notRestartableStep() { throw new Error('Fail'); }
 ### Integration Points
 
 ```yaml
-TYPE SYSTEM:
-  - type: Add stepRetry event to WorkflowEvent discriminated union in src/types/events.ts
-  - type: Import delay function in src/decorators/step.ts
-  - type: Use existing StepOptions fields (restartable, maxRetries, retryDelayMs, retryOn)
+NO EXTERNAL INTEGRATIONS:
+  - This is test code only
+  - No external service dependencies
+  - No configuration changes
+  - No new dependencies
 
-UTILS:
-  - create: src/utils/delay.ts with delay() function
-  - modify: src/utils/index.ts to export delay function
+INTERNAL INTEGRATIONS:
+  - AgentResponseSchema (src/types/agent.ts)
+    - Uses strengthened schema from P3.M2.T1.S2
+    - Must have .superRefine() on each union member
+    - Tests verify refinements work correctly
+  - Existing test suite (src/__tests__/unit/agent-response.test.ts)
+    - Must extend existing tests
+    - Must not break existing tests
+    - Must follow existing patterns
 
-EVENT SYSTEM:
-  - emit: stepRetry event on each retry attempt
-  - preserve: All existing event emissions (stepStart, stepEnd, error)
-  - pattern: Follow existing event structure with 'type' discriminator and 'node' property
+SCOPE BOUNDARIES:
+  - ONLY modify src/__tests__/unit/agent-response.test.ts
+  - ADD new describe block for refinement tests
+  - DON'T modify any other files
+  - DON'T modify existing tests
+  - DON'T create new test file
 
-ERROR HANDLING:
-  - preserve: Existing WorkflowError creation pattern
-  - preserve: Error emission with 'error' event type
-  - extend: Add retry event before throwing on retryable errors
+BACKWARD COMPATIBILITY:
+  - MUST maintain all existing test behavior
+  - MUST not break existing tests
+  - MUST only add new test coverage
+  - MUST follow existing test patterns
 
-TEST SYSTEM:
-  - create: src/__tests__/unit/decorators-retry.test.ts
-  - pattern: Follow Vitest pattern from decorators.test.ts
-  - coverage: All retry scenarios (success, failure, max retries, delay, criteria)
+RELATED WORK:
+  - P3.M2.T1.S1: Refactor AgentResponse as discriminated union (COMPLETED)
+    - Added compile-time type safety
+  - P3.M2.T1.S2: Add Zod refinement for AgentResponse validation (IN PROGRESS)
+    - Adds runtime validation with .superRefine()
+    - This PRP tests the refinements from P3.M2.T1.S2
 
-BUILD SYSTEM:
-  - validation: npm run lint must succeed
-  - validation: npm run build must succeed
-  - validation: npm run test must succeed
+FILES TO MODIFY:
+  - src/__tests__/unit/agent-response.test.ts (add refinement tests)
+
+FILES NOT TO MODIFY:
+  - PRD.md (read-only)
+  - tasks.json (read-only)
+  - src/types/agent.ts (modified by P3.M2.T1.S2)
+  - Any other test files
 ```
 
 ---
@@ -884,267 +851,130 @@ BUILD SYSTEM:
 ### Level 1: Syntax & Style (Immediate Feedback)
 
 ```bash
-# Run after completing each task - fix before proceeding
+# Run TypeScript compiler to check for type errors
+npx tsc --noEmit
+
+# Expected: Zero errors
+# If errors exist:
+# 1. READ the error messages carefully
+# 2. VERIFY errors are in test file
+# 3. FIX any type errors before proceeding
+
+# Run linter
 npm run lint
-# Expected: Zero errors. If errors exist, READ output and fix.
-# This runs: tsc --noEmit (TypeScript compiler check)
 
-# Build declaration files
-npm run build
-# Expected: Clean build, .d.ts files generated in dist/
-# Check: dist/utils/delay.d.ts contains delay function
-# Check: dist/types/events.d.ts contains stepRetry event type
-# Check: dist/decorators/step.d.ts contains retry loop
+# Expected: Zero errors in test file
+# Fix any linting issues
 
-# Verify exports
-grep -r "stepRetry" dist/
-grep -r "delay" dist/utils/
-# Expected: New types and functions appear in declaration files
+# Run formatter
+npm run format  # if exists
+
+# Expected: Consistent formatting
 ```
-
----
 
 ### Level 2: Unit Tests (Component Validation)
 
 ```bash
-# Test new retry functionality
-npm run test -- src/__tests__/unit/decorators-retry.test.ts
-# Expected: All retry tests pass
+# Run all tests to verify no regressions
+npm test
 
-# Test existing functionality (regression check)
-npm run test -- src/__tests__/unit/decorators.test.ts
-# Expected: All existing tests pass
+# Expected: All tests pass
+# Verify: No existing tests broken
+# Verify: New refinement tests fail invalid combinations
+# Verify: New refinement tests pass valid combinations
 
-# Test entire test suite
-npm run test
-# Expected: All tests pass, no regressions
+# Run specific test file for AgentResponse
+npm test -- agent-response.test.ts
 
-# Coverage validation (if coverage tools available)
-npm run test -- --coverage
-# Expected: High coverage for new retry code paths
+# Expected: All AgentResponse tests pass
+# Verify: Schema validation tests pass
+# Verify: Refinement tests pass
+# Verify: Factory function tests pass
+
+# Run tests with coverage
+npm test -- --coverage
+
+# Expected: Coverage maintained or improved
+# Verify: New refinement code is covered
 ```
-
----
 
 ### Level 3: Integration Testing (System Validation)
 
 ```bash
-# Test retry with actual workflow execution
-cat > /tmp/retry-test.ts << 'EOF'
-import { Workflow, Step } from './dist/index.js';
+# Run all tests in __tests__/unit/
+npm test -- unit/
 
-class RetryTestWorkflow extends Workflow {
-  attemptCount = 0;
+# Expected: All unit tests pass
+# Verify: No regressions in unit tests
 
-  @Step({ restartable: true, maxRetries: 3, retryDelayMs: 100 })
-  async retryableStep(): Promise<string> {
-    this.attemptCount++;
-    console.log(`Attempt ${this.attemptCount}`);
-    if (this.attemptCount < 2) {
-      throw new Error('Temporary failure');
-    }
-    return 'success';
-  }
+# Run full test suite
+npm test
 
-  async run(): Promise<string> {
-    return this.retryableStep();
-  }
-}
-
-const wf = new RetryTestWorkflow();
-wf.run().then(
-  (result) => console.log('Result:', result, 'Attempts:', wf.attemptCount),
-  (error) => console.log('Error:', error.message, 'Attempts:', wf.attemptCount)
-);
-EOF
-
-tsx /tmp/retry-test.ts
-# Expected: Attempt 1, Attempt 2, Result: success Attempts: 2
-
-# Test max retries limit
-cat > /tmp/max-retries-test.ts << 'EOF'
-import { Workflow, Step } from './dist/index.js';
-
-class MaxRetriesWorkflow extends Workflow {
-  attemptCount = 0;
-
-  @Step({ restartable: true, maxRetries: 2 })
-  async failingStep(): Promise<void> {
-    this.attemptCount++;
-    throw new Error('Persistent failure');
-  }
-
-  async run(): Promise<void> {
-    await this.failingStep();
-  }
-}
-
-const wf = new MaxRetriesWorkflow();
-wf.run().catch(
-  (error) => console.log('Error:', error.message, 'Attempts:', wf.attemptCount)
-);
-EOF
-
-tsx /tmp/max-retries-test.ts
-# Expected: Error: Persistent failure Attempts: 3
-
-# Test event emission
-cat > /tmp/events-test.ts << 'EOF'
-import { Workflow, Step } from './dist/index.js';
-
-class EventsTestWorkflow extends Workflow {
-  attemptCount = 0;
-
-  @Step({ restartable: true, maxRetries: 2 })
-  async retryableStep(): Promise<void> {
-    this.attemptCount++;
-    if (this.attemptCount < 2) {
-      throw new Error('Temporary failure');
-    }
-  }
-
-  async run(): Promise<void> {
-    this.addObserver({
-      onLog: () => {},
-      onEvent: (e) => console.log('Event:', e.type, e.step || '', e.retryCount || ''),
-      onStateUpdated: () => {},
-      onTreeChanged: () => {},
-    });
-
-    await this.retryableStep();
-  }
-}
-
-const wf = new EventsTestWorkflow();
-wf.run();
-EOF
-
-tsx /tmp/events-test.ts
-# Expected: Event: stepStart, Event: stepRetry 1, Event: stepEnd
+# Expected: All tests pass
+# Verify: No test failures
+# Verify: No skipped tests
+# Verify: No timeout errors
 ```
 
----
-
-### Level 4: Creative & Domain-Specific Validation
+### Level 4: Manual Verification (Refinement-Specific)
 
 ```bash
-# Retry with error criteria matching
-cat > /tmp/criteria-test.ts << 'EOF'
-import { Workflow, Step } from './dist/index.js';
+# Create a test script to verify refinements work
+cat > /tmp/test-refinements.js << 'EOF'
+import { AgentResponseSchema } from './src/types/agent.js';
+import { z } from 'zod';
 
-class CriteriaWorkflow extends Workflow {
-  attemptCount = 0;
+const schema = AgentResponseSchema(z.string());
 
-  @Step({
-    restartable: true,
-    maxRetries: 3,
-    retryOn: [
-      { code: 'TEMPORARY_FAILURE' },
-      (error) => error.message.includes('timeout')
-    ]
-  })
-  async conditionalStep(): Promise<void> {
-    this.attemptCount++;
-    if (this.attemptCount === 1) {
-      throw new Error('TEMPORARY_FAILURE');
-    }
-    if (this.attemptCount === 2) {
-      throw new Error('Network timeout occurred');
-    }
-  }
-
-  async run(): Promise<void> {
-    this.addObserver({
-      onLog: () => {},
-      onEvent: (e) => console.log('Event:', e.type),
-      onStateUpdated: () => {},
-      onTreeChanged: () => {},
-    });
-
-    await this.conditionalStep();
-  }
-}
-
-const wf = new CriteriaWorkflow();
-wf.run().then(
-  () => console.log('Success, attempts:', wf.attemptCount),
-  () => console.log('Failed, attempts:', wf.attemptCount)
-);
-EOF
-
-tsx /tmp/criteria-test.ts
-# Expected: Should retry on both errors (matches code and function criteria)
-
-# Retry delay timing verification
-cat > /tmp/timing-test.ts << 'EOF'
-import { Workflow, Step } from './dist/index.js';
-
-class TimingWorkflow extends Workflow {
-  timestamps: number[] = [];
-
-  @Step({ restartable: true, maxRetries: 3, retryDelayMs: 200 })
-  async delayedStep(): Promise<void> {
-    this.timestamps.push(Date.now());
-    if (this.timestamps.length < 3) {
-      throw new Error('Fail');
-    }
-  }
-
-  async run(): Promise<void> {
-    await this.delayedStep();
-  }
-}
-
-const wf = new TimingWorkflow();
-const startTime = Date.now();
-wf.run().then(() => {
-  const totalTime = Date.now() - startTime;
-  const delays = [];
-  for (let i = 1; i < wf.timestamps.length; i++) {
-    delays.push(wf.timestamps[i] - wf.timestamps[i - 1]);
-  }
-  console.log('Delays:', delays);
-  console.log('Total time:', totalTime);
-  console.log('Expected: ~400ms (2 retries × 200ms)');
+// Test 1: Invalid success with error
+console.log('Test 1: status=success with error!=null');
+const result1 = schema.safeParse({
+  status: 'success',
+  data: 'test',
+  error: { code: 'E', message: 'm', details: null, recoverable: false },
+  metadata: { agentId: 'test', timestamp: Date.now() }
 });
-EOF
-
-tsx /tmp/timing-test.ts
-# Expected: Delays close to [200, 200], Total time ~400ms
-
-# Backward compatibility test
-cat > /tmp/compat-test.ts << 'EOF'
-import { Workflow, Step } from './dist/index.js';
-
-class CompatWorkflow extends Workflow {
-  @Step()  // No options - should NOT retry
-  async noOptions() { throw new Error('No options'); }
-
-  @Step({ trackTiming: true })  // Old option - should NOT retry
-  async oldOptions() { throw new Error('Old options'); }
-
-  @Step({ restartable: false })  // Explicitly false - should NOT retry
-  async notRestartable() { throw new Error('Not restartable'); }
-
-  async testNoOptions() {
-    try { await this.noOptions(); } catch (e) { console.log('noOptions: OK (no retry)'); }
-  }
-
-  async testOldOptions() {
-    try { await this.oldOptions(); } catch (e) { console.log('oldOptions: OK (no retry)'); }
-  }
-
-  async testNotRestartable() {
-    try { await this.notRestartable(); } catch (e) { console.log('notRestartable: OK (no retry)'); }
-  }
+console.log('Success:', result1.success);
+if (!result1.success) {
+  console.log('Error path:', result1.error.errors[0].path);
+  console.log('Error message:', result1.error.errors[0].message);
 }
 
-const wf = new CompatWorkflow();
-wf.testNoOptions().then(() => wf.testOldOptions()).then(() => wf.testNotRestartable());
+// Test 2: Invalid error with data
+console.log('\nTest 2: status=error with data!=null');
+const result2 = schema.safeParse({
+  status: 'error',
+  data: 'test',
+  error: { code: 'E', message: 'm', details: null, recoverable: false },
+  metadata: { agentId: 'test', timestamp: Date.now() }
+});
+console.log('Success:', result2.success);
+if (!result2.success) {
+  console.log('Error path:', result2.error.errors[0].path);
+  console.log('Error message:', result2.error.errors[0].message);
+}
+
+// Test 3: Valid success
+console.log('\nTest 3: valid success');
+const result3 = schema.safeParse({
+  status: 'success',
+  data: 'test',
+  error: null,
+  metadata: { agentId: 'test', timestamp: Date.now() }
+});
+console.log('Success:', result3.success);
 EOF
 
-tsx /tmp/compat-test.ts
-# Expected: All three methods throw immediately without retrying
+# Run manual test
+node --loader tsx /tmp/test-refinements.js
+
+# Expected:
+# Test 1: Success: false, Error path: ['error']
+# Test 2: Success: false, Error path: ['data']
+# Test 3: Success: true
+
+# Clean up
+rm /tmp/test-refinements.js
 ```
 
 ---
@@ -1153,82 +983,104 @@ tsx /tmp/compat-test.ts
 
 ### Technical Validation
 
-- [ ] All 4 validation levels completed successfully
-- [ ] Type checking passes: `npm run lint`
-- [ ] Build succeeds: `npm run build`
-- [ ] All tests pass: `npm run test`
-- [ ] stepRetry event type defined in src/types/events.ts
-- [ ] delay utility exported from src/utils/index.ts
-- [ ] Retry loop implemented in src/decorators/step.ts
-- [ ] Error criterion matching function implemented
-- [ ] No import/export errors
-- [ ] Declaration files generated correctly
+- [ ] TypeScript compiler passes: `npx tsc --noEmit`
+- [ ] All existing tests pass: `npm test`
+- [ ] New refinement tests pass: `npm test -- agent-response.test.ts`
+- [ ] Linter passes: `npm run lint`
+- [ ] Formatter passes: `npm run format` (if exists)
+- [ ] No breaking changes to existing tests
+
+### Refinement Validation
+
+- [ ] Test for `status='success'` with `error!=null` fails validation
+- [ ] Test for `status='success'` with `data=null` fails validation
+- [ ] Test for `status='error'` with `data!=null` fails validation
+- [ ] Test for `status='error'` with `error=null` fails validation
+- [ ] Test for `status='partial'` with `error!=null` fails validation
+- [ ] Test for `status='partial'` with `data=null` fails validation
+- [ ] Error paths point to correct field (`['error']` or `['data']`)
+- [ ] Error codes are `z.ZodIssueCode.custom` for refinements
+- [ ] Error messages contain status and field information
+- [ ] Valid combinations continue to pass
 
 ### Feature Validation
 
 - [ ] All success criteria from "What" section met
-- [ ] Retry loop wraps existing try-catch in while loop
-- [ ] Checks opts.restartable before retrying
-- [ ] Respects maxRetries limit
-- [ ] Respects retryDelayMs delay
-- [ ] Emits stepRetry event with correct structure
-- [ ] Checks retryOn criteria before retrying
-- [ ] Preserves error context across retries
-- [ ] Existing tests still pass
-- [ ] New tests cover all retry scenarios
+- [ ] Invalid combinations caught at runtime
+- [ ] Clear, actionable error messages
+- [ ] Existing tests still pass (no regressions)
+- [ ] New tests cover all refinement scenarios
+- [ ] Test organization follows existing patterns
 
 ### Code Quality Validation
 
-- [ ] Follows existing codebase patterns (decorator wrapper, event emission)
-- [ ] File placement matches desired codebase tree structure
-- [ ] Anti-patterns avoided (no arrow functions for descriptor.value, while loop not for loop)
-- [ ] Delay utility is Promise-based (non-blocking)
-- [ ] Error criterion matching uses proper type narrowing
-- [ ] Backward compatibility maintained (existing @Step usage unchanged)
-- [ ] JSDoc comments present on delay utility
+- [ ] Code follows existing test patterns in codebase
+- [ ] Test names are descriptive and clear
+- [ ] Helper functions follow existing patterns
+- [ ] Error assertions follow existing patterns
+- [ ] No code duplication
+- [ ] Consistent test structure
 
 ### Documentation & Deployment
 
-- [ ] Code is self-documenting with clear variable/function names
-- [ ] Retry behavior is observable via stepRetry events
-- [ ] Error messages are informative
-- [ ] Test cases document expected retry behavior
-- [ ] Integration with existing event system is seamless
+- [ ] Tests serve as documentation of validation behavior
+- [ ] Test names clearly indicate what is being tested
+- [ ] No deployment notes needed (test changes only)
 
 ---
 
 ## Anti-Patterns to Avoid
 
-- ❌ **Don't** use arrow function for `descriptor.value` - use regular function to preserve `this` binding
-- ❌ **Don't** use for loop for retry - use while loop for dynamic condition checking
-- ❌ **Don't** forget to preserve original error in WorkflowError.original
-- ❌ **Don't** skip delay between retries - must respect retryDelayMs
-- ❌ **Don't** emit stepRetry event after max retries exceeded - only emit when actually retrying
-- ❌ **Don't** modify existing event emissions - stepStart and stepEnd must remain unchanged
-- ❌ **Don't** retry when restartable is false or undefined - backward compatibility critical
-- ❌ **Don't** forget to check retryOn criteria - must match before retrying
-- ❌ **Don't** use blocking delay - must be Promise-based for async
-- ❌ **Don't** change error handling when not restartable - existing behavior must be preserved
-- ❌ **Don't** create infinite loop - always respect maxRetries limit
-- ❌ **Don't** put function type first in ErrorCriterion matching - check typeof first for type narrowing
+- ❌ Don't create a new test file (extend existing agent-response.test.ts)
+- ❌ Don't modify existing tests (only add new ones)
+- ❌ Don't use `.parse()` instead of `.safeParse()` for error testing
+- ❌ Don't forget to check `result.success` before accessing `result.error`
+- ❌ Don't skip error path assertions
+- ❌ Don't skip error code assertions
+- ❌ Don't skip error message assertions
+- ❌ Don't test data schema validation (already covered)
+- ❌ Don't use complex data schemas (keep it simple)
+- ❌ Don't modify PRD.md or tasks.json (read-only files)
+- ❌ Don't break existing tests
+- ❌ Don't add tests without proper error assertions
+- ❌ Don't forget to test valid combinations too
+- ❌ Don't use vague test names
+- ❌ Don't skip testing all three status types
 
 ---
 
-## Confidence Score
+## Success Metrics
 
-**9/10** - One-pass implementation success likelihood is very high
+**Confidence Score**: 10/10 for one-pass implementation success likelihood
 
-**Reasoning**:
-- ✅ All required context gathered and documented
-- ✅ Specific file paths, line numbers, and patterns provided
-- ✅ Existing patterns identified to follow
-- ✅ Validation commands are project-specific and verified
-- ✅ Clear implementation blueprint with 11 ordered tasks
-- ✅ Comprehensive code examples for all patterns
-- ✅ Backward compatibility requirements clearly defined
-- ✅ Test patterns documented with examples
-- ✅ All integration points identified
-- ⚠️ Minor risk: Error criterion matching for 'recoverable' field may need adjustment (WorkflowError doesn't have this field - documented in gotchas)
-- ⚠️ Minor risk: Delay utility placement/import path must be correct (documented in tasks)
+**Rationale**:
+- ✅ Existing test file structure thoroughly analyzed
+- ✅ Previous PRP output clearly defines schema structure
+- ✅ Zod refinement testing patterns researched and documented
+- ✅ Discriminated union testing patterns documented
+- ✅ Codebase test patterns catalogued
+- ✅ Clear implementation blueprint with ordered tasks
+- ✅ Specific test patterns provided
+- ✅ Comprehensive validation checklist
+- ✅ Integration points identified
+- ✅ No breaking changes to existing code
+- ✅ Minimal risk (only adds tests, doesn't modify schema)
+- ✅ Research documents provide detailed examples
 
-**Validation**: The completed PRP provides everything needed to implement the retry loop successfully. A developer unfamiliar with the codebase can follow the implementation tasks verbatim and produce the correct retry behavior. The extensive context, patterns, and validation procedures minimize the risk of implementation errors.
+**Risk Assessment**: Minimal risk
+- Only adds test coverage, doesn't modify production code
+- All existing tests should pass without modification
+- Worst case: remove new tests if they fail
+- Cannot break existing functionality
+
+**Validation**: This is a focused test addition to verify the refinements added in P3.M2.T1.S2 work correctly. The change is localized to the test file. All existing code and tests should continue to work. Highest confidence for one-pass implementation success.
+
+---
+
+**PRP Version:** 1.0.0
+**Date:** January 26, 2026
+**Status:** READY FOR IMPLEMENTATION
+
+---
+
+**End of PRP**
