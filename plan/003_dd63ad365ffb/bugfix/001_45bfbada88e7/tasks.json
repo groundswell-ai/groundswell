@@ -554,7 +554,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S1",
                   "title": "Extend WorkflowConfig with errorMergeStrategy",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - ErrorMergeStrategy exists in src/types/error-strategy.ts. @Task decorator supports error merge for concurrent tasks. WorkflowConfig in src/types/workflow-context.ts has no error merge option.\n2. INPUT: Existing ErrorMergeStrategy interface.\n3. LOGIC: Extend WorkflowConfig interface in src/types/workflow-context.ts with optional errorMergeStrategy?: ErrorMergeStrategy field. Pass through to workflow initialization. Default: disabled (matches PRD - 'first error wins').\n4. OUTPUT: Extended WorkflowConfig interface with error merge support."
@@ -563,7 +563,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S2",
                   "title": "Implement error collection in workflow execution",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M4.T1.S1"

@@ -8,6 +8,7 @@
 import type { WorkflowNode } from './workflow.js';
 import type { ReflectionAPI } from './reflection.js';
 import type { AgentResponse } from './agent.js';
+import type { ErrorMergeStrategy } from './error-strategy.js';
 
 // Re-export ReflectionAPI for backward compatibility
 export type { ReflectionAPI } from './reflection.js';
@@ -150,6 +151,42 @@ export interface WorkflowConfig {
 
   /** Automatically validate AgentResponse results after agent.prompt() calls */
   autoValidateResponses?: boolean;
+
+  /**
+   * Strategy for merging multiple errors
+   *
+   * @remarks
+   * When provided, enables workflow-level error merge for multiple failures.
+   * Default: undefined (first error wins behavior).
+   *
+   * @example
+   * ```ts
+   * // Enable error merging with default strategy
+   * const config: WorkflowConfig = {
+   *   name: 'MyWorkflow',
+   *   errorMergeStrategy: { enabled: true }
+   * };
+   *
+   * // Enable with custom combine function
+   * const config: WorkflowConfig = {
+   *   name: 'MyWorkflow',
+   *   errorMergeStrategy: {
+   *     enabled: true,
+   *     combine: (errors) => ({
+   *       message: `Custom: ${errors.length} failures`,
+   *       // ... custom error object
+   *     })
+   *   }
+   * };
+   *
+   * // Default behavior (first error wins)
+   * const config: WorkflowConfig = {
+   *   name: 'MyWorkflow'
+   *   // errorMergeStrategy not provided = first error wins
+   * };
+   * ```
+   */
+  errorMergeStrategy?: ErrorMergeStrategy;
 }
 
 /**
