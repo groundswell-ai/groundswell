@@ -366,6 +366,9 @@ export class Agent {
       throw new Error(`Provider '${resolvedProvider}' is not registered`);
     }
 
+    // Capture non-null provider instance for use in closure (TypeScript strict mode requirement)
+    const provider = providerInstance;
+
     // Merge configuration: Prompt > Overrides > Config
     const effectiveSystem =
       prompt.systemOverride ?? overrides?.system ?? this.config.system;
@@ -461,16 +464,20 @@ export class Agent {
     async function* streamGenerator(): AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
       try {
         // Call provider with streaming enabled
-        const providerStream = await providerInstance.execute<T>(
+        // Provider returns: Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>>
+        const providerResult = provider.execute<T>(
           providerRequest,
           self.toolExecutor.bind(self),
           providerHooks
         );
 
-        // Check if provider returned an AsyncGenerator (streaming mode)
-        if (Symbol.asyncIterator in providerStream) {
+        // Check if provider returned an AsyncGenerator (streaming mode) directly
+        if (Symbol.asyncIterator in providerResult) {
           // Provider is in streaming mode - iterate and yield events
-          for await (const event of providerStream as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>) {
+          const providerStream = providerResult as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
+          let finalValue: AgentResponse<T> | undefined;
+
+          for await (const event of providerStream) {
             // Check for cancellation
             if (controller.signal.aborted) {
               yield {
@@ -479,20 +486,32 @@ export class Agent {
                 code: 'CANCELLED',
                 retryable: false,
               };
-              break;
+              // Cancellation: return error response
+              return createErrorResponse(
+                'CANCELLED',
+                'Stream cancelled by user',
+                {},
+                false
+              ) as AgentResponse<T>;
             }
 
             // Yield event from provider
             yield event;
           }
 
-          // Return final AgentResponse from generator
-          // The provider's generator will return the final response
-          return (await (providerStream as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>).next()).value;
+          // After loop completes, the AsyncGenerator's return value is the final AgentResponse<T>
+          // We need to get it by calling next() one more time
+          const finalResult = await providerStream.next();
+          // The value should be AgentResponse<T> when done=true, but TypeScript sees it as StreamEvent | AgentResponse<T>
+          finalValue = finalResult.value as AgentResponse<T>;
+
+          // Return the final response
+          return finalValue;
         } else {
-          // Provider returned a regular AgentResponse (non-streaming mode)
+          // Provider returned a Promise<AgentResponse<T>> (non-streaming mode)
           // This shouldn't happen with streaming: true, but handle it gracefully
-          const response = await providerStream as AgentResponse<T>;
+          const responsePromise = providerResult as Promise<AgentResponse<T>>;
+          const response = await responsePromise;
           yield {
             type: 'done',
             finishReason: response.status === 'error' ? 'error' : 'stop',
@@ -578,6 +597,9 @@ export class Agent {
         false
       ) as AgentResponse<T>;
     }
+
+    // Capture non-null provider instance for use in closure (TypeScript strict mode requirement)
+    const provider = providerInstance;
 
     // Merge configuration: Prompt > Overrides > Config
     const effectiveSystem =
@@ -728,11 +750,28 @@ export class Agent {
       };
 
       // Execute via provider abstraction
-      const response = await providerInstance.execute<T>(
+      // Provider returns: Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>>
+      // For non-streaming mode, it returns Promise<AgentResponse<T>>
+      const providerResult = provider.execute<T>(
         providerRequest,
         this.toolExecutor.bind(this),
         providerHooks
       );
+
+      // Handle the union return type
+      const response: AgentResponse<T> = Symbol.asyncIterator in providerResult
+        ? (await (async () => {
+            // Provider returned AsyncGenerator (shouldn't happen without streaming: true, but handle gracefully)
+            const generator = providerResult as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
+            // Consume all events
+            for await (const _event of generator) {
+              // Discard events, we just want the final response
+            }
+            const finalResult = await generator.next();
+            // The value should be AgentResponse<T> when done=true
+            return finalResult.value as AgentResponse<T>;
+          })())
+        : await (providerResult as Promise<AgentResponse<T>>);
 
       const duration = Date.now() - startTime;
 

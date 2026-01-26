@@ -556,7 +556,7 @@ export interface Provider {
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
     hooks?: ProviderHookEvents
-  ): Promise<AgentResponse<T> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>>;
+  ): Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
 
   /**
    * Register MCP servers and return available tools

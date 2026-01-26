@@ -245,7 +245,7 @@ export class AnthropicProvider implements Provider {
    * P2.M1.T1.S6: Message iteration - iterates AsyncGenerator and builds AgentResponse
    * Streaming: Returns AsyncGenerator<StreamEvent> when options.streaming = true
    */
-  async execute<T>(
+  execute<T>(
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
     hooks?: ProviderHookEvents,
@@ -262,198 +262,203 @@ export class AnthropicProvider implements Provider {
       return this.executeStreaming<T>(request, toolExecutor, hooks);
     }
 
-    // P2.M2.T1.S2: Session detection and retrieval
-    // Extract sessionId from request options and retrieve session state
-    const sessionId = request.options.sessionId;
-    let session: SessionState | undefined;
-    let isContinuation = false;
+    // NON-STREAMING MODE: Wrap in async IIFE to return Promise<AgentResponse<T>>
+    // Note: This function is not 'async' because it needs to return either Promise or AsyncGenerator
+    // The non-streaming path is wrapped in an async IIFE to return a Promise
+    return (async (): Promise<AgentResponse<T>> => {
+      // P2.M2.T1.S2: Session detection and retrieval
+      // Extract sessionId from request options and retrieve session state
+      const sessionId = request.options.sessionId;
+      let session: SessionState | undefined;
+      let isContinuation = false;
 
-    if (sessionId) {
-      session = this.getSession(sessionId);
-
-      // Check if this is a continuation (existing history)
-      // Only continue if session exists and has history
-      if (session && session.history.length > 0) {
-        isContinuation = true;
-      }
-
-      // P2.M2.T1.S2: Create session if it doesn't exist (lazy session creation)
-      // Session will be populated with user messages during message iteration
-      if (!session) {
-        this.createSession(sessionId);
+      if (sessionId) {
         session = this.getSession(sessionId);
+
+        // Check if this is a continuation (existing history)
+        // Only continue if session exists and has history
+        if (session && session.history.length > 0) {
+          isContinuation = true;
+        }
+
+        // P2.M2.T1.S2: Create session if it doesn't exist (lazy session creation)
+        // Session will be populated with user messages during message iteration
+        if (!session) {
+          this.createSession(sessionId);
+          session = this.getSession(sessionId);
+        }
       }
-    }
 
-    // PATTERN: Model resolution using normalizeModel()
-    // FROM: src/providers/anthropic-provider.ts:246-259
-    // Default model from src/core/agent.ts:320
-    const modelSpec = this.normalizeModel(
-      request.options.model ?? "claude-sonnet-4-20250514",
-    );
+      // PATTERN: Model resolution using normalizeModel()
+      // FROM: src/providers/anthropic-provider.ts:246-259
+      // Default model from src/core/agent.ts:320
+      const modelSpec = this.normalizeModel(
+        request.options.model ?? "claude-sonnet-4-20250514",
+      );
 
-    // PATTERN: Convert Provider hooks to SDK hooks
-    // Adapts ProviderHookEvents to SDK-compatible format for use in query()
-    const sdkHooks = this.buildAgentSDKHooks(hooks);
+      // PATTERN: Convert Provider hooks to SDK hooks
+      // Adapts ProviderHookEvents to SDK-compatible format for use in query()
+      const sdkHooks = this.buildAgentSDKHooks(hooks);
 
-    // PATTERN: AgentSDKOptions construction (EXACT pattern from src/core/agent.ts:397-426)
-    // CRITICAL: Map ProviderRequest fields to SDK Options format
-    const sdkOptions = {
-      // Model mapping
-      model: modelSpec.model,
+      // PATTERN: AgentSDKOptions construction (EXACT pattern from src/core/agent.ts:397-426)
+      // CRITICAL: Map ProviderRequest fields to SDK Options format
+      const sdkOptions = {
+        // Model mapping
+        model: modelSpec.model,
 
-      // System prompt mapping (from src/core/agent.ts:317-318)
-      // CRITICAL: Inject loaded skills via buildSystemPromptWithSkills() helper
-      systemPrompt: this.buildSystemPromptWithSkills(request.options.systemPrompt),
+        // System prompt mapping (from src/core/agent.ts:317-318)
+        // CRITICAL: Inject loaded skills via buildSystemPromptWithSkills() helper
+        systemPrompt: this.buildSystemPromptWithSkills(request.options.systemPrompt),
 
-      // P2.M2.T1.S2: Continue flag for session continuation
-      // CRITICAL: When continuing, SDK expects continue: true AND streamInput() with history
-      ...(isContinuation && { continue: true }),
+        // P2.M2.T1.S2: Continue flag for session continuation
+        // CRITICAL: When continuing, SDK expects continue: true AND streamInput() with history
+        ...(isContinuation && { continue: true }),
 
-      // Tools mapping to allowedTools (string[])
-      // CRITICAL: Map tool objects to tool names (from src/core/agent.ts:405-407)
-      ...(request.options.tools &&
-        request.options.tools.length > 0 && {
-          allowedTools: request.options.tools.map((t) => t.name),
+        // Tools mapping to allowedTools (string[])
+        // CRITICAL: Map tool objects to tool names (from src/core/agent.ts:405-407)
+        ...(request.options.tools &&
+          request.options.tools.length > 0 && {
+            allowedTools: request.options.tools.map((t) => t.name),
+          }),
+
+        // MCP servers integration (from P2.M1.T1.S7)
+        // Include registered MCP servers if available
+        ...(this.mcpServerConfig && {
+          mcpServers: {
+            "groundswell-mcp": this.mcpServerConfig,
+          },
         }),
 
-      // MCP servers integration (from P2.M1.T1.S7)
-      // Include registered MCP servers if available
-      ...(this.mcpServerConfig && {
-        mcpServers: {
-          "groundswell-mcp": this.mcpServerConfig,
-        },
-      }),
+        // Hooks integration (from P2.M1.T2.S1)
+        // Include converted hooks if any were mapped
+        ...(Object.keys(sdkHooks).length > 0 && {
+          hooks: sdkHooks,
+        }),
+      };
 
-      // Hooks integration (from P2.M1.T2.S1)
-      // Include converted hooks if any were mapped
-      ...(Object.keys(sdkHooks).length > 0 && {
-        hooks: sdkHooks,
-      }),
-    };
+      // PATTERN: Start time tracking for duration calculation
+      // FROM: src/core/agent.ts line 406
+      const startTime = Date.now();
 
-    // PATTERN: Start time tracking for duration calculation
-    // FROM: src/core/agent.ts line 406
-    const startTime = Date.now();
+      // PATTERN: SDK query() call (EXACT pattern from src/core/agent.ts:431)
+      // CRITICAL: query() returns AsyncGenerator<SDKMessage> (not Promise!)
+      // Do NOT await the query() call - it returns the generator synchronously
+      // P2.M2.T1.S2: For continuation, use empty prompt (history comes via streamInput)
+      const queryResult = this.sdk!.query({
+        prompt: isContinuation ? '' : request.prompt,
+        options: sdkOptions,
+      });
 
-    // PATTERN: SDK query() call (EXACT pattern from src/core/agent.ts:431)
-    // CRITICAL: query() returns AsyncGenerator<SDKMessage> (not Promise!)
-    // Do NOT await the query() call - it returns the generator synchronously
-    // P2.M2.T1.S2: For continuation, use empty prompt (history comes via streamInput)
-    const queryResult = this.sdk.query({
-      prompt: isContinuation ? '' : request.prompt,
-      options: sdkOptions,
-    });
+      // P2.M2.T1.S2: Stream session history for continuation
+      // CRITICAL: continue: true alone is insufficient - must also call streamInput() with history
+      if (isContinuation && session) {
+        await queryResult.streamInput(
+          async function* historyStream() {
+            for (const msg of session!.history) {
+              yield msg;
+            }
+          }()
+        );
 
-    // P2.M2.T1.S2: Stream session history for continuation
-    // CRITICAL: continue: true alone is insufficient - must also call streamInput() with history
-    if (isContinuation && session) {
-      await queryResult.streamInput(
-        async function* historyStream() {
-          for (const msg of session!.history) {
-            yield msg;
-          }
-        }()
-      );
+        // Stream new user message for continuation
+        // CRITICAL: New message also goes via streamInput(), not prompt parameter
+        await queryResult.streamInput(
+          async function* newMessageStream() {
+            yield {
+              type: 'user',
+              message: { content: request.prompt },
+              parent_tool_use_id: null,
+              session_id: session!.history[0]?.session_id ?? '',
+            } as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage;
+          }()
+        );
+      }
 
-      // Stream new user message for continuation
-      // CRITICAL: New message also goes via streamInput(), not prompt parameter
-      await queryResult.streamInput(
-        async function* newMessageStream() {
-          yield {
-            type: 'user',
-            message: { content: request.prompt },
-            parent_tool_use_id: null,
-            session_id: session!.history[0]?.session_id ?? '',
-          } as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage;
-        }()
-      );
-    }
+      // PATTERN: Message iteration and AgentResponse construction
+      // FROM: src/core/agent.ts lines 437-492
+      let resultMessage: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null = null;
+      let toolCallCount = 0;
 
-    // PATTERN: Message iteration and AgentResponse construction
-    // FROM: src/core/agent.ts lines 437-492
-    let resultMessage: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null = null;
-    let toolCallCount = 0;
-
-    // Iterate over the AsyncGenerator of SDK messages
-    for await (const message of queryResult) {
-      // Count tool uses from assistant messages
-      if (message.type === "assistant") {
-        const content = message.message?.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === "tool_use") {
-              toolCallCount++;
-              // Note: Hooks adapter will be implemented in P2.M1.T2.S1
+      // Iterate over the AsyncGenerator of SDK messages
+      for await (const message of queryResult) {
+        // Count tool uses from assistant messages
+        if (message.type === "assistant") {
+          const content = message.message?.content;
+          if (Array.isArray(content)) {
+            for (const block of content) {
+              if (block.type === "tool_use") {
+                toolCallCount++;
+                // Note: Hooks adapter will be implemented in P2.M1.T2.S1
+              }
             }
           }
         }
-      }
 
-      // P2.M2.T1.S2: Capture user messages and append to session history
-      // CRITICAL: User messages must be accumulated for next turn's streamInput()
-      if (message.type === "user" && session) {
-        session.history.push(message as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage);
-      }
+        // P2.M2.T1.S2: Capture user messages and append to session history
+        // CRITICAL: User messages must be accumulated for next turn's streamInput()
+        if (message.type === "user" && session) {
+          session.history.push(message as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage);
+        }
 
-      // Capture the final result message
-      if (message.type === "result") {
-        resultMessage = message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
+        // Capture the final result message
+        if (message.type === "result") {
+          resultMessage = message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
 
-        // P2.M2.T1.S2: Update session lastResult with latest execution result
-        if (session) {
-          session.lastResult = resultMessage;
+          // P2.M2.T1.S2: Update session lastResult with latest execution result
+          if (session) {
+            session.lastResult = resultMessage;
+          }
         }
       }
-    }
 
-    // Calculate duration from start time
-    const duration = Date.now() - startTime;
+      // Calculate duration from start time
+      const duration = Date.now() - startTime;
 
-    // Handle missing result message
-    if (!resultMessage) {
-      return createErrorResponse(
-        "INVALID_RESPONSE_FORMAT",
-        "No result message received from Agent SDK",
-        { duration },
-        false
-      ) as AgentResponse<T>;
-    }
+      // Handle missing result message
+      if (!resultMessage) {
+        return createErrorResponse(
+          "INVALID_RESPONSE_FORMAT",
+          "No result message received from Agent SDK",
+          { duration },
+          false
+        ) as AgentResponse<T>;
+      }
 
-    // Handle error subtypes (error_during_execution, error_max_turns)
-    if (resultMessage.subtype !== "success") {
-      const errorResult = resultMessage as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage & {
-        subtype: string;
-        errors?: string[];
+      // Handle error subtypes (error_during_execution, error_max_turns)
+      if (resultMessage.subtype !== "success") {
+        const errorResult = resultMessage as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage & {
+          subtype: string;
+          errors?: string[];
+        };
+        return createErrorResponse(
+          "EXECUTION_FAILED",
+          `Agent SDK execution failed: ${errorResult.subtype}`,
+          {
+            errors: errorResult.errors ?? [],
+            subtype: errorResult.subtype,
+          },
+          errorResult.subtype === "error_max_turns" // Recoverable if just hit turn limit
+        ) as AgentResponse<T>;
+      }
+
+      // Extract usage from result
+      const usage = {
+        input_tokens: resultMessage.usage?.input_tokens ?? 0,
+        output_tokens: resultMessage.usage?.output_tokens ?? 0,
       };
-      return createErrorResponse(
-        "EXECUTION_FAILED",
-        `Agent SDK execution failed: ${errorResult.subtype}`,
-        {
-          errors: errorResult.errors ?? [],
-          subtype: errorResult.subtype,
-        },
-        errorResult.subtype === "error_max_turns" // Recoverable if just hit turn limit
-      ) as AgentResponse<T>;
-    }
 
-    // Extract usage from result
-    const usage = {
-      input_tokens: resultMessage.usage?.input_tokens ?? 0,
-      output_tokens: resultMessage.usage?.output_tokens ?? 0,
-    };
+      // Extract data from result (prefer structured_output, fallback to result)
+      const data = (resultMessage.structured_output ?? resultMessage.result) as T;
 
-    // Extract data from result (prefer structured_output, fallback to result)
-    const data = (resultMessage.structured_output ?? resultMessage.result) as T;
-
-    // Return success response with metadata
-    return createSuccessResponse(data, {
-      agentId: this.id,
-      timestamp: Date.now(),
-      duration,
-      usage,
-      toolCalls: toolCallCount,
-    });
+      // Return success response with metadata
+      return createSuccessResponse(data, {
+        agentId: this.id,
+        timestamp: Date.now(),
+        duration,
+        usage,
+        toolCalls: toolCallCount,
+      });
+    })();
   }
 
   /**
@@ -475,6 +480,13 @@ export class AnthropicProvider implements Provider {
     toolExecutor: ToolExecutor,
     hooks?: ProviderHookEvents,
   ): AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
+    // SDK initialization check (required by TypeScript strict mode)
+    // The caller (execute) already checks this, but we need to assert here
+    // for TypeScript's control flow analysis across method boundaries
+    if (!this.sdk) {
+      throw new Error("SDK not initialized. Call initialize() first.");
+    }
+
     // P2.M2.T1.S2: Session detection and retrieval
     const sessionId = request.options.sessionId;
     let session: SessionState | undefined;

@@ -390,7 +390,7 @@ export class OpenCodeProvider implements Provider {
    * Full implementation in P3.M2.T1.S3
    * Streaming: Returns AsyncGenerator<StreamEvent> when options.streaming = true
    */
-  async execute<T>(
+  execute<T>(
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
     hooks?: ProviderHookEvents,
@@ -410,178 +410,181 @@ export class OpenCodeProvider implements Provider {
       return this.executeStreaming<T>(request, hooks);
     }
 
-    // ===== STEP 2: Session creation/retrieval =====
-    // OpenCode sessions are server-side, not in-memory like AnthropicProvider
-    // If sessionId is provided, reuse it. Otherwise, create a new session.
-    let sessionId = request.options.sessionId;
+    // NON-STREAMING MODE: Wrap in async IIFE to return Promise<AgentResponse<T>>
+    // Note: This function is not 'async' because it needs to return either Promise or AsyncGenerator
+    // The non-streaming path is wrapped in an async IIFE to return a Promise
+    return (async (): Promise<AgentResponse<T>> => {
+      // ===== STEP 2: Session creation/retrieval =====
+      // OpenCode sessions are server-side, not in-memory like AnthropicProvider
+      // If sessionId is provided, reuse it. Otherwise, create a new session.
+      let sessionId = request.options.sessionId;
 
-    if (!sessionId) {
-      // Create new session on server
-      const sessionResult = await this.client.session.create({});
-      if (!sessionResult.data) {
+      if (!sessionId) {
+        // Create new session on server
+        const sessionResult = await this.client!.session.create({});
+        if (!sessionResult.data) {
+          return createErrorResponse(
+            "EXECUTION_FAILED",
+            "Failed to create session: no data returned",
+            {},
+            false,
+          ) as AgentResponse<T>;
+        }
+        sessionId = sessionResult.data.id;
+      }
+
+      // ===== STEP 3: Model parsing =====
+      // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:280-282)
+      // Default model uses OpenCode's default: claude-opus-4-5-20251101
+      const modelSpec = this.normalizeModel(
+        request.options.model ?? "claude-opus-4-5-20251101",
+      );
+
+      // ===== STEP 4: Extract providerID and modelID =====
+      // OpenCode uses "providerID/modelID" format (e.g., "openai/gpt-4")
+      // parseModelSpec() handles the string, need to split for SDK call
+      const parts = modelSpec.model.split("/");
+      if (parts.length !== 2) {
         return createErrorResponse(
-          "EXECUTION_FAILED",
-          "Failed to create session: no data returned",
-          {},
+          "INVALID_MODEL_FORMAT",
+          `Model must be in 'provider/model' format: ${modelSpec.model}`,
+          { model: modelSpec.raw },
           false,
         ) as AgentResponse<T>;
       }
-      sessionId = sessionResult.data.id;
-    }
+      const [providerID, modelID] = parts;
 
-    // ===== STEP 3: Model parsing =====
-    // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:280-282)
-    // Default model uses OpenCode's default: claude-opus-4-5-20251101
-    const modelSpec = this.normalizeModel(
-      request.options.model ?? "claude-opus-4-5-20251101",
-    );
+      // ===== STEP 5: Hooks setup =====
+      const hookConfig = this.buildOpenCodeHooks(hooks);
 
-    // ===== STEP 4: Extract providerID and modelID =====
-    // OpenCode uses "providerID/modelID" format (e.g., "openai/gpt-4")
-    // parseModelSpec() handles the string, need to split for SDK call
-    const parts = modelSpec.model.split("/");
-    if (parts.length !== 2) {
-      return createErrorResponse(
-        "INVALID_MODEL_FORMAT",
-        `Model must be in 'provider/model' format: ${modelSpec.model}`,
-        { model: modelSpec.raw },
-        false,
-      ) as AgentResponse<T>;
-    }
-    const [providerID, modelID] = parts;
+      // ===== STEP 6: Start time tracking =====
+      // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:326)
+      const startTime = Date.now();
 
-    // ===== STEP 5: Hooks setup =====
-    const hookConfig = this.buildOpenCodeHooks(hooks);
+      // ===== STEP 7: Setup event subscription for hooks (if configured) =====
+      // OpenCode uses Server-Sent Events, not callback hooks like Anthropic
+      let eventStreamResult: { stream: AsyncIterable<unknown> } | null = null;
 
-    // ===== STEP 6: Start time tracking =====
-    // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:326)
-    const startTime = Date.now();
+      if (Object.keys(hookConfig).length > 0) {
+        // Subscribe to events for hook dispatch
+        eventStreamResult = await this.client!.event.subscribe();
 
-    // ===== STEP 7: Setup event subscription for hooks (if configured) =====
-    // OpenCode uses Server-Sent Events, not callback hooks like Anthropic
-    let eventStreamResult: Awaited<
-      ReturnType<typeof this.client.event.subscribe>
-    > | null = null;
-
-    if (Object.keys(hookConfig).length > 0) {
-      // Subscribe to events for hook dispatch
-      eventStreamResult = await this.client.event.subscribe();
-
-      // Process events in background (best-effort, non-blocking)
-      (async () => {
-        try {
-          if (!eventStreamResult) return;
-          for await (const event of eventStreamResult.stream) {
-            // onStream: TextPart with delta (streaming text chunks)
-            if (
-              hookConfig.onStream &&
-              event.type === "message.part.updated" &&
-              hooks?.onStream
-            ) {
-              const part = (
-                event as {
-                  properties?: { part?: { type: string; delta?: string } };
+        // Process events in background (best-effort, non-blocking)
+        (async () => {
+          try {
+            if (!eventStreamResult) return;
+            for await (const event of eventStreamResult.stream) {
+              // onStream: TextPart with delta (streaming text chunks)
+              if (
+                hookConfig.onStream &&
+                (event as { type?: string }).type === "message.part.updated" &&
+                hooks?.onStream
+              ) {
+                const part = (
+                  event as {
+                    properties?: { part?: { type: string; delta?: string } };
+                  }
+                ).properties?.part;
+                if (part?.type === "text" && part.delta) {
+                  hooks.onStream(part.delta);
                 }
-              ).properties?.part;
-              if (part?.type === "text" && part.delta) {
-                hooks.onStream(part.delta);
               }
             }
+          } catch (error) {
+            // Log but don't throw - event processing is best-effort
+            console.warn("Event stream error:", error);
           }
-        } catch (error) {
-          // Log but don't throw - event processing is best-effort
-          console.warn("Event stream error:", error);
-        }
-      })().catch((error) => {
-        console.warn("Event stream processing failed:", error);
+        })().catch((error) => {
+          console.warn("Event stream processing failed:", error);
+        });
+      }
+
+      // ===== STEP 8: Call onSessionStart hook =====
+      if (hooks?.onSessionStart) {
+        await hooks.onSessionStart();
+      }
+
+      // ===== STEP 9: Execute prompt =====
+      // PATTERN: Follow OpenCode execution patterns (opencode-execution-patterns.md Section 2)
+      // session.prompt() is synchronous - waits for completion
+      const result = await this.client!.session.prompt({
+        body: {
+          parts: [{ type: "text", text: request.prompt }],
+          model: { providerID, modelID },
+          // CRITICAL: Inject loaded skills via buildSystemPromptWithSkills() helper
+          // OpenCode supports system prompt via 'system' field in body
+          ...(request.options.systemPrompt || this.skillsPrompt ? {
+            system: this.buildSystemPromptWithSkills(request.options.systemPrompt),
+          } : {}),
+        },
+        path: { id: sessionId },
       });
-    }
 
-    // ===== STEP 8: Call onSessionStart hook =====
-    if (hooks?.onSessionStart) {
-      await hooks.onSessionStart();
-    }
+      // ===== STEP 10: Calculate duration =====
+      // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:400)
+      const duration = Date.now() - startTime;
 
-    // ===== STEP 9: Execute prompt =====
-    // PATTERN: Follow OpenCode execution patterns (opencode-execution-patterns.md Section 2)
-    // session.prompt() is synchronous - waits for completion
-    const result = await this.client.session.prompt({
-      body: {
-        parts: [{ type: "text", text: request.prompt }],
-        model: { providerID, modelID },
-        // CRITICAL: Inject loaded skills via buildSystemPromptWithSkills() helper
-        // OpenCode supports system prompt via 'system' field in body
-        ...(request.options.systemPrompt || this.skillsPrompt ? {
-          system: this.buildSystemPromptWithSkills(request.options.systemPrompt),
-        } : {}),
-      },
-      path: { id: sessionId },
-    });
+      // ===== STEP 11: Handle error response =====
+      // Check for error in result
+      if (!result.data || result.error) {
+        // Call onSessionEnd hook before returning error
+        if (hooks?.onSessionEnd) {
+          await hooks.onSessionEnd(duration);
+        }
 
-    // ===== STEP 10: Calculate duration =====
-    // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:400)
-    const duration = Date.now() - startTime;
+        return createErrorResponse(
+          "EXECUTION_FAILED",
+          result.error ? String(result.error) : "Unknown error",
+          { duration },
+          false,
+        ) as AgentResponse<T>;
+      }
 
-    // ===== STEP 11: Handle error response =====
-    // Check for error in result
-    if (!result.data || result.error) {
-      // Call onSessionEnd hook before returning error
+      // ===== STEP 12: Extract message and check for errors =====
+      // result.data is { info: AssistantMessage, parts: Part[] }
+      const responseData = result.data as {
+        info: import("@opencode-ai/sdk").AssistantMessage;
+        parts: unknown[];
+      };
+      const assistantMessage = responseData.info;
+
+      // Check for message-level errors
+      if (assistantMessage.error) {
+        return createErrorResponse(
+          "EXECUTION_FAILED",
+          `${assistantMessage.error.name}: ${assistantMessage.error.data?.message ?? "Unknown error"}`,
+          {
+            duration,
+            providerID: assistantMessage.providerID,
+            modelID: assistantMessage.modelID,
+          },
+          false,
+        ) as AgentResponse<T>;
+      }
+
+      // ===== STEP 13: Extract token usage =====
+      // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:430-433)
+      // Map OpenCode tokens format to TokenUsage (snake_case)
+      const usage = {
+        input_tokens: assistantMessage.tokens?.input ?? 0,
+        output_tokens: assistantMessage.tokens?.output ?? 0,
+      };
+
+      // ===== STEP 14: Call onSessionEnd hook =====
       if (hooks?.onSessionEnd) {
         await hooks.onSessionEnd(duration);
       }
 
-      return createErrorResponse(
-        "EXECUTION_FAILED",
-        result.error ? String(result.error) : "Unknown error",
-        { duration },
-        false,
-      ) as AgentResponse<T>;
-    }
-
-    // ===== STEP 12: Extract message and check for errors =====
-    // result.data is { info: AssistantMessage, parts: Part[] }
-    const responseData = result.data as {
-      info: import("@opencode-ai/sdk").AssistantMessage;
-      parts: unknown[];
-    };
-    const assistantMessage = responseData.info;
-
-    // Check for message-level errors
-    if (assistantMessage.error) {
-      return createErrorResponse(
-        "EXECUTION_FAILED",
-        `${assistantMessage.error.name}: ${assistantMessage.error.data?.message ?? "Unknown error"}`,
-        {
-          duration,
-          providerID: assistantMessage.providerID,
-          modelID: assistantMessage.modelID,
-        },
-        false,
-      ) as AgentResponse<T>;
-    }
-
-    // ===== STEP 13: Extract token usage =====
-    // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:430-433)
-    // Map OpenCode tokens format to TokenUsage (snake_case)
-    const usage = {
-      input_tokens: assistantMessage.tokens?.input ?? 0,
-      output_tokens: assistantMessage.tokens?.output ?? 0,
-    };
-
-    // ===== STEP 14: Call onSessionEnd hook =====
-    if (hooks?.onSessionEnd) {
-      await hooks.onSessionEnd(duration);
-    }
-
-    // ===== STEP 15: Return success response =====
-    // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:439-445)
-    // Return the entire AssistantMessage as T (caller can extract what they need)
-    return createSuccessResponse(assistantMessage as T, {
-      agentId: this.id,
-      timestamp: Date.now(),
-      duration,
-      usage,
-    });
+      // ===== STEP 15: Return success response =====
+      // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:439-445)
+      // Return the entire AssistantMessage as T (caller can extract what they need)
+      return createSuccessResponse(assistantMessage as T, {
+        agentId: this.id,
+        timestamp: Date.now(),
+        duration,
+        usage,
+      });
+    })();
   }
 
   /**
