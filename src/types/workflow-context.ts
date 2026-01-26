@@ -140,6 +140,77 @@ export interface WorkflowContext {
 }
 
 /**
+ * Event history configuration for workflow execution
+ *
+ * @remarks
+ * When enabled, events are stored in memory and can be accessed via
+ * the workflow's replay functionality. Events include step execution,
+ * errors, agent prompts, tool invocations, and state changes.
+ *
+ * **Memory Management:**
+ * - Events are trimmed based on both count (`maxEvents`) and age (`maxAgeMs`)
+ * - Lazy trimming is used for performance (only trims when significantly over limit)
+ * - When disabled, no events are stored in history (still emitted to observers)
+ *
+ * **Performance Impact:**
+ * - Enabled: Minimal overhead (~1-2ms per event)
+ * - Disabled: Zero overhead
+ *
+ * @example Enable event history with defaults
+ * ```ts
+ * const config: WorkflowConfig = {
+ *   name: 'MyWorkflow',
+ *   eventHistory: { enabled: true }
+ * };
+ * ```
+ *
+ * @example Custom limits
+ * ```ts
+ * const config: WorkflowConfig = {
+ *   name: 'MyWorkflow',
+ *   eventHistory: {
+ *     enabled: true,
+ *     maxEvents: 500,
+ *     maxAgeMs: 1800000  // 30 minutes
+ *   }
+ * };
+ * ```
+ */
+export interface EventHistoryConfig {
+  /**
+   * Enable event history collection
+   *
+   * When false (default), no events are stored in history.
+   * Events are still emitted to observers in real-time.
+   *
+   * @default false
+   */
+  enabled?: boolean;
+
+  /**
+   * Maximum number of events to store in history
+   *
+   * When the limit is exceeded, oldest events are removed first.
+   * Uses lazy trimming for performance (trims at 1.5x the limit).
+   *
+   * @default 1000
+   * @minimum 1
+   */
+  maxEvents?: number;
+
+  /**
+   * Maximum age of events in milliseconds
+   *
+   * Events older than this are removed from history.
+   * Age is based on insertion time, not event timestamp.
+   *
+   * @default 3600000 (1 hour)
+   * @minimum 1000 (1 second)
+   */
+  maxAgeMs?: number;
+}
+
+/**
  * Configuration for creating a functional workflow
  */
 export interface WorkflowConfig {
@@ -151,6 +222,36 @@ export interface WorkflowConfig {
 
   /** Automatically validate AgentResponse results after agent.prompt() calls */
   autoValidateResponses?: boolean;
+
+  /**
+   * Event history configuration
+   *
+   * @remarks
+   * Controls whether events are stored in memory for replay functionality.
+   * When disabled (default), events are still emitted to observers but not
+   * stored in the internal event history array.
+   *
+   * @example Enable with defaults
+   * ```ts
+   * const config: WorkflowConfig = {
+   *   name: 'MyWorkflow',
+   *   eventHistory: { enabled: true }
+   * };
+   * ```
+   *
+   * @example Custom limits
+   * ```ts
+   * const config: WorkflowConfig = {
+   *   name: 'MyWorkflow',
+   *   eventHistory: {
+   *     enabled: true,
+   *     maxEvents: 500,
+   *     maxAgeMs: 1800000
+   *   }
+   * };
+   * ```
+   */
+  eventHistory?: EventHistoryConfig;
 
   /**
    * Strategy for merging multiple errors

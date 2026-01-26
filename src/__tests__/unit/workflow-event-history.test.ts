@@ -20,7 +20,11 @@ describe('Workflow Event History', () => {
   let capturedEvents: WorkflowEvent[];
 
   beforeEach(() => {
+    // Create workflow with event history enabled
     workflow = new TestWorkflow();
+    // Enable event history for testing
+    (workflow as any).config.eventHistory = { enabled: true };
+
     capturedEvents = [];
 
     // Create observer that captures events

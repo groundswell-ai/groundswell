@@ -7,7 +7,7 @@ import type {
   SerializedWorkflowState,
   WorkflowError,
 } from '../types/index.js';
-import type { WorkflowContext, WorkflowConfig, WorkflowResult } from '../types/workflow-context.js';
+import type { WorkflowContext, WorkflowConfig, WorkflowResult, EventHistoryConfig } from '../types/workflow-context.js';
 import type { AgentResponse } from '../types/agent.js';
 import { z } from 'zod';
 import { generateId } from '../utils/id.js';
@@ -33,6 +33,20 @@ export interface RestartStepOptions {
   maxRetries?: number;
   /** Override state to restore (defaults to current snapshot) */
   stateOverride?: SerializedWorkflowState;
+}
+
+/**
+ * Internal entry for event history with insertion timestamp
+ *
+ * @remarks
+ * This type is used internally to track when events were added to history,
+ * enabling age-based trimming independent of event timestamps.
+ */
+interface EventHistoryEntry {
+  /** The workflow event */
+  event: WorkflowEvent;
+  /** Insertion time in milliseconds since epoch */
+  insertedAt: number;
 }
 
 /**
@@ -101,8 +115,8 @@ export class Workflow<T = unknown> {
   /** Error collection state for workflow-level error merge */
   private collectedErrors: WorkflowError[] = [];
 
-  /** Event history for replay functionality (ES2022 private field) */
-  #eventHistory: WorkflowEvent[] = [];
+  /** Event history entries with insertion timestamps for replay functionality (ES2022 private field) */
+  #eventHistory: EventHistoryEntry[] = [];
 
   /** Total operations count for error merge context */
   private totalOperations: number = 0;
@@ -214,6 +228,73 @@ export class Workflow<T = unknown> {
     }
 
     return root.observers;
+  }
+
+  /**
+   * Check if event history is enabled for this workflow
+   *
+   * @returns true if event history is enabled, false otherwise
+   */
+  private isEventHistoryEnabled(): boolean {
+    return this.config.eventHistory?.enabled === true;
+  }
+
+  /**
+   * Get event history configuration with defaults applied
+   *
+   * @returns Configuration object with all required fields populated
+   */
+  private getEventHistoryConfig(): Required<EventHistoryConfig> {
+    return {
+      enabled: this.config.eventHistory?.enabled ?? false,
+      maxEvents: this.config.eventHistory?.maxEvents ?? 1000,
+      maxAgeMs: this.config.eventHistory?.maxAgeMs ?? 3600000,
+    };
+  }
+
+  /**
+   * Trim event history based on configuration
+   *
+   * Uses lazy trimming for performance:
+   * - Only trims when at least 1.5x over the maxEvents limit
+   * - Applies both count and age constraints
+   * - Uses slice() for efficiency (not shift())
+   *
+   * @remarks
+   * Lazy trimming reduces the number of trim operations by only trimming
+   * when the history is significantly over the limit (1.5x). This provides
+   * better performance for high-frequency event emission.
+   */
+  private trimEventHistory(): void {
+    const config = this.getEventHistoryConfig();
+
+    // Lazy trimming: only trim when significantly over limit
+    const trimThreshold = Math.floor(config.maxEvents * 1.5);
+    if (this.#eventHistory.length < trimThreshold) {
+      return;
+    }
+
+    const now = Date.now();
+    const ageCutoff = now - config.maxAgeMs;
+
+    // Age-based trimming: find first entry within age limit
+    let keepFromIndex = 0;
+    for (let i = 0; i < this.#eventHistory.length; i++) {
+      if (this.#eventHistory[i].insertedAt > ageCutoff) {
+        keepFromIndex = i;
+        break;
+      }
+    }
+
+    // Count-based trimming: remove excess events
+    const countBasedIndex = Math.max(0, this.#eventHistory.length - config.maxEvents);
+
+    // Use the more aggressive constraint
+    const finalIndex = Math.max(keepFromIndex, countBasedIndex);
+
+    if (finalIndex > 0) {
+      this.#eventHistory = this.#eventHistory.slice(finalIndex);
+    }
   }
 
   /**
@@ -494,8 +575,11 @@ export class Workflow<T = unknown> {
    * May trigger treeUpdated notifications for specific event types.
    */
   public emitEvent(event: WorkflowEvent): void {
-    // Store event in history FIRST (for replay functionality)
-    this.#eventHistory.push(event);
+    // Store event in history FIRST (for replay functionality) - only if enabled
+    if (this.isEventHistoryEnabled()) {
+      this.#eventHistory.push({ event, insertedAt: Date.now() });
+      this.trimEventHistory();
+    }
 
     this.node.events.push(event);
 
@@ -569,8 +653,8 @@ export class Workflow<T = unknown> {
     observer: WorkflowObserver,
     options?: ReplayEventsOptions
   ): void {
-    // Start with full history
-    let events = this.#eventHistory;
+    // Extract events from entries
+    let events = this.#eventHistory.map(entry => entry.event);
 
     // Filter by timestamp if provided
     if (options?.since !== undefined) {
