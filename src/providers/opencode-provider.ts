@@ -93,18 +93,39 @@ export class OpenCodeProvider implements Provider {
   private sdk: typeof import("@opencode-ai/sdk") | null = null;
 
   /**
+   * OpenCode server instance
+   *
+   * Stores the server control object from createOpencode().
+   * Has { url: string, close(): void } shape.
+   *
+   * @internal
+   */
+  private server: { url: string; close(): void } | null = null;
+
+  /**
+   * OpenCode client instance
+   *
+   * Stores the OpencodeClient for use in execute() method.
+   *
+   * @internal
+   */
+  private client: import("@opencode-ai/sdk").OpencodeClient | null = null;
+
+  /**
    * Initialize the OpenCode provider
    *
-   * Loads the OpenCode SDK module. Server startup will be handled
-   * in subsequent subtasks (P3.M2.T1.S2).
+   * Loads the OpenCode SDK and starts the OpenCode server.
+   * Uses full-stack mode (embedded server) for complete lifecycle control.
    *
-   * @param options - Optional provider configuration (endpoint, apiKey, etc.)
+   * @param options - Optional provider configuration (endpoint, apiKey, timeout, etc.)
    * @throws {Error} When SDK module fails to load
+   * @throws {Error} When server fails to start
    * @remarks
-   * Implemented in P3.M2.T1.S1
+   * Implemented in P3.M2.T1.S2
    */
   async initialize(options?: ProviderOptions): Promise<void> {
     // Idempotent check: if SDK is already loaded, return immediately
+    // FOLLOW: AnthropicProvider pattern at src/providers/anthropic-provider.ts:156-159
     if (this.sdk) {
       return;
     }
@@ -127,33 +148,115 @@ export class OpenCodeProvider implements Provider {
       );
     }
 
-    // Note: Server startup will be in P3.M2.T1.S2
-    // This task only loads the SDK module
+    // Map ProviderOptions to OpenCode ServerOptions
+    const serverOptions: {
+      hostname?: string;
+      port?: number;
+      timeout?: number;
+      config?: import("@opencode-ai/sdk").Config;
+    } = {
+      port: 4096,  // OpenCode default port
+      timeout: options?.timeout || 30000,  // 30 second default
+    };
+
+    // Handle endpoint option (may be full URL or just hostname)
+    if (options?.endpoint) {
+      if (options.endpoint.includes('://')) {
+        // Full URL provided (e.g., http://localhost:4096)
+        // The Config interface uses baseUrl for the server URL
+        serverOptions.config = {
+          ...serverOptions.config,
+          baseUrl: options.endpoint,
+        } as import("@opencode-ai/sdk").Config;
+      } else {
+        // Just hostname provided (e.g., localhost)
+        serverOptions.hostname = options.endpoint;
+      }
+    }
+
+    // Handle API key option
+    // Note: OpenCode SDK doesn't have a simple apiKey config
+    // The API key is typically handled via server-side config or auth
+    // For MVP, we'll pass it through headers if provided
+    if (options?.apiKey) {
+      serverOptions.config = {
+        ...serverOptions.config,
+        headers: {
+          ...(serverOptions.config as any)?.headers,
+          Authorization: `Bearer ${options.apiKey}`,
+        },
+      } as import("@opencode-ai/sdk").Config;
+    }
+
+    // Handle custom headers
+    if (options?.headers) {
+      serverOptions.config = {
+        ...serverOptions.config,
+        headers: {
+          ...(serverOptions.config as any)?.headers,
+          ...options.headers,
+        },
+      } as import("@opencode-ai/sdk").Config;
+    }
+
+    // Start OpenCode server and get client
+    // CRITICAL: createOpencode() is async - must await
+    // CRITICAL: Returns { client, server } - server needs cleanup
+    try {
+      const { client, server } = await this.sdk.createOpencode(serverOptions);
+
+      this.client = client;
+      this.server = server;
+
+      console.log(`OpenCode initialized at ${server.url}`);
+    } catch (error) {
+      // Handle server startup failures
+      throw new Error(
+        `Failed to start OpenCode server: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+
+    // Note: sessionId option ignored - OpenCode has native sessions
+    // Note: headers option not supported by OpenCode SDK
   }
 
   /**
    * Terminate the provider and cleanup resources
    *
-   * Clears the SDK module reference to allow garbage collection.
-   * Additional cleanup will be added in subsequent subtasks.
+   * Shuts down the OpenCode server and clears all references.
+   * The server process is terminated and all resources are released.
    *
    * @remarks
-   * Implemented in P3.M2.T1.S1
+   * Implemented in P3.M2.T1.S2
    */
   async terminate(): Promise<void> {
     // Idempotent check: if SDK is already null, return immediately
+    // FOLLOW: initialize() pattern (check this.sdk === null for terminate)
     if (this.sdk === null) {
       return;
     }
 
-    // Clear SDK reference for garbage collection
+    // Close OpenCode server (best-effort - never throw)
+    // CRITICAL: Must call server.close() to terminate server process
+    // CRITICAL: Use try-catch to prevent throwing in terminate()
+    if (this.server) {
+      try {
+        this.server.close();
+      } catch (error) {
+        // Log but don't throw - cleanup is best-effort
+        console.warn('Error closing OpenCode server:', error);
+      }
+      this.server = null;
+    }
+
+    // Clear client reference
+    this.client = null;
+
+    // Clear SDK reference to allow garbage collection
     this.sdk = null;
 
-    // Additional cleanup will be added in later subtasks:
-    // - Server shutdown (P3.M2.T1.S2)
-    // - MCP config clearing (P3.M2.T1.S4)
-    // - Skills clearing (P3.M2.T1.S4)
-    // - Session clearing (P3.M2.T1.S3)
+    // GOTCHA: No return value needed - Promise<void> is implicit
+    // GOTCHA: No throws possible from null check and assignment
   }
 
   /**
