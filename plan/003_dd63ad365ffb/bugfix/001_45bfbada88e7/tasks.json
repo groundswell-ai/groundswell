@@ -108,7 +108,7 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "Implement Workflow-Level Restart Methods",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Add restartStep() and analyzeError() methods to Workflow base class for parent-driven restart decisions with state restoration.",
               "subtasks": [
                 {
@@ -148,7 +148,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T3.S4",
                   "title": "Write unit tests for workflow restart methods",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T3.S1",
