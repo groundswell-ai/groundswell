@@ -555,7 +555,8 @@ export class Workflow<T = unknown> {
       node: this.node,
       stepName,
       retryCount,
-      state: restoredState,
+      restoredState,
+      timestamp: Date.now(),
     });
 
     return result;

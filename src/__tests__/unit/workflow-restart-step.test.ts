@@ -233,8 +233,9 @@ describe('Workflow.restartStep', () => {
         expect(restartedEvents[0].stepName).toBe('myStep');
         expect(restartedEvents[0].retryCount).toBe(2); // retryCount 1 + 1 = 2
         expect(restartedEvents[0].node).toBe(wf.node);
-        expect(restartedEvents[0].state).toBeDefined();
-        expect(typeof restartedEvents[0].state).toBe('object');
+        expect(restartedEvents[0].restoredState).toBeDefined();
+        expect(typeof restartedEvents[0].restoredState).toBe('object');
+        expect(restartedEvents[0].timestamp).toBeGreaterThan(0);
       }
     });
 
@@ -359,8 +360,9 @@ describe('Workflow.restartStep', () => {
       expect(restartedEvents.length).toBe(1);
 
       if (restartedEvents[0]?.type === 'stepRestarted') {
-        expect(restartedEvents[0].state).toBeDefined();
-        expect(restartedEvents[0].state.myValue).toBe('test value');
+        expect(restartedEvents[0].restoredState).toBeDefined();
+        expect(restartedEvents[0].restoredState.myValue).toBe('test value');
+        expect(restartedEvents[0].timestamp).toBeGreaterThan(0);
       }
     });
 
@@ -396,10 +398,11 @@ describe('Workflow.restartStep', () => {
       expect(restartedEvents.length).toBe(1);
 
       if (restartedEvents[0]?.type === 'stepRestarted') {
-        expect(restartedEvents[0].state).toEqual({
+        expect(restartedEvents[0].restoredState).toEqual({
           myValue: 'overridden',
           counter: 42,
         });
+        expect(restartedEvents[0].timestamp).toBeGreaterThan(0);
       }
     });
   });

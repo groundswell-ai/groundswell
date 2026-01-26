@@ -14,7 +14,7 @@ export type WorkflowEvent =
   | { type: 'stateSnapshot'; node: WorkflowNode }
   | { type: 'stepStart'; node: WorkflowNode; step: string }
   | { type: 'stepRetry'; node: WorkflowNode; stepName: string; retryCount: number; analysis: RestartAnalysis; error: WorkflowError; timestamp: number }
-  | { type: 'stepRestarted'; node: WorkflowNode; stepName: string; retryCount: number; state: SerializedWorkflowState }
+  | { type: 'stepRestarted'; node: WorkflowNode; stepName: string; retryCount: number; restoredState: SerializedWorkflowState; timestamp: number }
   | { type: 'stepEnd'; node: WorkflowNode; step: string; duration: number }
   | { type: 'error'; node: WorkflowNode; error: WorkflowError }
   | { type: 'taskStart'; node: WorkflowNode; task: string }
