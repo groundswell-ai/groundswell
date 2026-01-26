@@ -264,7 +264,7 @@ export interface PromptOverrides {
 export type AgentResponseStatus = 'success' | 'error' | 'partial';
 
 /**
- * Response wrapper for agent execution results
+ * Response wrapper for agent execution results (discriminated union)
  *
  * ## PRD 6.4 Response Requirements
  *
@@ -276,9 +276,20 @@ export type AgentResponseStatus = 'success' | 'error' | 'partial';
  * 4. **Null over Undefined** (PRD 6.4.4): Use `null` for absent values
  * 5. **Error Responses** (PRD 6.4.5): Failed operations return valid JSON
  *
+ * ## Discriminated Union Type Safety
+ *
+ * **This is a discriminated union type** - the `status` field determines the
+ * shape of `data` and `error` at compile-time. TypeScript will prevent invalid
+ * combinations like `status='success'` with `error!=null`.
+ *
+ * The three variants are:
+ * - **Success**: `status: 'success'`, `data: T`, `error: null`
+ * - **Error**: `status: 'error'`, `data: null`, `error: AgentErrorDetails`
+ * - **Partial**: `status: 'partial'`, `data: T`, `error: null`
+ *
  * ## Type Narrowing
  *
- * The `status` field is a discriminant. Use type guards to narrow types:
+ * Use the `status` field directly or type guards for type narrowing:
  * - `isSuccess(response)` → `SuccessResponse<T>` (data is T, error is null)
  * - `isError(response)` → `ErrorResponse` (data is null, error exists)
  * - `isPartial(response)` → `PartialResponse<T>` (data is T, error is null)
@@ -291,70 +302,57 @@ export type AgentResponseStatus = 'success' | 'error' | 'partial';
  * const response: AgentResponse<{ result: string; artifacts: string[] }> = {
  *   status: 'success',
  *   data: { result: 'Task completed', artifacts: ['file1.ts', 'file2.ts'] },
- *   error: null,
+ *   error: null,  // Must be null for success - enforced by TypeScript
  *   metadata: { agentId: 'agent-abc123', timestamp: 1706140800000, duration: 1523 }
  * };
  * ```
  *
- * @example <caption>Error response (PRD 6.5)</caption>
+ * @example <caption>Type narrowing with status field</caption>
  * ```ts
- * const response: AgentResponse<null> = {
- *   status: 'error',
- *   data: null,
- *   error: {
- *     code: 'EXECUTION_FAILED',
- *     message: 'Failed to compile TypeScript files',
- *     details: { failedFiles: ['src/index.ts'] },
- *     recoverable: true
- *   },
- *   metadata: { agentId: 'agent-abc123', timestamp: 1706140800000 }
- * };
+ * function handleResponse<T>(response: AgentResponse<T>) {
+ *   switch (response.status) {
+ *     case 'success':
+ *       // TypeScript knows: response.data is T, response.error is null
+ *       return response.data;
+ *     case 'error':
+ *       // TypeScript knows: response.data is null, response.error is AgentErrorDetails
+ *       throw new Error(response.error.message);
+ *     case 'partial':
+ *       // TypeScript knows: response.data is T, response.error is null
+ *       return response.data;
+ *     default:
+ *       // Exhaustiveness check - unreachable
+ *       const _exhaustive: never = response;
+ *       return _exhaustive;
+ *   }
+ * }
  * ```
  *
- * @example <caption>Partial response (PRD 6.5)</caption>
+ * @example <caption>Invalid combinations are compile-time errors</caption>
  * ```ts
- * const response: AgentResponse<{ completedSteps: number; totalSteps: number }> = {
- *   status: 'partial',
- *   data: { completedSteps: 3, totalSteps: 5 },
- *   error: null,
- *   metadata: { agentId: 'agent-abc123', timestamp: 1706140800000 }
+ * // ❌ TYPE ERROR: status='success' with error!=null
+ * const invalid1: AgentResponse<string> = {
+ *   status: 'success',
+ *   data: 'hello',
+ *   error: { code: 'ERROR', message: 'oops', recoverable: false },  // Type error!
+ *   metadata: { agentId: 'test', timestamp: Date.now() }
  * };
+ * // TypeScript error: Type '{ code: string; message: string; recoverable: boolean; }' is not assignable to type 'null'.
+ *
+ * // ❌ TYPE ERROR: status='error' with data!=null
+ * const invalid2: AgentResponse<string> = {
+ *   status: 'error',
+ *   data: 'hello',  // Type error!
+ *   error: { code: 'ERROR', message: 'oops', recoverable: false },
+ *   metadata: { agentId: 'test', timestamp: Date.now() }
+ * };
+ * // TypeScript error: Type 'string' is not assignable to type 'null'.
  * ```
  */
-export interface AgentResponse<T = unknown> {
-  /**
-   * Response status - use as discriminant for type narrowing
-   *
-   * The status field determines the shape of data and error:
-   * - 'success': data is T, error is null
-   * - 'error': data is null, error is AgentErrorDetails
-   * - 'partial': data is T, error is null
-   */
-  status: AgentResponseStatus;
-
-  /**
-   * Response data - null for error responses (per PRD 6.4.5)
-   *
-   * Contains the result data for success and partial responses.
-   * Per PRD 6.4.4: Use null instead of undefined for absent values.
-   */
-  data: T | null;
-
-  /**
-   * Error details - null for success/partial responses
-   *
-   * Contains error information for error responses.
-   * Per PRD 6.4.4: Use null instead of undefined for absent values.
-   */
-  error: AgentErrorDetails | null;
-
-  /**
-   * Response metadata including agent, timestamp, and execution details
-   *
-   * Always present regardless of response status.
-   */
-  metadata: AgentResponseMetadata;
-}
+export type AgentResponse<T = unknown> =
+  | { status: 'success'; data: T; error: null; metadata: AgentResponseMetadata }
+  | { status: 'error'; data: null; error: AgentErrorDetails; metadata: AgentResponseMetadata }
+  | { status: 'partial'; data: T; error: null; metadata: AgentResponseMetadata };
 
 /**
  * Error details for agent error responses

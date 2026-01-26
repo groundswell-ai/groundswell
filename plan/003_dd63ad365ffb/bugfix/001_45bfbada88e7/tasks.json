@@ -706,7 +706,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S1",
                   "title": "Refactor AgentResponse as discriminated union",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Issue 7 - AgentResponse allows invalid combinations like status='success' with error!=null. Schema in src/types/agent.ts doesn't enforce consistency.\n2. INPUT: Current AgentResponse interface.\n3. LOGIC: Refactor AgentResponse to discriminated union: type SuccessResponse<T> = { status: 'success', data: T, error: null, metadata: AgentResponseMetadata }, type ErrorResponse = { status: 'error', data: null, error: AgentErrorDetails, metadata: AgentResponseMetadata }, type AgentResponse<T> = SuccessResponse<T> | ErrorResponse. This enforces type-level consistency.\n4. OUTPUT: Refactored AgentResponse type in src/types/agent.ts. Must be backward compatible with existing usage."
@@ -715,7 +715,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S2",
                   "title": "Add Zod refinement for validation",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M2.T1.S1"
