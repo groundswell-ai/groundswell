@@ -591,7 +591,7 @@
       "type": "Phase",
       "id": "P3",
       "title": "Phase 3: Minor Issues - Polish",
-      "status": "Researching",
+      "status": "Complete",
       "description": "Address minor issues that improve developer experience, documentation clarity, and system polish. These are low-priority but should be completed for production readiness.",
       "milestones": [
         {
@@ -741,14 +741,14 @@
           "type": "Milestone",
           "id": "P3.M3",
           "title": "Milestone 3.3: Event Replay System",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Implement workflow event replay functionality to enable late-joining observers to catch up on past events (Issue 12).",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M3.T1",
               "title": "Add Event History Storage to Workflow",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Store event history in workflow and implement replay mechanism for observers.",
               "subtasks": [
                 {
@@ -775,7 +775,7 @@
                   "type": "Subtask",
                   "id": "P3.M3.T1.S3",
                   "title": "Write tests for event replay",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M3.T1.S2"
