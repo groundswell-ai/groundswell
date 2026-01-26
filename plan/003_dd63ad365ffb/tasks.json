@@ -758,7 +758,7 @@
               "type": "Task",
               "id": "P5.M1.T2",
               "title": "Task: Test Provider Registry",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Write tests for ProviderRegistry singleton lifecycle",
               "subtasks": [
                 {
@@ -776,7 +776,7 @@
                   "type": "Subtask",
                   "id": "P5.M1.T2.S2",
                   "title": "Test provider initialization and termination",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S3"
