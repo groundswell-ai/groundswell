@@ -1,14 +1,36 @@
 /**
- * OpenCode provider implementation
+ * OpenCode provider implementation (LLM-Only Mode)
  *
  * Wraps the @opencode-ai/sdk to provide multi-provider LLM access
  * through the unified Provider interface.
  *
+ * ## IMPORTANT: Tool Execution Limitation
+ *
+ * OpenCode executes tools server-side and does not support client-side
+ * tool delegation. This provider operates in **LLM-only mode**:
+ *
+ * - ✅ Multi-provider LLM access (75+ providers)
+ * - ✅ Session-based state management
+ * - ✅ Extended thinking support
+ * - ✅ Streaming responses
+ * - ✅ Skills via system prompt injection
+ * - ❌ NO TOOL EXECUTION (tools disabled in execute())
+ * - ❌ NO MCP INTEGRATION (managed by Groundswell's MCPHandler)
+ * - ❌ NO LSP INTEGRATION (server-side only)
+ *
+ * ## Architecture
+ *
+ * This provider is designed for scenarios where:
+ * 1. You need multi-provider LLM access without tools
+ * 2. Tools are managed separately via Groundswell's MCPHandler
+ * 3. Skills are loaded via system prompt injection (OpenCode has no native skills API)
+ *
+ * For full tool support, use AnthropicProvider or implement direct
+ * provider integrations (OpenAI, Google, etc.).
+ *
  * ## Capabilities
  *
- * - **MCP**: Native MCP integration via client.mcp namespace
- * - **Skills**: Native skill loading via OpenCode skills system
- * - **LSP**: Native LSP integration via client.lsp namespace
+ * - **Skills**: System prompt-based skill loading (not native OpenCode skills)
  * - **Streaming**: Server-Sent Events streaming support
  * - **Sessions**: Native session-based state management
  * - **Extended Thinking**: Native reasoning token support
@@ -25,9 +47,10 @@
  * const provider = new OpenCodeProvider();
  * await provider.initialize();
  *
+ * // LLM-only execution (no tools)
  * const result = await provider.execute(
- *   { prompt: 'Hello!', options: {} },
- *   toolExecutor
+ *   { prompt: 'Explain quantum computing', options: {} },
+ *   toolExecutor  // ← Accepted but not used (LLM-only mode)
  * );
  * ```
  */
@@ -46,6 +69,8 @@ import type { AgentResponse } from "../types/agent.js";
 import { createSuccessResponse, createErrorResponse } from "../types/agent.js";
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
 import { parseModelSpec } from "../utils/model-spec.js";
+import { readFile } from "fs/promises";
+import { join } from "path";
 
 export class OpenCodeProvider implements Provider {
   /**
@@ -58,23 +83,23 @@ export class OpenCodeProvider implements Provider {
   /**
    * Provider capability flags
    *
-   * OpenCode SDK capabilities:
-   * - MCP via client.mcp namespace
-   * - Skills via native skill loading
-   * - LSP via client.lsp namespace
+   * OpenCode SDK capabilities (LLM-only mode):
+   * - Skills via system prompt injection (not native OpenCode skills)
    * - Streaming responses via Server-Sent Events
    * - Native session-based state management
    * - Extended thinking via reasoning tokens
    *
+   * Note: MCP and LSP are set to false due to LLM-only mode limitation.
+   *
    * @readonly
    */
   readonly capabilities: ProviderCapabilities = {
-    /** MCP server connections via client.mcp namespace */
-    mcp: true,
-    /** Skill loading via native skills system */
+    /** MCP server connections - DISABLED (LLM-only mode) */
+    mcp: false,
+    /** Skill loading via system prompt injection */
     skills: true,
-    /** LSP integration via client.lsp namespace */
-    lsp: true,
+    /** LSP integration - DISABLED (server-side only, not available in LLM-only mode) */
+    lsp: false,
     /** Streaming response support via Server-Sent Events */
     streaming: true,
     /** Native session-based state management */
@@ -111,6 +136,17 @@ export class OpenCodeProvider implements Provider {
    * @internal
    */
   private client: import("@opencode-ai/sdk").OpencodeClient | null = null;
+
+  /**
+   * Combined skills prompt for injection into system prompts
+   *
+   * Stores the formatted skills content from loadSkills() for injection
+   * into system prompts during execute() calls. Skills are combined with
+   * markdown headers and separators.
+   *
+   * @internal
+   */
+  private skillsPrompt: string = '';
 
   /**
    * Initialize the OpenCode provider
@@ -250,6 +286,9 @@ export class OpenCodeProvider implements Provider {
 
     // Clear client reference
     this.client = null;
+
+    // Clear skills prompt (from P3.M2.T1.S4)
+    this.skillsPrompt = '';
 
     // Clear SDK reference to allow garbage collection
     this.sdk = null;
@@ -425,6 +464,11 @@ export class OpenCodeProvider implements Provider {
       body: {
         parts: [{ type: "text", text: request.prompt }],
         model: { providerID, modelID },
+        // CRITICAL: Inject loaded skills via buildSystemPromptWithSkills() helper
+        // OpenCode supports system prompt via 'system' field in body
+        ...(request.options.systemPrompt || this.skillsPrompt ? {
+          system: this.buildSystemPromptWithSkills(request.options.systemPrompt),
+        } : {}),
       },
       path: { id: sessionId },
     });
@@ -498,28 +542,149 @@ export class OpenCodeProvider implements Provider {
   /**
    * Register MCP servers and return available tools
    *
-   * @param servers - Array of MCP server configurations
-   * @returns Array of discovered tools
-   * @throws {Error} Full implementation not yet available
+   * NOTE: OpenCodeProvider operates in LLM-only mode.
+   * OpenCode executes tools server-side with no client-side delegation mechanism.
+   * Tools are managed by Groundswell's MCPHandler, not OpenCode.
+   *
+   * @param servers - Array of MCP server configurations (ignored in LLM-only mode)
+   * @returns Empty array (no tools in LLM-only mode)
+   * @throws {Error} When SDK is not initialized
    * @remarks
-   * Full implementation in P3.M2.T1.S4
+   * This method returns an empty array to satisfy the Provider interface.
+   * MCP tool registration is not supported by OpenCode's server-side architecture.
+   *
+   * @example
+   * ```ts
+   * const provider = new OpenCodeProvider();
+   * await provider.initialize();
+   *
+   * // Returns empty array (LLM-only mode)
+   * const tools = await provider.registerMCPs([
+   *   { name: 'filesystem', transport: 'inprocess', tools: [...] }
+   * ]);
+   * console.log(tools); // []
+   * ```
    */
   async registerMCPs(servers: MCPServer[]): Promise<Tool[]> {
-    // STUB: Full implementation in P3.M2.T1.S4
-    throw new Error("OpenCodeProvider.registerMCPs() not implemented yet");
+    // PATTERN: SDK initialization check (follow execute() pattern)
+    // CRITICAL: Validate client is initialized before attempting to use it
+    if (!this.client) {
+      throw new Error("OpenCode provider not initialized. Call initialize() first.");
+    }
+
+    // LLM-only mode: no tool registration
+    // OpenCode executes tools server-side with no client-side delegation
+    // Tools are managed by Groundswell's MCPHandler, not OpenCode
+    return [];
   }
 
   /**
    * Load skills into the provider
    *
-   * @param skills - Array of skill definitions to load
-   * @throws {Error} Full implementation not yet available
+   * Skills are read from SKILL.md files in each skill directory and combined
+   * into a formatted system prompt fragment for injection during execute().
+   * OpenCode has no native skills API, so skills are injected via system prompts.
+   *
+   * @param skills - Array of skill definitions with name and path
+   * @throws {Error} When SDK is not initialized
+   * @throws {Error} When SKILL.md file cannot be read
    * @remarks
-   * Full implementation in P3.M2.T1.S4
+   * Each skill directory must contain a SKILL.md file. Skills are combined
+   * with markdown headers (### Skill Name) and separators (---).
+   *
+   * @example
+   * ```ts
+   * const provider = new OpenCodeProvider();
+   * await provider.initialize();
+   * await provider.loadSkills([
+   *   { name: 'math-expert', path: '/skills/math' },
+   *   { name: 'code-reviewer', path: '/skills/code' }
+   * ]);
+   * ```
    */
   async loadSkills(skills: Skill[]): Promise<void> {
-    // STUB: Full implementation in P3.M2.T1.S4
-    throw new Error("OpenCodeProvider.loadSkills() not implemented yet");
+    // PATTERN: SDK initialization check (follow execute() pattern)
+    // CRITICAL: Validate client is initialized before proceeding
+    if (!this.client) {
+      throw new Error("OpenCode provider not initialized. Call initialize() first.");
+    }
+
+    // Handle empty skills array - nothing to load
+    if (skills.length === 0) {
+      this.skillsPrompt = '';
+      return;
+    }
+
+    // Load each skill's SKILL.md content
+    const skillContents: string[] = [];
+
+    for (const skill of skills) {
+      try {
+        // GOTCHA: Skill.path is directory, must join with 'SKILL.md'
+        const skillMdPath = join(skill.path, 'SKILL.md');
+        const content = await readFile(skillMdPath, 'utf-8');
+
+        // Format skill with markdown header
+        skillContents.push(`### ${skill.name}\n\n${content.trim()}`);
+      } catch (error) {
+        // PATTERN: Wrap errors with context (follow AnthropicProvider pattern)
+        throw new Error(
+          `Failed to load skill '${skill.name}' from ${skill.path}: ` +
+          `${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+      }
+    }
+
+    // Combine all skills with markdown separator
+    // PATTERN: Use "\n\n---\n\n" for visual clarity (horizontal rule)
+    this.skillsPrompt = skillContents.join('\n\n---\n\n');
+  }
+
+  /**
+   * Build system prompt with skills injected
+   *
+   * Combines the base system prompt with loaded skills for injection into
+   * the OpenCode session's system prompt field.
+   *
+   * @param baseSystemPrompt - Optional base system prompt to enhance with skills
+   * @returns Enhanced system prompt with skills section, or base prompt unchanged if no skills loaded
+   * @internal
+   * @remarks
+   * Three handling cases:
+   * 1. No skills loaded - returns basePrompt unchanged
+   * 2. No base prompt - returns skills-only prompt with default header
+   * 3. Both exist - combines with "## Available Skills" section
+   */
+  private buildSystemPromptWithSkills(baseSystemPrompt?: string): string {
+    // Case 1: No skills loaded - return base prompt unchanged
+    if (!this.skillsPrompt) {
+      return baseSystemPrompt ?? '';
+    }
+
+    // Case 2: No base prompt - return skills with default header
+    if (!baseSystemPrompt) {
+      return `You are a helpful assistant.
+
+## Available Skills
+
+${this.skillsPrompt}
+
+## Instructions
+Leverage the available skills above when responding to requests.
+`;
+    }
+
+    // Case 3: Both exist - combine with skills section
+    return `${baseSystemPrompt}
+
+## Available Skills
+
+${this.skillsPrompt}
+
+## Skill Usage
+When responding, leverage the available skills above.
+Each skill provides specific capabilities and guidelines.
+`;
   }
 
   /**
