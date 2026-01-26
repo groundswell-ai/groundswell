@@ -10,7 +10,7 @@ export interface StepOptions {
   name?: string;
   /** If true, capture state snapshot after step completion */
   snapshotState?: boolean;
-  /** Track and emit step duration (default: true) */
+  /** Track and emit step duration (default: true, tracked unless explicitly set to false) */
   trackTiming?: boolean;
   /** If true, log message at step start */
   logStart?: boolean;

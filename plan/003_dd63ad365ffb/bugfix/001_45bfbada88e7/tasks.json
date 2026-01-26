@@ -634,14 +634,14 @@
               "type": "Task",
               "id": "P3.M1.T2",
               "title": "Improve JSDoc Clarity",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Update JSDoc comments to be clearer about default values and behavior, addressing Issue 9 from the bug report.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T2.S1",
                   "title": "Update Step decorator JSDoc for trackTiming default",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 0.5,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Issue 9 notes that trackTiming defaults to true but JSDoc doesn't clearly state this. Step decorator in src/decorators/step.ts line 94 has unclear comment.\n2. INPUT: Step decorator JSDoc comments.\n3. LOGIC: Update trackTiming JSDoc from 'Track and emit step duration' to 'Track and emit step duration (default: true, tracked unless explicitly set to false)'. Make the default crystal clear.\n4. OUTPUT: Improved JSDoc clarity in src/decorators/step.ts."
@@ -650,7 +650,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T2.S2",
                   "title": "Audit and improve other unclear JSDoc comments",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: JSDoc clarity varies across codebase. Some defaults are unclear.\n2. INPUT: Codebase JSDoc comments.\n3. LOGIC: Audit JSDoc in critical files: Workflow class, Agent class, Provider interface, decorators. Identify comments with unclear defaults or behavior. Update to be explicit: '(default: X)', 'required vs optional', side effects. Focus on public APIs.\n4. OUTPUT: Improved JSDoc clarity across key interfaces and classes."
