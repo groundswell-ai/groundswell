@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Milestone 1.1: Traditional Restart Logic Implementation",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Implement traditional restart logic separate from the reflection-based retry system. This addresses PRD Section 11 requirements for parent-driven restart decisions with state restoration.",
           "tasks": [
             {
@@ -163,7 +163,7 @@
               "type": "Task",
               "id": "P1.M1.T4",
               "title": "Implement Parent-Driven Restart Decision Pattern",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Enable parent workflows to analyze child errors and orchestrate restart decisions using the new restart infrastructure.",
               "subtasks": [
                 {
@@ -181,7 +181,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T4.S2",
                   "title": "Document restart decision pattern with examples",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T4.S1"

@@ -453,6 +453,8 @@ class ResilientParent extends Workflow {
 }
 ```
 
+**Advanced Retry Logic:** For intelligent retry patterns with state preservation, parent-driven restart decisions, and error analysis, see [Restart Pattern](./restart-pattern.md).
+
 ## Concurrent Execution
 
 ### Sequential (default)
