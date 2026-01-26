@@ -25,7 +25,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S1",
                   "title": "Extend StepOptions interface with restart configuration",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/restart_logic_analysis.md - @Step decorator currently has no restartable option. StepOptions interface is in src/decorators/step.ts and src/types/decorators.ts.\n2. INPUT: PRD Section 11 specification for restart behavior.\n3. LOGIC: Add restartable?: boolean (default: false), maxRetries?: number (default: 3), retryDelayMs?: number (default: 1000), retryOn?: ErrorCriterion[] to StepOptions interface. Define ErrorCriterion as discriminated union: { code: string } | { recoverable: boolean } | ((error: WorkflowError) => boolean).\n4. OUTPUT: Updated StepOptions interface exported from src/types/decorators.ts. Type definition must be compatible with existing step decorator usage (backward compatible)."
@@ -34,9 +34,11 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S2",
                   "title": "Modify step decorator to implement retry loop",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T1.S1"],
+                  "dependencies": [
+                    "P1.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/restart_logic_analysis.md - Step decorator in src/decorators/step.ts currently wraps methods in try-catch but does NOT implement retry logic. It creates WorkflowError and re-throws immediately.\n2. INPUT: Extended StepOptions interface from P1.M1.T1.S1. Original method function from decorator target.\n3. LOGIC: Wrap existing try-catch in while loop that checks retryCount <= maxRetries. On catch, check if opts.restartable is true. If not restartable or max retries exceeded, throw WorkflowError immediately. If restartable, emit stepRetry event (needs new event type in src/types/events.ts), wait for retryDelayMs using delay utility, increment retryCount, and continue loop. Preserve original error context.\n4. OUTPUT: Modified step decorator function in src/decorators/step.ts that implements retry loop. Must emit stepRetry event with structure: { stepName: string, retryCount: number, analysis: RestartAnalysis, error: WorkflowError }."
                 },
                 {
@@ -54,7 +56,10 @@
                   "title": "Write unit tests for restartable step decorator",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T1.S2", "P1.M1.T1.S3"],
+                  "dependencies": [
+                    "P1.M1.T1.S2",
+                    "P1.M1.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From test suite analysis - Test files are in src/__tests__/unit/decorators.test.ts. Existing tests use AAA pattern (Arrange-Act-Assert) with helper functions. No restart logic tests currently exist.\n2. INPUT: Modified step decorator from P1.M1.T1.S2.\n3. LOGIC: Create test suite in src/__tests__/unit/decorators/step-restart.test.ts (NEW FILE). Test cases: should not retry step when restartable=false, should retry step when restartable=true and error occurs, should respect maxRetries limit, should emit stepRetry event on each retry, should honor retryDelayMs between retries. Mock WorkflowError creation. Use Jest timers for delay testing. Verify stepRetry events are captured by observer.\n4. OUTPUT: New test file src/__tests__/unit/decorators/step-restart.test.ts with passing tests. Must follow existing test patterns (describe/it hierarchy, AAA pattern, helper functions)."
                 }
               ]
@@ -81,7 +86,9 @@
                   "title": "Implement analyzeErrorForRestart utility function",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T2.S1"],
+                  "dependencies": [
+                    "P1.M1.T2.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/restart_logic_analysis.md - No error analysis utility exists. Reflection-based retry in src/core/reflection.ts provides AI-powered analysis but is different from traditional restart logic.\n2. INPUT: WorkflowError instance, optional StepOptions with retryOn criteria.\n3. LOGIC: Create function in src/utils/restart-analysis.ts (NEW FILE). Check error.recoverable - if false, return shouldRestart=false with 'abort' action. Check error.code against transient error list (TIMEOUT, RATE_LIMIT, NETWORK_ERROR, SERVICE_UNAVAILABLE) - return shouldRestart=true with 'retry' action. If stepOptions.retryOn provided, iterate through criteria and check matches (code equality, recoverable match, or custom function evaluation). Default: shouldRestart=false.\n4. OUTPUT: New file src/utils/restart-analysis.ts with exported analyzeErrorForRestart function. Must return RestartAnalysis object. Must be side-effect free (pure function)."
                 },
                 {
@@ -90,7 +97,9 @@
                   "title": "Write unit tests for error analysis utility",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T2.S2"],
+                  "dependencies": [
+                    "P1.M1.T2.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From test suite analysis - Utility tests are in src/__tests__/utils/. Error-related tests exist in src/__tests__/unit/workflow-error-utils.test.ts.\n2. INPUT: analyzeErrorForRestart function from P1.M1.T2.S2.\n3. LOGIC: Create test file src/__tests__/unit/restart-analysis.test.ts (NEW FILE). Test cases: should return abort for non-recoverable errors, should return retry for transient error codes, should match error code criterion, should match recoverable criterion, should call custom predicate function, should default to abort when no criteria match. Mock WorkflowError objects with different codes and recoverable flags.\n4. OUTPUT: New test file src/__tests__/unit/restart-analysis.test.ts with passing tests. Must cover all code paths in analyzeErrorForRestart."
                 }
               ]
@@ -108,7 +117,9 @@
                   "title": "Add restartStep method to Workflow base class",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T2.S2"],
+                  "dependencies": [
+                    "P1.M1.T2.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - Workflow base class is in src/core/workflow.ts. No restartStep method exists. Workflow has stepMetadata Map storing decorator metadata. snapshotState() method exists for capturing state.\n2. INPUT: stepName: string, options: { retryCount?: number, maxRetries?: number, stateOverride?: SerializedWorkflowState }. Step metadata from this.stepMetadata.\n3. LOGIC: Create async restartStep method. Get stepMeta from stepMetadata Map - if not found or !restartable, throw error. Calculate retryCount (options.retryCount + 1). Check against maxRetries - if exceeded, throw WorkflowError with max retries message. Get state snapshot (options.stateOverride || this.snapshotState()). Re-execute step by calling this[stepName]() with restored context. Return result. Emit stepRestarted event.\n4. OUTPUT: Modified Workflow class in src/core/workflow.ts with new restartStep method. Must handle missing step metadata, max retries exceeded, and state restoration failures."
                 },
                 {
@@ -117,7 +128,9 @@
                   "title": "Add analyzeError method to Workflow base class",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T2.S2"],
+                  "dependencies": [
+                    "P1.M1.T2.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/restart_logic_analysis.md - No parent-level error analysis exists. Parent workflows currently receive child error events but have no framework for restart decisions.\n2. INPUT: WorkflowError from child workflow.\n3. LOGIC: Create analyzeError method in Workflow class. Check error.recoverable - if false, return 'abort'. Get stepName from error metadata (if available). Get stepMeta from stepMetadata. If step not found or !restartable, return 'abort'. Check stepMeta.options.retryOn criteria (if any) against error. If any criteria match, return 'retry'. Default: return 'abort'. Return type: 'retry' | 'abort' | 'rebuild'.\n4. OUTPUT: Modified Workflow class in src/core/workflow.ts with new analyzeError method. Must use analyzeErrorForRestart utility from P1.M1.T2.S2 for consistency."
                 },
                 {
@@ -126,7 +139,9 @@
                   "title": "Add stepRestarted event type",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T3.S1"],
+                  "dependencies": [
+                    "P1.M1.T3.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Event types are in src/types/events.ts. Need new event for workflow-level restart completion.\n2. INPUT: Event structure from P1.M1.T3.S1.\n3. LOGIC: Add new discriminated union member to WorkflowEvent type: { type: 'stepRestarted', stepName: string, retryCount: number, restoredState: SerializedWorkflowState, timestamp: number }.\n4. OUTPUT: Updated WorkflowEvent type in src/types/events.ts with stepRestarted event."
                 },
                 {
@@ -135,7 +150,11 @@
                   "title": "Write unit tests for workflow restart methods",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T3.S1", "P1.M1.T3.S2", "P1.M1.T3.S3"],
+                  "dependencies": [
+                    "P1.M1.T3.S1",
+                    "P1.M1.T3.S2",
+                    "P1.M1.T3.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From test suite analysis - Workflow tests are in src/__tests__/unit/workflow.test.ts. Tests use helper functions to create test workflows. No restart tests exist.\n2. INPUT: Modified Workflow class with restartStep and analyzeError methods.\n3. LOGIC: Create test file src/__tests__/unit/workflow-restart.test.ts (NEW FILE). Test cases: restartStep should throw error for non-restartable step, restartStep should re-execute step and return result, restartStep should restore state from snapshot, restartStep should throw error when max retries exceeded, analyzeError should return abort for non-recoverable errors, analyzeError should return retry for restartable steps with matching criteria. Create test workflow class with @Step decorated methods.\n4. OUTPUT: New test file src/__tests__/unit/workflow-restart.test.ts with passing tests. Must verify state restoration, retry counting, and event emission."
                 }
               ]
@@ -153,7 +172,9 @@
                   "title": "Create parent-child restart integration test",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T3.S4"],
+                  "dependencies": [
+                    "P1.M1.T3.S4"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From test suite analysis - Integration tests are in src/__tests__/integration/. Workflow tree structure tests exist in tree-mirroring.test.ts. Parent-child relationship tests exist.\n2. INPUT: Workflow restart methods from P1.M1.T3, step decorator with restartable option from P1.M1.T1.\n3. LOGIC: Create test file src/__tests__/integration/parent-restart-decisions.test.ts (NEW FILE). Test scenario: ChildWorkflow with @Step(restartable: true) that fails on first attempt, succeeds on second. ParentWorkflow with @Task that spawns child. Parent catches child error, calls this.analyzeError(error), if returns 'retry', calls child.restartStep(). Verify child step is re-executed and succeeds. Verify events are emitted to parent observer. Verify state is preserved across restart.\n4. OUTPUT: New integration test file demonstrating parent-driven restart pattern. Must verify error propagation, analysis, decision, and re-execution flow."
                 },
                 {
@@ -162,7 +183,9 @@
                   "title": "Document restart decision pattern with examples",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T4.S1"],
+                  "dependencies": [
+                    "P1.M1.T4.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/restart_logic_analysis.md - PRD Section 11 specifies parent-driven restart but no implementation examples exist. Documentation is needed.\n2. INPUT: Working restart implementation from P1.M1.T1-T3.\n3. LOGIC: Create documentation file docs/restart-pattern.md (NEW FILE). Document: How to mark steps as restartable, how parent workflows analyze child errors, how to call restartStep, error criteria configuration, state restoration behavior, differences between restart and reflection-based retry. Provide code examples for common patterns (transient error retry, recoverable error retry, custom retry logic).\n4. OUTPUT: New documentation file with comprehensive restart pattern guide. Must include practical examples and best practices."
                 }
               ]
@@ -173,7 +196,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Milestone 1.2: Workflow-Level Agent Response Validation",
-          "status": "Prerequisite",
+          "status": "Planned",
           "description": "Add workflow-level validation for AgentResponse to ensure data integrity when agents are used within workflows. Addresses PRD Section 6.6 requirements.",
           "tasks": [
             {
@@ -216,7 +239,11 @@
                   "title": "Write unit tests for workflow-level validation",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M2.T1.S1", "P1.M2.T1.S2", "P1.M2.T1.S3"],
+                  "dependencies": [
+                    "P1.M2.T1.S1",
+                    "P1.M2.T1.S2",
+                    "P1.M2.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Agent response validation tests exist in src/__tests__/unit/agent-response.test.ts. No workflow-level validation tests exist.\n2. INPUT: validateAgentResponse method from P1.M2.T1.S1.\n3. LOGIC: Create test file src/__tests__/unit/workflow-validation.test.ts (NEW FILE). Test cases: should return true for valid response, should return false and emit invalidResponse event for malformed response, should create INVALID_RESPONSE_FORMAT error with proper context. Create test workflow with agent. Mock agent.prompt() to return invalid responses (missing fields, wrong types, status/data mismatch). Verify events are captured.\n4. OUTPUT: New test file src/__tests__/unit/workflow-validation.test.ts with passing tests. Must cover all validation failure scenarios."
                 }
               ]
@@ -234,7 +261,9 @@
                   "title": "Add automatic validation hook to workflow context",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M2.T1.S3"],
+                  "dependencies": [
+                    "P1.M2.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - Workflow execution context is in src/core/workflow-context.ts. Agent operations go through context. No automatic validation hook exists.\n2. INPUT: validateAgentResponse utility from P1.M2.T1.S3.\n3. LOGIC: Modify workflow context to automatically validate responses after agent.prompt() or agent.execute() calls. In context execution wrapper, check if result is AgentResponse. If yes, call validateAgentResponse(). If validation fails, throw INVALID_RESPONSE_FORMAT WorkflowError. Make validation opt-in via WorkflowConfig option (autoValidateResponses: boolean, default: true).\n4. OUTPUT: Modified workflow context in src/core/workflow-context.ts with automatic validation hook. Must not break existing agent usage patterns."
                 },
                 {
@@ -243,7 +272,9 @@
                   "title": "Write integration tests for automatic validation",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M2.T2.S1"],
+                  "dependencies": [
+                    "P1.M2.T2.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Integration tests are in src/__tests__/integration/. Agent-workflow integration tests exist in agent-workflow.test.ts.\n2. INPUT: Modified workflow context with automatic validation from P1.M2.T2.S1.\n3. LOGIC: Create test file src/__tests__/integration/agent-validation.test.ts (NEW FILE). Test cases: should automatically validate valid agent responses in workflow, should throw INVALID_RESPONSE_FORMAT for invalid responses, should emit invalidResponse event, should allow disabling auto-validation via config, should handle validation errors gracefully. Create workflow with @Step that calls agent.prompt(). Mock agent to return valid and invalid responses.\n4. OUTPUT: New integration test file src/__tests__/integration/agent-validation.test.ts with passing tests. Must verify automatic validation behavior and event emission."
                 },
                 {
@@ -252,7 +283,9 @@
                   "title": "Document workflow-level validation behavior",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M2.T2.S2"],
+                  "dependencies": [
+                    "P1.M2.T2.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Documentation gap exists - PRD Section 6.6 requires workflow-level validation but no docs explain usage.\n2. INPUT: Working validation implementation from P1.M2.T1-T2.\n3. LOGIC: Update docs/workflows.md (or create if doesn't exist) with section on agent response validation. Document: automatic validation behavior, how to disable, manual validation with validateAgentResponse(), invalidResponse event structure, INVALID_RESPONSE_FORMAT error handling. Provide code examples for manual validation in error handlers.\n4. OUTPUT: Updated documentation with validation section. Must be clear and include practical examples."
                 }
               ]
@@ -288,7 +321,9 @@
                   "title": "Execute OpenCode provider resolution",
                   "status": "Planned",
                   "story_points": 8,
-                  "dependencies": ["P1.M3.T1.S1"],
+                  "dependencies": [
+                    "P1.M3.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: This subtask implementation depends on decision from P1.M3.T1.S1. Cannot specify implementation without knowing decision.\n2. INPUT: Decision document from P1.M3.T1.S1.\n3. LOGIC: [TO BE DETERMINED BASED ON DECISION]. If Option A (Document): Update docs/providers.md with prominent warnings, update PRD capabilities table, add deprecation notice. If Option B (Implement): Create new tasks for MCP/LSP implementation (out of scope for current PRD). If Option C (Remove): Deprecate provider, add migration guide, remove from registry.\n4. OUTPUT: [TO BE DETERMINED]. Resolution of OpenCode provider feature parity violation."
                 }
               ]
@@ -333,7 +368,9 @@
                   "title": "Update PRD documentation for Provider interface",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M1.T1.S1"],
+                  "dependencies": [
+                    "P2.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD Section 7.3 specifies ProviderResult return type. Documentation must match implementation.\n2. INPUT: Updated Provider interface from P2.M1.T1.S1.\n3. LOGIC: Update PRD.md Section 7.3 to reflect AgentResponse<T> return type. Add migration note for code using ProviderResult. Update examples to use AgentResponse.\n4. OUTPUT: Updated PRD documentation matching implementation reality."
                 },
                 {
@@ -342,7 +379,9 @@
                   "title": "Add type compatibility tests for Provider interface",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M1.T1.S1"],
+                  "dependencies": [
+                    "P2.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Provider interface tests exist in src/__tests__/unit/provider-interface.test.ts. No tests verify return type consistency.\n2. INPUT: Updated Provider interface from P2.M1.T1.S1.\n3. LOGIC: Extend existing provider interface tests. Add test: polymorphic usage should work correctly - create Provider variable, assign AnthropicProvider instance, call execute() and verify return type is AgentResponse. Ensure TypeScript compilation passes with strict type checking.\n4. OUTPUT: Extended test coverage verifying type consistency. Must compile without type errors."
                 }
               ]
@@ -385,9 +424,12 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S3",
                   "title": "Integrate session store into AnthropicProvider",
-              "status": "Planned",
+                  "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M2.T1.S1", "P2.M2.T1.S2"],
+                  "dependencies": [
+                    "P2.M2.T1.S1",
+                    "P2.M2.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: AnthropicProvider in src/providers/anthropic-provider.ts has private sessions Map. terminate() calls sessions.clear(). initialize() creates new Map.\n2. INPUT: SessionStore interface from P2.M2.T1.S1, serialization utilities from P2.M2.T1.S2.\n3. LOGIC: Modify AnthropicProvider constructor to accept optional sessionStore: SessionStore (default: MemorySessionStore). Replace private sessions Map with sessionStore usage. In initialize(): if sessionStore is not MemorySessionStore, call sessionStore.list() and restore sessions. In terminate(): if sessionStore is not MemorySessionStore, save all sessions via sessionStore.save(). Update createSession(), getSession(), deleteSession() to use sessionStore API.\n4. OUTPUT: Modified AnthropicProvider with pluggable session storage. Default behavior unchanged (backward compatible)."
                 },
                 {
@@ -396,7 +438,9 @@
                   "title": "Write tests for session persistence",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M2.T1.S3"],
+                  "dependencies": [
+                    "P2.M2.T1.S3"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Session tests exist in src/__tests__/unit/providers/anthropic-provider-sessions.test.ts (728 lines). Tests verify sessions are cleared on terminate.\n2. INPUT: Modified AnthropicProvider with session persistence from P2.M2.T1.S3.\n3. LOGIC: Extend existing session tests. Add tests: should persist sessions across terminate → initialize cycle with FileSessionStore, should save sessions to disk, should restore sessions on initialize, should handle missing session file gracefully, should default to in-memory sessions when no store provided. Create temporary directory for file store tests. Clean up after tests.\n4. OUTPUT: Extended test coverage verifying session persistence. Must test both success and failure scenarios."
                 }
               ]
@@ -423,7 +467,9 @@
                   "title": "Implement session TTL and cleanup",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M2.T2.S1"],
+                  "dependencies": [
+                    "P2.M2.T2.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: No session TTL or cleanup exists. Sessions persist indefinitely in current implementation.\n2. INPUT: SessionTtl configuration from P2.M2.T2.S1.\n3. LOGIC: Extend SessionState with createdAt and lastAccessedAt timestamps. In FileSessionStore.save(), add/update timestamps. In FileSessionStore.load(), check if session is expired (lastAccessedAt + ttl < now). Return null if expired. Add cleanup method to SessionStore: deleteExpired(): Promise<void>. Call cleanup periodically in provider or on initialize.\n4. OUTPUT: Session TTL enforcement in FileSessionStore. Must handle edge cases (clock skew, negative TTL, disabled TTL)."
                 },
                 {
@@ -432,7 +478,9 @@
                   "title": "Write documentation for session persistence",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M2.T2.S2"],
+                  "dependencies": [
+                    "P2.M2.T2.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Documentation gap exists - PRD Section 7.4 mentions sessions but persistence is not documented.\n2. INPUT: Session persistence implementation from P2.M2.T1-T2.\n3. LOGIC: Update docs/providers.md with session persistence section. Document: session lifecycle (create → use → persist → restore), configuration options (sessionPersistence, sessionTtl, sessionPath), differences between storage backends, session cleanup behavior, migration from in-memory to persistent sessions. Provide code examples for each backend.\n4. OUTPUT: Comprehensive session persistence documentation. Must include practical examples and configuration guidance."
                 }
               ]
@@ -468,7 +516,9 @@
                   "title": "Add treeUpdated emission to missing methods",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M3.T1.S1"],
+                  "dependencies": [
+                    "P2.M3.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: treeUpdated event exists in WorkflowEvent type. Observer pattern supports onTreeChanged callback.\n2. INPUT: Audit list from P2.M3.T1.S1.\n3. LOGIC: For each method in audit that lacks treeUpdated emission, add this.emit('treeUpdated', { root: this.toNode() }) after state change. Methods to fix likely include: setStatus(), snapshotState(), possibly attachChild()/detachChild() (check if already emitting). Ensure emission happens AFTER state is modified. Add JSDoc comments indicating treeUpdated emission.\n4. OUTPUT: Modified Workflow class with consistent treeUpdated emission. All state changes must notify observers."
                 },
                 {
@@ -477,7 +527,9 @@
                   "title": "Write integration tests for tree update consistency",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M3.T1.S2"],
+                  "dependencies": [
+                    "P2.M3.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Tree mirroring tests exist in src/__tests__/integration/tree-mirroring.test.ts. Tests verify 1:1 mirror but not treeUpdated emission.\n2. INPUT: Modified Workflow class from P2.M3.T1.S2.\n3. LOGIC: Extend tree-mirroring.test.ts. Add tests: should emit treeUpdated when status changes, should emit treeUpdated when snapshot is created, should emit treeUpdated when child is attached, should emit treeUpdated when child is detached, observer should receive all tree updates. Create observer that records treeUpdated events and verify count matches expected.\n4. OUTPUT: Extended test coverage verifying treeUpdated emission for all state changes. Must catch regression."
                 }
               ]
@@ -513,7 +565,9 @@
                   "title": "Implement error collection in workflow execution",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M4.T1.S1"],
+                  "dependencies": [
+                    "P2.M4.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: mergeWorkflowErrors utility exists in src/utils/workflow-error-utils.ts. Used by @Task decorator. Not used by workflow-level execution.\n2. INPUT: ErrorMergeStrategy config from P2.M4.T1.S1, mergeWorkflowErrors utility.\n3. LOGIC: Modify workflow run() execution to collect errors when errorMergeStrategy.enabled is true. In sequential step execution, catch each error and add to collection instead of throwing immediately. After run() completes (or all steps fail), if errors collected and merge strategy enabled, call mergeWorkflowErrors() with collected errors. If only one error, throw it directly. If multiple errors, throw WorkflowAggregateError.\n4. OUTPUT: Modified workflow execution in src/core/workflow.ts that supports error merge for sequential steps. Must not break existing behavior (default disabled)."
                 },
                 {
@@ -522,7 +576,9 @@
                   "title": "Write tests for workflow-level error merge",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M4.T1.S2"],
+                  "dependencies": [
+                    "P2.M4.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Error merge strategy tests exist in src/__tests__/adversarial/error-merge-strategy.test.ts (760 lines) but only for @Task concurrent execution.\n2. INPUT: Modified workflow execution from P2.M4.T1.S2.\n3. LOGIC: Create test file src/__tests__/unit/workflow-error-merge.test.ts (NEW FILE). Test cases: should throw first error when merge disabled (default), should merge all sequential step errors when enabled, should use custom combine function if provided, should emit merged error event. Create test workflow with multiple @Step decorated methods that fail. Verify WorkflowAggregateError contains all errors.\n4. OUTPUT: New test file with comprehensive workflow-level error merge coverage."
                 }
               ]
@@ -567,7 +623,9 @@
                   "title": "Write tests for capability helpers",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M1.T1.S1"],
+                  "dependencies": [
+                    "P3.M1.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Provider tests exist in src/__tests__/unit/providers/ directory. No capability helper tests exist.\n2. INPUT: Implemented capability helpers from P3.M1.T1.S1.\n3. LOGIC: Extend provider tests. Add tests: supports() should return true for enabled capabilities, supports() should return false for disabled capabilities, requiresFeatures() should return true when all features present, requiresFeatures() should return false when any feature missing. Test with both AnthropicProvider and OpenCodeProvider.\n4. OUTPUT: Test coverage for capability checking helpers."
                 }
               ]
@@ -621,7 +679,9 @@
                   "title": "Write tests for name validation",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M1.T3.S1"],
+                  "dependencies": [
+                    "P3.M1.T3.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Workflow constructor tests exist but don't test security validation.\n2. INPUT: Enhanced validation from P3.M1.T3.S1.\n3. LOGIC: Extend workflow constructor tests. Add tests: should throw error for control characters, should throw error for HTML tags, should throw error for javascript: protocol, should throw error for path traversal patterns, should allow valid names with spaces/hyphens/underscores.\n4. OUTPUT: Test coverage for workflow name security validation."
                 }
               ]
@@ -657,7 +717,9 @@
                   "title": "Add Zod refinement for validation",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M2.T1.S1"],
+                  "dependencies": [
+                    "P3.M2.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: AgentResponseSchema exists but doesn't catch invalid combinations. Zod schema in src/types/agent.ts.\n2. INPUT: Refactored AgentResponse type from P3.M2.T1.S1.\n3. LOGIC: Update AgentResponseSchema to use discriminated union validation. Add .refine() to ensure: if status='success' then error must be null and data must be non-null, if status='error' then data must be null and error must be non-null. Add test cases for invalid combinations.\n4. OUTPUT: Strengthened AgentResponseSchema that enforces consistency. Must catch previously allowed invalid responses."
                 },
                 {
@@ -666,7 +728,9 @@
                   "title": "Write tests for schema validation",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M2.T1.S2"],
+                  "dependencies": [
+                    "P3.M2.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Agent response validation tests exist in src/__tests__/unit/agent-response.test.ts but don't test invalid combinations.\n2. INPUT: Strengthened schema from P3.M2.T1.S2.\n3. LOGIC: Extend agent-response.test.ts. Add tests: should reject success response with error, should reject success response with null data, should reject error response with data, should reject error response with null error. Verify validation fails with descriptive error.\n4. OUTPUT: Test coverage for strengthened AgentResponse validation."
                 }
               ]
@@ -702,7 +766,9 @@
                   "title": "Add event history configuration",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M3.T1.S1"],
+                  "dependencies": [
+                    "P3.M3.T1.S1"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Event history could consume unbounded memory. Need configuration and limits.\n2. INPUT: Event history implementation from P3.M3.T1.S1.\n3. LOGIC: Add eventHistoryConfig to WorkflowConfig: { enabled: boolean (default: false), maxEvents: number (default: 1000), maxAgeMs: number (default: 3600000 - 1 hour) }. In emit(), check if history is enabled before storing. Implement trimming: if maxEvents exceeded, shift() oldest events; if maxAgeMs exceeded, filter old events. Add config option to Workflow constructor.\n4. OUTPUT: Configurable event history with memory limits."
                 },
                 {
@@ -711,7 +777,9 @@
                   "title": "Write tests for event replay",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M3.T1.S2"],
+                  "dependencies": [
+                    "P3.M3.T1.S2"
+                  ],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: No event replay tests exist.\n2. INPUT: Event history implementation from P3.M3.T1.S2.\n3. LOGIC: Create test file src/__tests__/unit/event-replay.test.ts (NEW FILE). Test cases: should store events when history enabled, should replay events to late-joining observer, should respect maxEvents limit, should respect maxAgeMs limit, should not store events when disabled, should clear event history on request. Create test workflow, emit events, add observer after events, verify replay.\n4. OUTPUT: Test coverage for event replay functionality."
                 }
               ]
