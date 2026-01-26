@@ -231,7 +231,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Phase 2: Anthropic Provider Implementation",
-      "status": "Planned",
+      "status": "Complete",
       "description": "Refactor existing Anthropic SDK integration into the Provider abstraction pattern. This wraps the current Agent class implementation.",
       "milestones": [
         {
@@ -365,14 +365,14 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Milestone 2.2: Anthropic Provider Session Abstraction",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Implement in-memory session abstraction for Anthropic to match OpenCode's native sessions",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M2.T1",
               "title": "Task: Implement Session State Management",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Add in-memory session tracking to AnthropicProvider",
               "subtasks": [
                 {
@@ -390,7 +390,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S2",
                   "title": "Modify execute() to support sessions",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T1.S1",

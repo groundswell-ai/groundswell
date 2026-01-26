@@ -251,6 +251,29 @@ export class AnthropicProvider implements Provider {
       throw new Error("SDK not initialized. Call initialize() first.");
     }
 
+    // P2.M2.T1.S2: Session detection and retrieval
+    // Extract sessionId from request options and retrieve session state
+    const sessionId = request.options.sessionId;
+    let session: SessionState | undefined;
+    let isContinuation = false;
+
+    if (sessionId) {
+      session = this.getSession(sessionId);
+
+      // Check if this is a continuation (existing history)
+      // Only continue if session exists and has history
+      if (session && session.history.length > 0) {
+        isContinuation = true;
+      }
+
+      // P2.M2.T1.S2: Create session if it doesn't exist (lazy session creation)
+      // Session will be populated with user messages during message iteration
+      if (!session) {
+        this.createSession(sessionId);
+        session = this.getSession(sessionId);
+      }
+    }
+
     // PATTERN: Model resolution using normalizeModel()
     // FROM: src/providers/anthropic-provider.ts:246-259
     // Default model from src/core/agent.ts:320
@@ -271,6 +294,10 @@ export class AnthropicProvider implements Provider {
       // System prompt mapping (from src/core/agent.ts:317-318)
       // CRITICAL: Inject loaded skills via buildSystemPromptWithSkills() helper
       systemPrompt: this.buildSystemPromptWithSkills(request.options.systemPrompt),
+
+      // P2.M2.T1.S2: Continue flag for session continuation
+      // CRITICAL: When continuing, SDK expects continue: true AND streamInput() with history
+      ...(isContinuation && { continue: true }),
 
       // Tools mapping to allowedTools (string[])
       // CRITICAL: Map tool objects to tool names (from src/core/agent.ts:405-407)
@@ -301,10 +328,36 @@ export class AnthropicProvider implements Provider {
     // PATTERN: SDK query() call (EXACT pattern from src/core/agent.ts:431)
     // CRITICAL: query() returns AsyncGenerator<SDKMessage> (not Promise!)
     // Do NOT await the query() call - it returns the generator synchronously
+    // P2.M2.T1.S2: For continuation, use empty prompt (history comes via streamInput)
     const queryResult = this.sdk.query({
-      prompt: request.prompt,
+      prompt: isContinuation ? '' : request.prompt,
       options: sdkOptions,
     });
+
+    // P2.M2.T1.S2: Stream session history for continuation
+    // CRITICAL: continue: true alone is insufficient - must also call streamInput() with history
+    if (isContinuation && session) {
+      await queryResult.streamInput(
+        async function* historyStream() {
+          for (const msg of session!.history) {
+            yield msg;
+          }
+        }()
+      );
+
+      // Stream new user message for continuation
+      // CRITICAL: New message also goes via streamInput(), not prompt parameter
+      await queryResult.streamInput(
+        async function* newMessageStream() {
+          yield {
+            type: 'user',
+            message: { content: request.prompt },
+            parent_tool_use_id: null,
+            session_id: session!.history[0]?.session_id ?? '',
+          } as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage;
+        }()
+      );
+    }
 
     // PATTERN: Message iteration and AgentResponse construction
     // FROM: src/core/agent.ts lines 437-492
@@ -326,9 +379,20 @@ export class AnthropicProvider implements Provider {
         }
       }
 
+      // P2.M2.T1.S2: Capture user messages and append to session history
+      // CRITICAL: User messages must be accumulated for next turn's streamInput()
+      if (message.type === "user" && session) {
+        session.history.push(message as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage);
+      }
+
       // Capture the final result message
       if (message.type === "result") {
         resultMessage = message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
+
+        // P2.M2.T1.S2: Update session lastResult with latest execution result
+        if (session) {
+          session.lastResult = resultMessage;
+        }
       }
     }
 
