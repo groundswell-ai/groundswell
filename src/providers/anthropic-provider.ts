@@ -10,7 +10,7 @@
  * - **Skills**: System prompt-based skill loading
  * - **LSP**: Language Server Protocol via MCP plugins
  * - **Streaming**: Streaming response support
- * - **Sessions**: Stateless API (no native sessions)
+ * - **Sessions**: Session-based state via abstraction layer
  * - **Extended Thinking**: maxThinkingTokens for extended reasoning
  *
  * ## SDK Integration
@@ -86,8 +86,8 @@ export class AnthropicProvider implements Provider {
     lsp: true,
     /** Streaming response support */
     streaming: true,
-    /** Session-based state (stateless API) */
-    sessions: false,
+    /** Session-based state (via abstraction layer) */
+    sessions: true,
     /** Extended thinking via maxThinkingTokens */
     extendedThinking: true,
   } satisfies ProviderCapabilities;
@@ -132,6 +132,16 @@ export class AnthropicProvider implements Provider {
    * @internal
    */
   private skillsPrompt: string = '';
+
+  /**
+   * Session storage for multi-turn conversations
+   *
+   * Maps session IDs to their conversation state. Enables session-based
+   * execution despite Anthropic SDK's stateless design.
+   *
+   * @internal
+   */
+  private sessions: Map<string, SessionState> = new Map();
 
   /**
    * Initialize the Anthropic provider
@@ -209,6 +219,9 @@ export class AnthropicProvider implements Provider {
 
     // Clear skills prompt (from P2.M1.T1.S8)
     this.skillsPrompt = '';
+
+    // Clear session storage (from P2.M2.T1.S1)
+    this.sessions.clear();
 
     // GOTCHA: No return value needed - Promise<void> is implicit
     // GOTCHA: No throws possible from null check and assignment
@@ -688,4 +701,62 @@ Each skill provides specific capabilities and guidelines.
 
     return spec;
   }
+
+  /**
+   * Create a new session with the specified ID
+   *
+   * Initializes empty session state for the given session ID.
+   * If session already exists, this is a no-op (idempotent).
+   *
+   * @param sessionId - Unique identifier for the session
+   * @throws {Error} If SDK is not initialized
+   * @remarks
+   * Session will be used when execute() receives matching sessionId in options.
+   */
+  createSession(sessionId: string): void {
+    // PATTERN: SDK initialization check (follow execute() pattern at lines 219-223)
+    if (!this.sdk) {
+      throw new Error("SDK not initialized. Call initialize() first.");
+    }
+
+    // PATTERN: Idempotent operation (follow initialize() pattern)
+    // Only create if doesn't exist
+    if (!this.sessions.has(sessionId)) {
+      this.sessions.set(sessionId, {
+        history: [],
+        lastResult: null,
+      });
+    }
+  }
+
+  /**
+   * Get session state for the specified ID
+   *
+   * Retrieves the current session state including conversation history
+   * and last result. Returns undefined if session doesn't exist.
+   *
+   * @param sessionId - Session identifier to retrieve
+   * @returns Session state or undefined if not found
+   * @remarks
+   * This is a read-only operation - does not modify session state.
+   */
+  getSession(sessionId: string): SessionState | undefined {
+    return this.sessions.get(sessionId);
+  }
+}
+
+/**
+ * Session state for maintaining conversation history
+ *
+ * Stores the conversation context for session-based execution.
+ * Used when request.options.sessionId is provided.
+ *
+ * @internal
+ */
+interface SessionState {
+  /** Conversation history - all user messages in this session */
+  history: import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
+
+  /** Last result message from the most recent execution */
+  lastResult: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
 }

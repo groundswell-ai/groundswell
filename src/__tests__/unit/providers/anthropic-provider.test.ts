@@ -42,7 +42,7 @@ describe('AnthropicProvider', () => {
       expect(provider.capabilities.skills).toBe(true);
       expect(provider.capabilities.lsp).toBe(true);
       expect(provider.capabilities.streaming).toBe(true);
-      expect(provider.capabilities.sessions).toBe(false);
+      expect(provider.capabilities.sessions).toBe(true);
       expect(provider.capabilities.extendedThinking).toBe(true);
     });
 
@@ -54,7 +54,7 @@ describe('AnthropicProvider', () => {
       expect(provider.capabilities.skills).toBe(true);
       expect(provider.capabilities.lsp).toBe(true);
       expect(provider.capabilities.streaming).toBe(true);
-      expect(provider.capabilities.sessions).toBe(false);
+      expect(provider.capabilities.sessions).toBe(true);
       expect(provider.capabilities.extendedThinking).toBe(true);
     });
 

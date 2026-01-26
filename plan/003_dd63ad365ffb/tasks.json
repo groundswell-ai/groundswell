@@ -379,7 +379,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S1",
                   "title": "Implement session storage in AnthropicProvider",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T1.S2"

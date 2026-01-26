@@ -1,97 +1,179 @@
-# Product Requirement Prompt (PRP)
-## Subtask P1.M2.T1.S2: Implement configureProviders() Function
+# Product Requirement Prompt (PRP): Implement Session Storage in AnthropicProvider
+
+**Work Item:** P2.M2.T1.S1
+**Title:** Implement session storage in AnthropicProvider
+**Points:** 1
+**Status:** Ready for Implementation
 
 ---
 
 ## Goal
 
-**Feature Goal**: Implement the `configureProviders()` function that validates and stores global provider configuration in the module-private `globalConfig` variable.
+**Feature Goal**: Add in-memory session storage to `AnthropicProvider` to enable session-based conversations, providing consistent API across providers despite Anthropic SDK's stateless nature.
 
-**Deliverable**: A complete `configureProviders()` function in `src/utils/provider-config.ts` with:
-1. Validation of `config.defaultProvider` against valid ProviderIds ('anthropic' | 'opencode')
-2. Validation of `config.providerDefaults` keys against valid ProviderIds
-3. Mutation of module-private `globalConfig` variable
-4. Comprehensive unit tests covering all validation scenarios
+**Deliverable**: Enhanced `AnthropicProvider` class with:
+- Private `sessions: Map<sessionId, SessionState>` storage
+- `SessionState` interface containing `history: SDKUserMessage[]` and `lastResult: SDKResultMessage`
+- `createSession(sessionId)` method to create new session state
+- `getSession(sessionId)` method to retrieve state or return `undefined`
+- Update `capabilities.sessions` from `false` to `true`
+- Clear sessions in `terminate()` method
 
 **Success Definition**:
-- Function validates input and throws descriptive errors for invalid providers
-- Function stores valid configuration in `globalConfig` variable
-- All tests pass (valid cases, invalid defaultProvider, invalid providerDefaults keys)
-- Function is exported from `src/utils/index.ts`
-- TypeScript compiles without errors
+- Session storage compiles without TypeScript errors
+- `createSession()` creates new empty session state
+- `getSession()` returns state for existing sessions, `undefined` for non-existent
+- `terminate()` clears all session storage
+- Unit tests verify session lifecycle operations
+- `capabilities.sessions` is `true` (enables session feature flag)
 
 ---
 
 ## User Persona
 
-**Target User**: Developer configuring the Groundswell library at application startup
+**Target User**: Groundswell developers implementing multi-provider session support. This is the foundation for P2.M2.T1.S2 (modify execute() to support sessions).
 
-**Use Case**: Set default provider and per-provider options once at app startup, cascading to all agents unless explicitly overridden
+**Use Case**: Anthropic SDK is stateless (no native sessions), but Groundswell requires consistent session API across providers. This abstraction layer stores conversation history in-memory to enable multi-turn conversations.
 
 **User Journey**:
-1. Developer imports `configureProviders` from Groundswell
-2. Calls `configureProviders()` with `GlobalProviderConfig` at app startup
-3. If configuration is valid, it's stored globally
-4. All agents created thereafter inherit this configuration
+1. Developer calls `provider.createSession('my-session')` to initialize session storage
+2. Developer calls `provider.getSession('my-session')` to retrieve session state
+3. In P2.M2.T1.S2: `execute()` method will use this storage for `continue: true` conversations
+4. `terminate()` method automatically clears all sessions
 
 **Pain Points Addressed**:
-- Single point of configuration instead of per-agent setup
-- Validation catches configuration errors early (fail-fast)
-- Clear error messages guide users to fix configuration issues
+- **Inconsistent provider APIs**: Anthropic has no native sessions, OpenCode does
+- **Stateless SDK limitation**: Anthropic SDK requires explicit message history management
+- **API parity**: Sessions should work the same regardless of provider choice
 
 ---
 
 ## Why
 
-- **Foundation for Multi-Provider System**: `configureProviders()` is the primary API for setting global provider defaults
-- **Fail-Fast Validation**: Catching configuration errors at startup prevents runtime failures
-- **Configuration Cascade**: Global config is the base of the cascade (Global → Agent → Prompt)
-- **Developer Experience**: Clear error messages with supported providers listed
-- **Type Safety**: Leverages TypeScript's `ProviderId` union type for compile-time and runtime validation
+- **Session abstraction (Decision 2)**: Provides consistent API across providers despite Anthropic's stateless design
+- **Foundation for P2.M2.T1.S2**: Session storage is prerequisite for modifying `execute()` to support `sessionId` in requests
+- **Provider parity**: Aligns Anthropic provider with OpenCode's native session capabilities
+- **User experience**: Developers shouldn't need to know about provider-specific session differences
 
 ---
 
 ## What
 
-Implement the `configureProviders()` function per PRD Section 7.6.
+### SessionState Interface Definition
 
-### Contract Definition (from Work Item Description)
+```typescript
+/**
+ * Session state for maintaining conversation history
+ *
+ * Stores the conversation context for session-based execution.
+ * Used when request.options.sessionId is provided.
+ *
+ * @internal
+ */
+interface SessionState {
+  /** Conversation history - all user messages in this session */
+  history: import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
 
-**INPUT**: `config: GlobalProviderConfig`
+  /** Last result message from the most recent execution */
+  lastResult: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
+}
+```
 
-**LOGIC**:
-1. Validate `config.defaultProvider` is 'anthropic' or 'opencode'
-2. Validate `config.providerDefaults` keys (if present) are valid ProviderIds
-3. Store in `globalConfig` variable
-4. Throw on invalid provider
+### Private Storage Field
 
-**OUTPUT**: Sets global configuration. No return value (void).
+```typescript
+/**
+ * Session storage for multi-turn conversations
+ *
+ * Maps session IDs to their conversation state. Enables session-based
+ * execution despite Anthropic SDK's stateless design.
+ *
+ * @internal
+ */
+private sessions: Map<string, SessionState> = new Map();
+```
 
-### Implementation Scope
+### Public Methods
 
-**IN SCOPE**:
-1. Implement `configureProviders()` function in `src/utils/provider-config.ts`
-2. Add private validation helper functions (`isValidProviderId`, `getSupportedProvidersList`)
-3. Mutate module-private `globalConfig` variable
-4. Export function from `src/utils/index.ts`
-5. Create comprehensive unit tests
+```typescript
+/**
+ * Create a new session with the specified ID
+ *
+ * Initializes empty session state for the given session ID.
+ * If session already exists, this is a no-op (idempotent).
+ *
+ * @param sessionId - Unique identifier for the session
+ * @throws {Error} If SDK is not initialized
+ * @remarks
+ * Session will be used when execute() receives matching sessionId in options.
+ */
+createSession(sessionId: string): void {
+  // PATTERN: SDK initialization check (follow execute() pattern at lines 219-223)
+  if (!this.sdk) {
+    throw new Error("SDK not initialized. Call initialize() first.");
+  }
 
-**OUT OF SCOPE** (Future Subtasks):
-- `getGlobalProviderConfig()` accessor → P1.M2.T1.S3
-- `resolveProviderConfig()` cascade utility → P1.M2.T1.S4
-- Provider registry integration → P1.M3
-- Actual provider implementations → P2, P3
+  // PATTERN: Idempotent operation (follow initialize() pattern)
+  // Only create if doesn't exist
+  if (!this.sessions.has(sessionId)) {
+    this.sessions.set(sessionId, {
+      history: [],
+      lastResult: null,
+    });
+  }
+}
+
+/**
+ * Get session state for the specified ID
+ *
+ * Retrieves the current session state including conversation history
+ * and last result. Returns undefined if session doesn't exist.
+ *
+ * @param sessionId - Session identifier to retrieve
+ * @returns Session state or undefined if not found
+ * @remarks
+ * This is a read-only operation - does not modify session state.
+ */
+getSession(sessionId: string): SessionState | undefined {
+  return this.sessions.get(sessionId);
+}
+```
+
+### Capability Update
+
+```typescript
+// Update capabilities.sessions from false to true
+readonly capabilities: ProviderCapabilities = {
+  mcp: true,
+  skills: true,
+  lsp: true,
+  streaming: true,
+  sessions: true,  // CHANGED: Was false, now true
+  extendedThinking: true,
+} satisfies ProviderCapabilities;
+```
+
+### Terminate Method Update
+
+```typescript
+async terminate(): Promise<void> {
+  // ... existing code ...
+
+  // NEW: Clear session storage
+  this.sessions.clear();
+}
+```
 
 ### Success Criteria
 
-- [ ] Function `configureProviders()` exists and is exported
-- [ ] Validates `defaultProvider` is 'anthropic' or 'opencode'
-- [ ] Validates `providerDefaults` keys are valid ProviderIds
-- [ ] Throws `Error` with descriptive message on invalid provider
-- [ ] Stores valid config in `globalConfig` variable
-- [ ] All tests pass (valid + error cases)
-- [ ] Exported from `src/utils/index.ts`
-- [ ] TypeScript compiles without errors
+- [ ] `SessionState` interface defined with `history` and `lastResult` fields
+- [ ] `private sessions: Map<string, SessionState>` field added
+- [ ] `createSession(sessionId)` method implemented
+- [ ] `getSession(sessionId)` method implemented
+- [ ] `capabilities.sessions` changed from `false` to `true`
+- [ ] `terminate()` method updated to clear sessions
+- [ ] Unit tests verify all session operations
+- [ ] TypeScript compilation succeeds
 
 ---
 
@@ -99,172 +181,233 @@ Implement the `configureProviders()` function per PRD Section 7.6.
 
 ### Context Completeness Check
 
-**"No Prior Knowledge" Test**: A developer unfamiliar with this codebase has everything needed:
-- Complete type definitions (GlobalProviderConfig, ProviderId, ProviderOptions)
-- Existing module structure with `globalConfig` variable
-- Validation patterns from existing codebase
-- Test patterns and framework configuration
-- Module system details (ESM, TypeScript config)
-- Exact file locations and import patterns
+**Question**: If someone knew nothing about this codebase, would they have everything needed to implement this successfully?
+
+**Answer**: YES - This PRP provides:
+- Exact `SessionState` interface structure with SDK message types
+- Precise method signatures and implementation patterns
+- File location and placement (`src/providers/anthropic-provider.ts`)
+- Test patterns with specific assertions
+- Integration with existing codebase patterns (Map storage, idempotent operations)
+- Common gotchas and anti-patterns to avoid
+
+---
 
 ### Documentation & References
 
 ```yaml
-# MUST READ - Type Definitions
+# MUST READ - Current AnthropicProvider Implementation
+- file: src/providers/anthropic-provider.ts
+  why: Complete provider implementation showing existing patterns for private fields, idempotent operations, and cleanup
+  critical: Lines 59-93 show readonly properties, lines 145-184 show initialize() pattern, lines 194-215 show terminate() pattern
+  pattern: private fields, SDK initialization checks, idempotent operations, cleanup in terminate()
+
+# MUST READ - Provider Interface with Session Support
 - file: src/types/providers.ts
-  why: Contains GlobalProviderConfig interface definition
-  critical: |
-    - Lines 353-364: GlobalProviderConfig interface
-    - defaultProvider: ProviderId (required)
-    - providerDefaults?: Partial<Record<ProviderId, ProviderOptions>> (optional)
-  section: "Global Provider Configuration (PRD 7.6)"
+  why: ProviderOptions.sessionId already exists in the interface - this implementation fulfills that contract
+  critical: Lines 82-123 define ProviderOptions with optional sessionId field
+  pattern: sessionId?: string in ProviderOptions, sessionId?: string in ProviderExecutionOptions
 
-# MUST READ - Existing Module Structure
-- file: src/utils/provider-config.ts
-  why: Contains module-private globalConfig variable to mutate
-  critical: |
-    - Lines 77: let globalConfig: GlobalProviderConfig | null = null
-    - Lines 82-103: Placeholder comment for configureProviders()
-    - Variable is NOT exported (module-private via ESM scoping)
-  gotcha: Do NOT export the globalConfig variable
+# MUST READ - Decision 2: Session Abstraction Layer
+- file: plan/003_dd63ad365ffb/docs/architecture/decisions.md
+  why: Architectural decision that defines session abstraction approach
+  critical: Lines 49-115 (Decision 2: Session Management Approach)
+  pattern: Session abstraction in provider adapter, Map<sessionId, SessionState> storage
 
-# MUST READ - Validation Pattern Reference
-- file: src/utils/model-spec.ts
-  why: Shows exact validation pattern to follow
-  pattern: |
-    - Lines 30-32: isValidProviderId() type guard function
-    - Lines 39-41: getSupportedProvidersList() helper
-    - Lines 145-150: Validation error pattern with throw
-  critical: Copy this pattern for configureProviders()
+# MUST READ - Implementation Patterns for Idempotent Operations
+- file: src/providers/anthropic-provider.ts
+  why: Shows exact pattern for idempotent initialization and cleanup
+  critical: Lines 147-149 (initialize idempotent check), lines 197-199 (terminate idempotent check)
+  pattern: if (this.sdk) { return; } for idempotent operations
 
-# MUST READ - Test Pattern Reference
-- file: src/__tests__/unit/utils/model-spec.test.ts
-  why: Shows test structure for validation functions
-  pattern: |
-    - describe('error cases') for error testing
-    - expect(() => function()).toThrow() for error cases
-    - try/catch with expect.fail() for detailed error checking
-    - Error message validation with contains()
-  section: Lines 140-175 (error case tests)
+# MUST READ - Test Patterns for Private State Testing
+- file: src/__tests__/unit/providers/anthropic-provider-initialize.test.ts
+  why: Shows how to test private properties using @ts-expect-error
+  critical: Lines 35-36, 43-44 show private property access pattern
+  pattern: // @ts-expect-error - Testing private property
 
-# MUST READ - Barrel Export Pattern
-- file: src/utils/index.ts
-  why: Shows how to export from utils module
-  pattern: export { parseModelSpec, formatModelForProvider } from './model-spec.js';
-  action: Add configureProviders export here
+# MUST READ - Test Patterns for State Management
+- file: src/__tests__/unit/providers/anthropic-provider-terminate.test.ts
+  why: Shows how to test state clearing and idempotent behavior
+  critical: Lines 32-46 (state change verification), lines 74-95 (idempotent behavior)
+  pattern: expect(provider.sdk).toBeNull() after termination
 
-# Project Configuration
-- file: package.json
-  why: Confirm ESM module system ("type": "module")
-  critical: All imports must use .js extensions
+# MUST READ - Anthropic SDK Session Research
+- docfile: plan/003_dd63ad365ffb/P2M2T1S1/research/anthropic-sdk-session-patterns.md
+  why: Complete research on SDK message types and continuation patterns
+  section: "1. SDK Message Type Structures" (lines 36-131)
+  critical: SDKUserMessage has session_id field, SDKResultMessage structure for lastResult
 
-- file: tsconfig.json
-  why: TypeScript configuration (ES2022 target, ES2022 modules)
-  critical: Strict mode enabled, noEmit for builds
+# MUST READ - Codebase Session Patterns Research
+- docfile: plan/003_dd63ad365ffb/P2M2T1S1/research/codebase-session-patterns.md
+  why: Shows existing Map-based state storage patterns in codebase
+  section: "1. Existing Session/State Management Patterns"
+  critical: ProviderRegistry uses Map<ProviderId, Provider>, MCPHandler uses Maps for tools
 
-- file: vitest.config.ts
-  why: Test framework configuration
-  pattern: Tests in src/__tests__/**/*.test.ts, globals enabled
+# MUST READ - Session Management Best Practices
+- docfile: plan/003_dd63ad365ffb/P2M2T1S1/research/session-management-best-practices.md
+  why: Industry best practices for session storage, memory management, and cleanup
+  section: "2. TypeScript Code Examples for Session Management" (line 142+)
+  critical: LRU cache patterns, TTL expiration, thread-safe operations
+
+# MUST READ - Test Patterns for Session Storage
+- docfile: plan/003_dd63ad365ffb/P2M2T1S1/research/test-patterns.md
+  why: Specific test patterns for Map-based storage and lifecycle testing
+  section: "4. Map Usage Testing Patterns" (lines 67-89)
+  critical: Map.has(), Map.get(), Map.size() testing patterns
+
+# REFERENCE - Anthropic SDK Message Types
+- url: https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk
+  why: SDK package documentation with type definitions
+  section: "SDKUserMessage" and "SDKResultMessage" types
+  critical: SDKUserMessage.session_id, SDKResultMessage with subtype and usage
+
+# REFERENCE - TypeScript Map Documentation
+- url: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Map
+  why: Complete Map API reference for session storage operations
+  section: "Methods" - has(), get(), set(), delete(), clear()
+  critical: Map.set() returns the Map object, Map.has() for existence checks
 ```
+
+---
 
 ### Current Codebase Tree
 
 ```bash
 src/
-├── cache/
-│   └── cache.ts
-├── core/
-│   ├── agent.ts
-│   ├── context.ts
-│   ├── mcp-handler.ts
-│   └── workflow.ts
+├── providers/
+│   ├── provider-registry.ts          # Singleton registry (Map-based state pattern)
+│   ├── anthropic-provider.ts         # [MODIFY] Add session storage
+│   └── __tests__/
+│       └── providers/
+│           ├── anthropropic-provider-initialize.test.ts
+│           ├── anthropropic-provider-terminate.test.ts
+│           └── ...
 ├── types/
-│   ├── providers.ts                # GlobalProviderConfig, ProviderId, ProviderOptions
-│   └── index.ts
-├── utils/
-│   ├── provider-config.ts          # MODIFY: Add configureProviders()
-│   ├── model-spec.ts               # Validation pattern reference
-│   ├── id.ts
-│   ├── observable.ts
-│   └── index.ts                    # MODIFY: Export configureProviders
-└── __tests__/
-    └── unit/
-        └── utils/
-            └── model-spec.test.ts  # Test pattern reference
+│   ├── providers.ts                  # ProviderOptions.sessionId already defined
+│   ├── sdk-primitives.ts             # Tool, MCPServer, Skill types
+│   └── agent.ts                      # AgentResponse<T> type
+└── core/
+    └── mcp-handler.ts                # Example of Map-based state management
 ```
+
+---
 
 ### Desired Codebase Tree (After This Subtask)
 
 ```bash
 src/
-├── utils/
-│   ├── provider-config.ts          # UPDATED: Add configureProviders() function
-│   └── index.ts                    # UPDATED: Export configureProviders
-└── __tests__/
-    └── unit/
-        └── utils/
-            └── provider-config.test.ts  # NEW: Test file
+├── providers/
+│   ├── provider-registry.ts          # Existing - no changes
+│   ├── anthropic-provider.ts         # [MODIFY] Add sessions field, createSession(), getSession(), update capabilities
+│   └── __tests__/
+│       └── providers/
+│           ├── anthropropic-provider-initialize.test.ts  # Existing
+│           ├── anthropropic-provider-terminate.test.ts   # Existing
+│           ├── anthropropic-provider-sessions.test.ts    # [NEW] Session storage tests
+│           └── ...
 ```
 
-### Known Gotchas & Library Quirks
+**Modified Files:**
+- `src/providers/anthropic-provider.ts` - Add session storage, methods, and capability update
+
+**New Files:**
+- `src/__tests__/unit/providers/anthropic-provider-sessions.test.ts` - Session storage unit tests
+
+---
+
+### Known Gotchas of Our Codebase & Library Quirks
 
 ```typescript
-// CRITICAL: ESM Module System
-// Project uses pure ESM ("type": "module" in package.json)
-// All imports MUST use .js extensions (TypeScript requires this for ESM)
-import type { GlobalProviderConfig } from '../types/providers.js';  // ✓ CORRECT
+// CRITICAL: Use typeof import() for SDK message types
+// SDKUserMessage and SDKResultMessage are from @anthropic-ai/claude-agent-sdk
+// Must use import() type pattern for accuracy
+type SessionState = {
+  history: typeof import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
+  lastResult: typeof import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
+};
+// WRONG: history: any[]; (loses type safety)
+// WRONG: history: SDKUserMessage[]; (SDKUserMessage not in scope)
 
-// CRITICAL: Module-Private Variable Access
-// globalConfig is module-private (not exported)
-// Access it directly by name since we're in the same module
-let globalConfig: GlobalProviderConfig | null = null;  // Already exists
+// CRITICAL: Initialize Map in field declaration, not constructor
+private sessions: Map<string, SessionState> = new Map();
+// WRONG: private sessions: Map<string, SessionState>; then this.sessions = new Map() in constructor
+// WHY: Fields are initialized in declaration order, consistent with existing patterns (mcpHandler, skillsPrompt)
 
-// CRITICAL: Validation Pattern
-// Follow the exact pattern from model-spec.ts
-function isValidProviderId(value: string): value is ProviderId {
-  return value === 'anthropic' || value === 'opencode';
+// CRITICAL: Idempotent createSession() - check before creating
+if (!this.sessions.has(sessionId)) {
+  this.sessions.set(sessionId, { history: [], lastResult: null });
 }
+// WRONG: Always set() (overwrites existing session state)
+// PATTERN: Follow initialize() idempotent check at lines 147-149
 
-// CRITICAL: Error Message Format
-// Use template literals + concatenation for consistency
-throw new Error(
-  `Invalid provider: "${provider}". ` +
-  `Supported providers: ${getSupportedProvidersList()}`
-);
-
-// CRITICAL: Validation Order
-// Validate BEFORE mutating globalConfig
-// 1. Validate defaultProvider
-// 2. Validate providerDefaults keys (if present)
-// 3. Then: globalConfig = config
-
-// CRITICAL: Type Safety
-// Use built-in Error class, not custom errors
-throw new Error('message');  // ✓ CORRECT
-
-// CRITICAL: Void Return Type
-// Function returns nothing, just mutates globalConfig
-export function configureProviders(config: GlobalProviderConfig): void
-
-// CRITICAL: providerDefaults is Optional
-// It may be undefined, check before iterating
-if (config.providerDefaults) {
-  // Validate keys
+// CRITICAL: SDK initialization check in public methods
+if (!this.sdk) {
+  throw new Error("SDK not initialized. Call initialize() first.");
 }
+// PATTERN: Follow execute() pattern at lines 219-223
+// WHY: Public methods should fail gracefully if SDK not loaded
 
-// CRITICAL: Object.keys() returns string[]
-// When iterating providerDefaults keys, they are strings, not ProviderIds
-// Need to validate each key with isValidProviderId()
-for (const providerId of Object.keys(config.providerDefaults)) {
-  if (!isValidProviderId(providerId)) {
-    // Throw error
+// CRITICAL: Return undefined (not null) for missing sessions
+getSession(sessionId: string): SessionState | undefined {
+  return this.sessions.get(sessionId);  // Returns undefined if not found
+}
+// WRONG: Return null for missing sessions
+// WHY: Map.get() returns undefined by default, consistent with Map semantics
+
+// CRITICAL: Clear sessions in terminate() after SDK null check
+async terminate(): Promise<void> {
+  if (this.sdk === null) {
+    return;
   }
+  this.sdk = null;
+  this.mcpServerConfig = null;
+  this.skillsPrompt = '';
+  this.sessions.clear();  // Add after existing cleanup
 }
 
-// CRITICAL: Test Isolation
-// No special reset needed for module-private variables
-// ES module scoping provides natural test isolation
-// Each test file imports a fresh module instance
+// CRITICAL: Update capabilities.sessions from false to true
+// This is a semantic change - sessions are now supported
+readonly capabilities: ProviderCapabilities = {
+  // ... other capabilities
+  sessions: true,  // CHANGED from false
+  // ...
+};
+
+// GOTCHA: SessionState.lastResult can be null
+// New sessions start with null lastResult
+interface SessionState {
+  history: SDKUserMessage[];
+  lastResult: SDKResultMessage | null;  // Null until first execution
+}
+
+// GOTCHA: createSession() is synchronous (no async)
+// Session storage is in-memory Map operation
+createSession(sessionId: string): void {
+  // Synchronous operation
+}
+// WRONG: async createSession(sessionId: string): Promise<void>
+
+// PATTERN: Use Map.has() before get() when you need to distinguish missing from undefined value
+if (this.sessions.has(sessionId)) {
+  const state = this.sessions.get(sessionId)!;  // Non-null assertion safe
+  // ...
+}
+
+// GOTCHA: Map.set() returns the Map (chainable)
+this.sessions.set(sessionId, state).set(sessionId2, state2);
+// But prefer separate statements for clarity
+
+// PATTERN: Follow existing private field naming
+private sessions: Map<string, SessionState>;  // camelCase, private
+// NOT: private _sessions, private sessionMap, private Sessions
+
+// GOTCHA: SessionState is internal (@internal JSDoc)
+// Not exported from module, used only within AnthropicProvider
+/**
+ * @internal
+ */
+interface SessionState { ... }
 ```
 
 ---
@@ -273,309 +416,323 @@ for (const providerId of Object.keys(config.providerDefaults)) {
 
 ### Data Models and Structure
 
-**No new models** - uses existing types from `src/types/providers.ts`:
-
+**New Type: SessionState**
 ```typescript
-// From src/types/providers.ts (lines 353-364)
-export interface GlobalProviderConfig {
-  defaultProvider: ProviderId;
-  providerDefaults?: Partial<Record<ProviderId, ProviderOptions>>;
-}
+/**
+ * Session state for maintaining conversation history
+ *
+ * Stores the conversation context for session-based execution.
+ * Used when request.options.sessionId is provided.
+ *
+ * @internal
+ */
+interface SessionState {
+  /** Conversation history - all user messages in this session */
+  history: import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
 
-// ProviderId type (lines 8-10)
-export type ProviderId = 'anthropic' | 'opencode';
-
-// ProviderOptions interface (lines 35-50)
-export interface ProviderOptions {
-  endpoint?: string;
-  apiKey?: string;
-  sessionId?: string;
-  timeout?: number;
-  headers?: Record<string, string>;
+  /** Last result message from the most recent execution */
+  lastResult: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
 }
 ```
+
+**Storage Field:**
+```typescript
+private sessions: Map<string, SessionState> = new Map();
+```
+
+---
 
 ### Implementation Tasks (Ordered by Dependencies)
 
 ```yaml
-Task 1: ADD Private Validation Helpers to provider-config.ts
-  - IMPLEMENT: isValidProviderId() type guard function
-  - IMPLEMENT: getSupportedProvidersList() helper function
-  - PATTERN: Copy from src/utils/model-spec.ts lines 30-41
-  - PLACEMENT: Before configureProviders() function
-  - ACCESSIBILITY: Private (not exported), same file only
+Task 1: ADD SessionState interface to AnthropicProvider
+  - DEFINE: SessionState interface with history and lastResult fields
+  - TYPE: history as SDKUserMessage[], lastResult as SDKResultMessage | null
+  - USE: typeof import() pattern for SDK message types
+  - PLACE: After private field declarations, before method implementations
+  - LOCATION: src/providers/anthropic-provider.ts (around line 135, after skillsPrompt field)
+  - JSDOC: Add @internal tag (internal to provider implementation)
 
-Task 2: IMPLEMENT configureProviders() Function
-  - UNCOMMENT: Lines 82-103 placeholder in provider-config.ts
-  - VALIDATION: Check defaultProvider with isValidProviderId()
-  - VALIDATION: Check providerDefaults keys with isValidProviderId()
-  - MUTATION: Set globalConfig = config (after validation)
-  - RETURN: void (no return value)
-  - NAMING: camelCase function name
-  - PLACEMENT: src/utils/provider-config.ts
+Task 2: ADD private sessions field to AnthropicProvider
+  - DECLARE: private sessions: Map<string, SessionState> = new Map();
+  - INITIALIZE: In field declaration (not constructor)
+  - PLACE: After skillsPrompt field (line 134), before initialize() method
+  - LOCATION: src/providers/anthropic-provider.ts (around line 135)
+  - PATTERN: Follow existing private field pattern (sdk, mcpHandler, mcpServerConfig, skillsPrompt)
 
-Task 3: EXPORT Function from Barrel
-  - MODIFY: src/utils/index.ts
-  - ADD: export { configureProviders } from './provider-config.js';
-  - PATTERN: Follow existing export pattern in index.ts
+Task 3: UPDATE capabilities.sessions from false to true
+  - CHANGE: sessions: false → sessions: true
+  - VERIFY: Update JSDoc comment for sessions capability
+  - PLACE: In capabilities property declaration (line 89)
+  - LOCATION: src/providers/anthropic-provider.ts (line 89)
+  - JSDOC: Update to reflect session support via abstraction layer
 
-Task 4: CREATE Test File provider-config.test.ts
-  - IMPLEMENT: describe block for configureProviders
-  - IMPLEMENT: Valid configuration test cases
-  - IMPLEMENT: Invalid defaultProvider test cases
-  - IMPLEMENT: Invalid providerDefaults keys test cases
-  - IMPLEMENT: Error message validation tests
-  - PATTERN: Follow src/__tests__/unit/utils/model-spec.test.ts
-  - FRAMEWORK: Vitest with describe/it/expect
-  - PLACEMENT: src/__tests__/unit/utils/provider-config.test.ts
+Task 4: IMPLEMENT createSession() method
+  - SIGNATURE: createSession(sessionId: string): void
+  - BODY: SDK initialization check, idempotent has() check, set() if not exists
+  - PLACE: After loadSkills() method (around line 497)
+  - LOCATION: src/providers/anthropic-provider.ts
+  - PATTERN: Follow initialize() idempotent check (lines 147-149)
+  - ERROR: Throw "SDK not initialized" if !this.sdk
+
+Task 5: IMPLEMENT getSession() method
+  - SIGNATURE: getSession(sessionId: string): SessionState | undefined
+  - BODY: Return this.sessions.get(sessionId)
+  - PLACE: After createSession() method
+  - LOCATION: src/providers/anthropic-provider.ts
+  - PATTERN: Simple getter, read-only operation
+  - RETURN: undefined if not found (Map.get() default behavior)
+
+Task 6: MODIFY terminate() to clear sessions
+  - FIND: terminate() method (line 194-215)
+  - ADD: this.sessions.clear() after this.skillsPrompt = '' (line 211)
+  - PLACE: After existing cleanup, before method end
+  - LOCATION: src/providers/anthropic-provider.ts (line 212)
+  - PATTERN: Follow existing cleanup pattern (mcpServerConfig, skillsPrompt)
+
+Task 7: CREATE unit tests in anthropic-provider-sessions.test.ts
+  - CREATE: src/__tests__/unit/providers/anthropic-provider-sessions.test.ts
+  - IMPLEMENT: Test 1 - createSession() creates new session state
+  - IMPLEMENT: Test 2 - createSession() is idempotent (no overwrite)
+  - IMPLEMENT: Test 3 - getSession() returns state for existing session
+  - IMPLEMENT: Test 4 - getSession() returns undefined for non-existent session
+  - IMPLEMENT: Test 5 - terminate() clears all sessions
+  - IMPLEMENT: Test 6 - createSession() throws when SDK not initialized
+  - IMPLEMENT: Test 7 - capabilities.sessions is true
+  - FOLLOW: Pattern from anthropic-provider-initialize.test.ts
+  - USE: @ts-expect-error for private sessions field access
+
+Task 8: RUN validation commands
+  - EXEC: npm run lint (TypeScript compilation check)
+  - EXEC: npm test -- src/__tests__/unit/providers/anthropic-provider-sessions.test.ts
+  - VERIFY: No TypeScript errors
+  - VERIFY: All tests pass
+  - FIX: Any type errors or test failures
 ```
+
+---
 
 ### Implementation Patterns & Key Details
 
 ```typescript
-// ============================================================================
-// src/utils/provider-config.ts - ADD THESE HELPER FUNCTIONS
-// ============================================================================
+// ========================================
+// PATTERN 1: SessionState Interface Definition
+// ========================================
 
 /**
- * Type guard to check if a string is a valid ProviderId
+ * Session state for maintaining conversation history
  *
- * @param value - The string value to check
- * @returns True if the value is a valid ProviderId ('anthropic' | 'opencode')
+ * Stores the conversation context for session-based execution.
+ * Used when request.options.sessionId is provided.
+ *
+ * @internal
  */
-function isValidProviderId(value: string): value is ProviderId {
-  return value === 'anthropic' || value === 'opencode';
+interface SessionState {
+  /** Conversation history - all user messages in this session */
+  history: import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
+
+  /** Last result message from the most recent execution */
+  lastResult: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
 }
 
-/**
- * Get comma-separated list of supported providers for error messages
- *
- * @returns Formatted list of valid provider IDs
- */
-function getSupportedProvidersList(): string {
-  return '"anthropic", "opencode"';
-}
+// KEY: Use typeof import() for SDK types to avoid import at top of file
+// KEY: Mark as @internal (implementation detail, not public API)
+// KEY: lastResult can be null (new sessions haven't executed yet)
 
-// ============================================================================
-// src/utils/provider-config.ts - IMPLEMENT configureProviders()
-// ============================================================================
+// ========================================
+// PATTERN 2: Private Field Initialization
+// ========================================
 
-/**
- * Configure global provider settings
- *
- * Validates the configuration and stores it in the module-private
- * globalConfig variable. This function should be called once at
- * application startup.
- *
- * ## Validation
- *
- * - `defaultProvider` must be 'anthropic' or 'opencode'
- * - `providerDefaults` keys (if present) must be valid ProviderIds
- *
- * ## Configuration Cascade (PRD 7.7)
- *
- * This global config is the lowest priority in the cascade:
- * 1. GlobalProviderConfig (this config) - lowest priority
- * 2. AgentConfig.provider / AgentConfig.providerOptions
- * 3. Prompt-level overrides - highest priority
- *
- * @param config - Global provider configuration
- * @throws {Error} If defaultProvider is invalid
- * @throws {Error} If providerDefaults contains invalid provider IDs
- *
- * @example
- * ```ts
- * import { configureProviders } from 'groundswell';
- *
- * configureProviders({
- *   defaultProvider: 'opencode',
- *   providerDefaults: {
- *     opencode: { endpoint: 'http://localhost:8080' },
- *     anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
- *   }
- * });
- * ```
- */
-export function configureProviders(config: GlobalProviderConfig): void {
-  // Step 1: Validate defaultProvider
-  if (!isValidProviderId(config.defaultProvider)) {
-    throw new Error(
-      `Invalid default provider: "${config.defaultProvider}". ` +
-      `Supported providers: ${getSupportedProvidersList()}`
-    );
-  }
+export class AnthropicProvider implements Provider {
+  // ... existing private fields ...
 
-  // Step 2: Validate providerDefaults keys (if present)
-  if (config.providerDefaults) {
-    for (const providerId of Object.keys(config.providerDefaults)) {
-      if (!isValidProviderId(providerId)) {
-        throw new Error(
-          `Invalid provider in providerDefaults: "${providerId}". ` +
-          `Supported providers: ${getSupportedProvidersList()}`
-        );
-      }
+  /**
+   * Session storage for multi-turn conversations
+   *
+   * Maps session IDs to their conversation state. Enables session-based
+   * execution despite Anthropic SDK's stateless design.
+   *
+   * @internal
+   */
+  private sessions: Map<string, SessionState> = new Map();
+
+  // KEY: Initialize Map in field declaration (not constructor)
+  // KEY: Follow existing pattern from mcpHandler, skillsPrompt
+  // KEY: Mark as @internal (private implementation detail)
+
+// ========================================
+// PATTERN 3: SDK Initialization Check
+// ========================================
+
+  /**
+   * Create a new session with the specified ID
+   *
+   * Initializes empty session state for the given session ID.
+   * If session already exists, this is a no-op (idempotent).
+   *
+   * @param sessionId - Unique identifier for the session
+   * @throws {Error} If SDK is not initialized
+   */
+  createSession(sessionId: string): void {
+    // PATTERN: SDK initialization check (follow execute() pattern)
+    if (!this.sdk) {
+      throw new Error("SDK not initialized. Call initialize() first.");
+    }
+
+    // PATTERN: Idempotent operation (follow initialize() pattern)
+    if (!this.sessions.has(sessionId)) {
+      this.sessions.set(sessionId, {
+        history: [],
+        lastResult: null,
+      });
     }
   }
 
-  // Step 3: Store configuration (validation passed)
-  globalConfig = config;
+// KEY: Always check this.sdk before public method operations
+// KEY: Use Map.has() to check existence before set()
+// KEY: Initialize with empty history and null lastResult
+
+// ========================================
+// PATTERN 4: Simple Getter Method
+// ========================================
+
+  /**
+   * Get session state for the specified ID
+   *
+   * Retrieves the current session state including conversation history
+   * and last result. Returns undefined if session doesn't exist.
+   *
+   * @param sessionId - Session identifier to retrieve
+   * @returns Session state or undefined if not found
+   */
+  getSession(sessionId: string): SessionState | undefined {
+    return this.sessions.get(sessionId);
+  }
+
+// KEY: Simple getter - just return Map.get() result
+// KEY: Return type includes undefined (Map.get() default)
+// KEY: No SDK check needed for read-only operation
+
+// ========================================
+// PATTERN 5: Cleanup in terminate()
+// ========================================
+
+  async terminate(): Promise<void> {
+    // ... existing cleanup code ...
+
+    // Clear session storage
+    this.sessions.clear();
+
+    // KEY: Add after existing cleanup (mcpServerConfig, skillsPrompt)
+    // KEY: Use Map.clear() for efficient cleanup
+    // KEY: No null check needed - clear() on empty Map is safe
+
+// ========================================
+// PATTERN 6: Capabilities Update
+// ========================================
+
+  readonly capabilities: ProviderCapabilities = {
+    /** MCP server connections via createSdkMcpServer */
+    mcp: true,
+    /** Skill loading via system prompt */
+    skills: true,
+    /** LSP integration via MCP plugins */
+    lsp: true,
+    /** Streaming response support */
+    streaming: true,
+    /** Session-based state (via abstraction layer) */
+    sessions: true,  // CHANGED: Was false, now true
+    /** Extended thinking via maxThinkingTokens */
+    extendedThinking: true,
+  } satisfies ProviderCapabilities;
+
+// KEY: Update sessions capability to reflect new feature
+// KEY: Update JSDoc to indicate "via abstraction layer"
+// KEY: Keep satisfies ProviderCapabilities for type safety
+
+// ========================================
+// GOTCHA: Idempotent createSession()
+// ========================================
+
+// WRONG: Always overwrites existing session
+createSession(sessionId: string): void {
+  this.sessions.set(sessionId, { history: [], lastResult: null });
 }
+
+// RIGHT: Check before creating (idempotent)
+createSession(sessionId: string): void {
+  if (!this.sessions.has(sessionId)) {
+    this.sessions.set(sessionId, { history: [], lastResult: null });
+  }
+}
+
+// WHY: Calling createSession() twice shouldn't lose conversation history
+
+// ========================================
+// GOTCHA: Return Type for getSession()
+// ========================================
+
+// WRONG: Returns null for missing sessions
+getSession(sessionId: string): SessionState | null {
+  return this.sessions.get(sessionId) ?? null;
+}
+
+// RIGHT: Returns undefined for missing sessions
+getSession(sessionId: string): SessionState | undefined {
+  return this.sessions.get(sessionId);
+}
+
+// WHY: Map.get() returns undefined by default - consistent with Map semantics
+// ALSO: TypeScript's optional chaining works better with undefined
+
+// ========================================
+// GOTCHA: SDK Type Import Pattern
+// ========================================
+
+// WRONG: Import at top level (circular dependency risk)
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+
+interface SessionState {
+  history: SDKUserMessage[];
+}
+
+// RIGHT: Use typeof import() in interface
+interface SessionState {
+  history: typeof import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
+}
+
+// WHY: Lazy type evaluation, avoids top-level import dependency
 ```
 
-### Test Implementation Pattern
-
-```typescript
-// ============================================================================
-// src/__tests__/unit/utils/provider-config.test.ts
-// ============================================================================
-
-import { describe, it, expect, beforeEach } from 'vitest';
-import { configureProviders } from '../../../utils/provider-config.js';
-
-// Note: No special reset needed - ES module scoping provides isolation
-
-describe('configureProviders', () => {
-  describe('valid configuration', () => {
-    it('should accept anthropic as default provider', () => {
-      expect(() => {
-        configureProviders({ defaultProvider: 'anthropic' });
-      }).not.toThrow();
-    });
-
-    it('should accept opencode as default provider', () => {
-      expect(() => {
-        configureProviders({ defaultProvider: 'opencode' });
-      }).not.toThrow();
-    });
-
-    it('should accept configuration with providerDefaults', () => {
-      expect(() => {
-        configureProviders({
-          defaultProvider: 'opencode',
-          providerDefaults: {
-            anthropic: { apiKey: 'sk-test' },
-            opencode: { endpoint: 'http://localhost:8080' }
-          }
-        });
-      }).not.toThrow();
-    });
-
-    it('should accept configuration with partial providerDefaults', () => {
-      expect(() => {
-        configureProviders({
-          defaultProvider: 'anthropic',
-          providerDefaults: {
-            anthropic: { apiKey: 'sk-test' }
-          }
-        });
-      }).not.toThrow();
-    });
-  });
-
-  describe('invalid defaultProvider', () => {
-    it('should throw on invalid provider string', () => {
-      expect(() => {
-        configureProviders({ defaultProvider: 'invalid' });
-      }).toThrow(/Invalid default provider/i);
-    });
-
-    it('should include invalid value in error message', () => {
-      try {
-        configureProviders({ defaultProvider: 'invalid' });
-        expect.fail('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toContain('"invalid"');
-      }
-    });
-
-    it('should list supported providers in error message', () => {
-      try {
-        configureProviders({ defaultProvider: 'invalid' });
-        expect.fail('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        const message = (error as Error).message;
-        expect(message).toContain('anthropic');
-        expect(message).toContain('opencode');
-      }
-    });
-  });
-
-  describe('invalid providerDefaults keys', () => {
-    it('should throw on invalid provider in providerDefaults', () => {
-      expect(() => {
-        configureProviders({
-          defaultProvider: 'anthropic',
-          providerDefaults: {
-            invalid: { apiKey: 'sk-test' }
-          }
-        });
-      }).toThrow(/Invalid provider in providerDefaults/i);
-    });
-
-    it('should include invalid key in error message', () => {
-      try {
-        configureProviders({
-          defaultProvider: 'anthropic',
-          providerDefaults: {
-            badprovider: { apiKey: 'sk-test' }
-          }
-        });
-        expect.fail('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toContain('"badprovider"');
-      }
-    });
-
-    it('should validate all providerDefaults keys', () => {
-      expect(() => {
-        configureProviders({
-          defaultProvider: 'anthropic',
-          providerDefaults: {
-            anthropic: { apiKey: 'sk-test' },
-            invalid: { endpoint: 'http://localhost:8080' }
-          }
-        });
-      }).toThrow(/Invalid provider in providerDefaults/i);
-    });
-  });
-
-  describe('error message format', () => {
-    it('should use consistent error message format', () => {
-      try {
-        configureProviders({ defaultProvider: 'wrong' });
-        expect.fail('Should have thrown an error');
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        const message = (error as Error).message;
-        // Format: "Invalid ...: "value". Supported providers: "anthropic", "opencode""
-        expect(message).toMatch(/Invalid.*:.*".*"/);
-        expect(message).toContain('Supported providers:');
-      }
-    });
-  });
-});
-```
+---
 
 ### Integration Points
 
 ```yaml
-TYPE_IMPORTS:
-  - from: ../types/providers.js
-  - types: GlobalProviderConfig
-  - pattern: import type { GlobalProviderConfig } from '../types/providers.js';
+CAPABILITIES:
+  - update: src/providers/anthropic-provider.ts
+  - line: 89
+  - change: sessions: false → sessions: true
+  - reason: Reflect session support via abstraction layer
 
-BARREL_EXPORT:
-  - modify: src/utils/index.ts
-  - add: export { configureProviders } from './provider-config.js';
-  - after: Existing model-spec exports
+TERMINATE:
+  - update: src/providers/anthropic-provider.ts
+  - method: terminate()
+  - add: this.sessions.clear()
+  - place: After this.skillsPrompt = '' (line 211)
+  - reason: Clear all session state on provider termination
 
-TEST_IMPORTS:
-  - from: ../../../utils/provider-config.js
-  - function: configureProviders
-  - pattern: import { configureProviders } from '../../../utils/provider-config.js';
+PROVIDEROPTIONS:
+  - exists: src/types/providers.ts
+  - field: ProviderOptions.sessionId?: string
+  - usage: Already exists - this implementation fulfills that contract
+  - note: P2.M2.T1.S2 will use this with session storage
+
+EXECUTE_METHOD:
+  - future: P2.M2.T1.S2 will modify execute()
+  - will_use: this.sessions.get(request.options.sessionId)
+  - will_use: this.createSession() for new sessions
+  - note: This subtask creates storage, next subtask uses it
 ```
 
 ---
@@ -585,119 +742,138 @@ TEST_IMPORTS:
 ### Level 1: Syntax & Style (Immediate Feedback)
 
 ```bash
-# Run after implementation - fix before proceeding
-# Check TypeScript compilation
-npx tsc --noEmit
+# TypeScript compilation check
+npm run lint
 
-# Expected: Zero errors. Output should be silent.
+# Expected: Zero TypeScript errors
+# If errors exist, check:
+# - SessionState interface uses typeof import() pattern correctly
+# - sessions field is private with correct type
+# - createSession() and getSession() signatures are correct
+# - capabilities.sessions is updated to true
 
-# If errors occur, READ the error message carefully:
-# - Check for missing .js extensions in imports
-# - Check that GlobalProviderConfig type is resolved
-# - Check for any type mismatches
+# Run specific file check
+npx tsc --noEmit src/providers/anthropic-provider.ts
 
-# Example error to fix:
-# error TS2307: Cannot find module '../types/providers'
-# Fix: Change to '../types/providers.js'
+# Expected: Clean compilation with no errors
 ```
+
+---
 
 ### Level 2: Unit Tests (Component Validation)
 
 ```bash
-# Test the configureProviders function
-uv run vitest src/__tests__/unit/utils/provider-config.test.ts --run
+# Run session storage tests
+npm test -- src/__tests__/unit/providers/anthropic-provider-sessions.test.ts
 
-# Full utils test suite
-uv run vitest src/__tests__/unit/utils/ --run
+# Expected: All tests pass
+# Test coverage:
+# - createSession() creates new session with empty state
+# - createSession() is idempotent (doesn't overwrite existing)
+# - getSession() returns state for existing session
+# - getSession() returns undefined for non-existent session
+# - terminate() clears all session storage
+# - createSession() throws when SDK not initialized
+# - capabilities.sessions is true
 
-# Coverage validation (if coverage tools available)
-uv run vitest src/__tests__/unit/utils/ --coverage
+# Run all provider tests to ensure no regressions
+npm test -- src/__tests__/unit/providers/
 
-# Expected: All tests pass. If failing, debug root cause and fix implementation.
+# Expected: All existing tests still pass
+# No test failures introduced by changes
 ```
 
-### Level 3: Integration Testing (System Validation)
+---
+
+### Level 3: Interface Compliance Validation
 
 ```bash
-# Test that the function can be imported from barrel export
-node -e "
-import('./src/utils/index.js').then(m => {
-  console.log('configureProviders exported:', typeof m.configureProviders);
-  console.log('Test passed: function is accessible');
-}).catch(err => {
-  console.error('Test failed:', err);
-  process.exit(1);
-});
-"
+# Test that AnthropicProvider still implements Provider interface
+# Create temporary test file: test-session-interface.ts
 
-# Manual testing (create temporary test script)
-cat > /tmp/test-configure.mjs << 'EOF'
-import { configureProviders } from './src/utils/index.js';
+import { AnthropicProvider } from './src/providers/anthropic-provider.js';
+import type { Provider } from './src/types/providers.js';
 
-// Test 1: Valid configuration
-configureProviders({
-  defaultProvider: 'anthropic',
-  providerDefaults: {
-    anthropic: { apiKey: 'sk-test' }
-  }
-});
-console.log('✓ Valid configuration accepted');
+// Type check: AnthropicProvider should be assignable to Provider
+const provider: Provider = new AnthropicProvider();
 
-// Test 2: Invalid provider (should throw)
-try {
-  configureProviders({ defaultProvider: 'invalid' });
-  console.log('✗ Invalid provider was accepted (should have thrown)');
-} catch (error) {
-  console.log('✓ Invalid provider rejected:', error.message);
+// Verify new methods exist
+expect(provider.createSession).toBeDefined();
+expect(provider.getSession).toBeDefined();
+
+// Verify capabilities updated
+expect(provider.capabilities.sessions).toBe(true);
+
+# Run: npx tsc --noEmit test-session-interface.ts
+
+# Expected: Successful compilation
+# If errors: Check method signatures match interface
+```
+
+---
+
+### Level 4: Integration Validation
+
+```bash
+# Test session storage with provider lifecycle
+# Create integration test: test-session-lifecycle.ts
+
+import { AnthropicProvider } from './src/providers/anthropic-provider.js';
+
+const provider = new AnthropicProvider();
+
+// Initialize provider
+await provider.initialize();
+
+// Create session
+provider.createSession('test-session');
+
+// Verify session exists
+const state = provider.getSession('test-session');
+console.log('Session state:', state);  // Should have empty history, null lastResult
+
+// Terminate provider
+await provider.terminate();
+
+// Verify sessions cleared
+const afterTerminate = provider.getSession('test-session');
+console.log('After terminate:', afterTerminate);  // Should be undefined
+
+# Expected: All operations succeed
+# If errors: Check session storage and cleanup logic
+```
+
+---
+
+### Level 5: Memory Management Validation
+
+```bash
+# Test that sessions don't cause memory leaks
+# Create test: test-session-memory.ts
+
+import { AnthropicProvider } from './src/providers/anthropic-provider.js';
+
+const provider = new AnthropicProvider();
+await provider.initialize();
+
+// Create many sessions
+for (let i = 0; i < 1000; i++) {
+  provider.createSession(`session-${i}`);
 }
 
-console.log('\nAll manual tests passed');
-EOF
+// @ts-expect-error - Testing private property
+const sizeBefore = provider.sessions.size;
+console.log('Sessions before:', sizeBefore);  // Should be 1000
 
-# Run manual test
-node /tmp/test-configure.mjs
+// Terminate should clear all
+await provider.terminate();
 
-# Cleanup: rm /tmp/test-configure.mjs
-```
+// @ts-expect-error - Testing private property
+const sizeAfter = provider.sessions.size;
+console.log('Sessions after:', sizeAfter);  // Should be 0
 
-### Level 4: Type System Validation
-
-```bash
-# Verify type exports work correctly
-npx tsc --noEmit --pretty
-
-# Test that the function signature matches expectations
-cat > /tmp/type-test.ts << 'EOF'
-import type { GlobalProviderConfig } from './src/types/providers.js';
-import { configureProviders } from './src/utils/index.js';
-
-// Type check: should accept valid config
-const validConfig: GlobalProviderConfig = {
-  defaultProvider: 'anthropic'
-};
-configureProviders(validConfig);
-
-// Type check: should accept config with providerDefaults
-const configWithDefaults: GlobalProviderConfig = {
-  defaultProvider: 'opencode',
-  providerDefaults: {
-    anthropic: { apiKey: 'sk-test' }
-  }
-};
-configureProviders(configWithDefaults);
-
-// Type check: should reject invalid provider at compile time
-// @ts-expect-error - Should not compile
-configureProviders({ defaultProvider: 'invalid' });
-
-console.log('Type checks passed');
-EOF
-
-# Compile type test
-npx tsc --noEmit /tmp/type-test.ts
-
-# Expected: Zero errors (ts-expect-error suppresses the intentional error)
-# Cleanup: rm /tmp/type-test.ts
+# Expected: Sessions cleared completely
+# If sizeAfter > 0: Check terminate() cleanup logic
 ```
 
 ---
@@ -706,104 +882,251 @@ npx tsc --noEmit /tmp/type-test.ts
 
 ### Technical Validation
 
-- [ ] File `src/utils/provider-config.ts` updated with `configureProviders()` function
-- [ ] Private validation helpers added (`isValidProviderId`, `getSupportedProvidersList`)
-- [ ] Function validates `defaultProvider` before storing config
-- [ ] Function validates `providerDefaults` keys before storing config
-- [ ] Function throws `Error` with descriptive messages
-- [ ] Function mutates `globalConfig` variable
-- [ ] TypeScript compiles without errors: `npx tsc --noEmit`
-- [ ] Export added to `src/utils/index.ts`
-- [ ] No linting errors (if project uses ESLint)
+- [ ] TypeScript compilation succeeds: `npm run lint`
+- [ ] `SessionState` interface defined with correct types
+- [ ] `private sessions: Map<string, SessionState>` field exists
+- [ ] `createSession(sessionId: string): void` method implemented
+- [ ] `getSession(sessionId: string): SessionState | undefined` method implemented
+- [ ] `capabilities.sessions` changed from `false` to `true`
+- [ ] `terminate()` clears session storage
+- [ ] All imports use .js extensions for ES modules
 
 ### Feature Validation
 
-- [ ] Valid anthropic configuration accepted
-- [ ] Valid opencode configuration accepted
-- [ ] Valid configuration with providerDefaults accepted
-- [ ] Invalid defaultProvider throws with error message
-- [ ] Invalid providerDefaults key throws with error message
-- [ ] Error messages include the invalid value in quotes
-- [ ] Error messages list supported providers
-- [ ] All unit tests pass: `uv run vitest src/__tests__/unit/utils/provider-config.test.ts`
+- [ ] `createSession()` creates empty session state (history: [], lastResult: null)
+- [ ] `createSession()` is idempotent (no overwrite on duplicate calls)
+- [ ] `getSession()` returns `SessionState` for existing sessions
+- [ ] `getSession()` returns `undefined` for non-existent sessions
+- [ ] `terminate()` clears all sessions (`sessions.size === 0` after)
+- [ ] `createSession()` throws when SDK not initialized
+- [ ] `capabilities.sessions` is `true`
 
 ### Code Quality Validation
 
-- [ ] Follows existing codebase patterns (copied from model-spec.ts)
-- [ ] JSDoc comments present and comprehensive
-- [ ] Error message format matches existing pattern
-- [ ] Validation occurs before mutation (fail-fast)
-- [ ] Function signature matches PRD specification
-- [ ] No dead code or commented-out code
+- [ ] Follows existing codebase patterns (private fields, idempotent operations)
+- [ ] Naming conventions match (camelCase methods, private fields)
+- [ ] JSDoc comments on all public members
+- [ ] `@internal` tag on SessionState interface
+- [ ] No anti-patterns used (see below)
 
-### Documentation & Deployment
+### Test Validation
 
-- [ ] JSDoc includes @throws tags for error conditions
-- [ ] JSDoc includes @example showing usage
-- [ ] JSDoc references PRD 7.7 configuration cascade
-- [ ] Error messages are actionable and descriptive
+- [ ] Unit test file created: `anthropic-provider-sessions.test.ts`
+- [ ] All tests pass: `npm test -- anthropic-provider-sessions.test.ts`
+- [ ] Test coverage includes:
+  - [ ] Session creation and retrieval
+  - [ ] Idempotent behavior
+  - [ ] Missing session handling
+  - [ ] Termination cleanup
+  - [ ] SDK initialization check
+  - [ ] Capabilities verification
+- [ ] No existing tests broken by changes
 
 ---
 
 ## Anti-Patterns to Avoid
 
-- ❌ **DON'T export validation helper functions**
-  - Keep `isValidProviderId` and `getSupportedProvidersList` private
-  - They are implementation details, not public API
+- ❌ **Don't initialize Map in constructor**
+  - Wrong: `private sessions: Map<string, SessionState>;` then `this.sessions = new Map()` in constructor
+  - Right: `private sessions: Map<string, SessionState> = new Map();`
+  - Why: Existing pattern initializes in field declaration (mcpHandler, skillsPrompt)
 
-- ❌ **DON'T validate after storing config**
-  - Always validate BEFORE mutating `globalConfig`
-  - Fail-fast on invalid input
+- ❌ **Don't make createSession() async**
+  - Wrong: `async createSession(sessionId: string): Promise<void>`
+  - Right: `createSession(sessionId: string): void`
+  - Why: Map operations are synchronous, no async needed
 
-- ❌ **DON'T use custom error classes**
-  - Use built-in `Error` class
-  - Consistent with existing codebase patterns
+- ❌ **Don't return null for missing sessions**
+  - Wrong: `getSession(): SessionState | null`
+  - Right: `getSession(): SessionState | undefined`
+  - Why: Map.get() returns undefined, consistent with Map semantics
 
-- ❌ **DON'T forget to check if providerDefaults exists**
-  - It's optional and may be undefined
-  - Use `if (config.providerDefaults)` before iterating
+- ❌ **Don't overwrite existing sessions in createSession()**
+  - Wrong: Always call `this.sessions.set(sessionId, state)`
+  - Right: Check `if (!this.sessions.has(sessionId))` before creating
+  - Why: Idempotent - calling twice shouldn't lose conversation history
 
-- ❌ **DON'T assume Object.keys() returns ProviderId[]**
-  - It returns `string[]`
-  - Must validate each key with `isValidProviderId()`
+- ❌ **Don't forget SDK initialization check in createSession()**
+  - Wrong: No check for `this.sdk` before creating session
+  - Right: `if (!this.sdk) { throw new Error(...); }`
+  - Why: Public methods should validate SDK state
 
-- ❌ **DON'T skip validation for empty providerDefaults**
-  - Empty object `{}` is valid (no keys to validate)
-  - But still need to check the keys if present
+- ❌ **Don't use top-level imports for SDK types**
+  - Wrong: `import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'`
+  - Right: `typeof import("@anthropic-ai/claude-agent-sdk").SDKUserMessage`
+  - Why: Lazy type evaluation, avoids circular dependency
 
-- ❌ **DON'T return anything from the function**
-  - Return type is `void`
-  - Function only mutates `globalConfig`
+- ❌ **Don't forget to update capabilities.sessions**
+  - Wrong: Leave `sessions: false` in capabilities
+  - Right: Change to `sessions: true`
+  - Why: Reflects new feature availability to users
 
-- ❌ **DON'T add reset/test-only functions**
-  - Test isolation is handled by ES module scoping
-  - Don't pollute production API with test utilities
+- ❌ **Don't forget to clear sessions in terminate()**
+  - Wrong: Only clear sdk, mcpServerConfig, skillsPrompt
+  - Right: Also clear `this.sessions.clear()`
+  - Why: Prevent memory leaks from orphaned sessions
+
+- ❌ **Don't use @ts-expect-error in production code**
+  - Only use `@ts-expect-error` in tests for private property access
+  - Never use in implementation files
+
+- ❌ **Don't create public session storage field**
+  - Wrong: `public sessions: Map<string, SessionState>`
+  - Right: `private sessions: Map<string, SessionState>`
+  - Why: Session storage is internal implementation detail
 
 ---
 
-## Success Metrics
+## Research Summary
 
-**Confidence Score**: 10/10 for one-pass implementation success
+This PRP is based on comprehensive research across four key areas:
 
-**Rationale**:
-- Complete type definitions available in codebase
-- Clear existing validation pattern to follow (model-spec.ts)
-- Simple, focused scope (one function with two validations)
-- Comprehensive test pattern reference available
-- No external dependencies or complex logic
-- Module structure already exists from P1.M2.T1.S1
+### 1. Codebase Analysis
+- **Files Analyzed**: src/providers/anthropic-provider.ts, src/providers/provider-registry.ts, src/core/mcp-handler.ts
+- **Key Findings**:
+  - Existing Map-based state patterns (ProviderRegistry, MCPHandler)
+  - Idempotent operation patterns (initialize, terminate)
+  - Private field initialization in declaration
+  - Cleanup patterns in terminate() method
 
-**Validation**: A developer unfamiliar with this codebase can successfully implement this feature using only this PRP content and codebase access.
+### 2. Anthropic SDK Research
+- **Documentation**: NPM package, GitHub repository, local node_modules
+- **Key Findings**:
+  - SDK is stateless by design
+  - `continue: true` flag for session resumption
+  - `SDKUserMessage` with session_id field
+  - `SDKResultMessage` for storing last execution result
+
+### 3. Test Pattern Research
+- **Files Analyzed**: anthropic-provider-initialize.test.ts, anthropic-provider-terminate.test.ts
+- **Key Findings**:
+  - `@ts-expect-error` for private property access
+  - State verification across method calls
+  - Idempotent behavior testing
+  - Lifecycle testing patterns
+
+### 4. External Best Practices Research
+- **Topics**: Session management patterns, memory leak prevention, Map usage
+- **Key Findings**:
+  - LRU cache patterns for memory management
+  - TTL-based expiration strategies
+  - Thread-safe operations for concurrent access
+  - Session ID generation best practices
 
 ---
 
-## Appendix: Related Subtasks
+## Confidence Score
 
-This PRP is part of a sequence. Understanding the broader context helps:
+**One-Pass Implementation Success Likelihood: 10/10**
 
-- **P1.M2.T1.S1** (Complete): Created module-private `globalConfig` variable storage
-- **P1.M2.T1.S2** (THIS PRP): Implement `configureProviders()` function to validate and store config
-- **P1.M2.T1.S3**: Implement `getGlobalProviderConfig()` accessor to read `globalConfig`
-- **P1.M2.T1.S4**: Implement `resolveProviderConfig()` cascade utility
+**Justification**:
+- ✅ Complete AnthropicProvider implementation already exists
+- ✅ Clear patterns for Map-based state management in codebase
+- ✅ Idempotent operation patterns well-established
+- ✅ Test patterns documented and verified
+- ✅ SDK message types researched and understood
+- ✅ Integration points clearly defined
+- ✅ No external dependencies to install
+- ✅ Comprehensive anti-patterns and gotchas documented
+- ✅ Simple, focused scope (1 point subtask)
 
-The `configureProviders()` function created in this subtask is the primary API for users to set global provider defaults at application startup.
+**Validation**: An AI agent unfamiliar with Groundswell can implement this session storage successfully using only this PRP content, existing codebase patterns, and the comprehensive research documentation.
+
+---
+
+## Appendix: Complete Implementation Reference
+
+```typescript
+/**
+ * Anthropic provider implementation
+ *
+ * ## Session Management
+ *
+ * Sessions provide consistent API across providers despite Anthropic SDK's
+ * stateless design. Session storage maintains conversation history for
+ * multi-turn conversations.
+ *
+ * @remarks
+ * P2.M2.T1.S1: Session storage implementation
+ * P2.M2.T1.S2: execute() modification to use sessions
+ */
+export class AnthropicProvider implements Provider {
+  // ... existing properties ...
+
+  /**
+   * Session storage for multi-turn conversations
+   *
+   * Maps session IDs to their conversation state. Enables session-based
+   * execution despite Anthropic SDK's stateless design.
+   *
+   * @internal
+   */
+  private sessions: Map<string, SessionState> = new Map();
+
+  // ... existing methods ...
+
+  /**
+   * Create a new session with the specified ID
+   *
+   * Initializes empty session state for the given session ID.
+   * If session already exists, this is a no-op (idempotent).
+   *
+   * @param sessionId - Unique identifier for the session
+   * @throws {Error} If SDK is not initialized
+   * @remarks
+   * Session will be used when execute() receives matching sessionId in options.
+   */
+  createSession(sessionId: string): void {
+    // PATTERN: SDK initialization check
+    if (!this.sdk) {
+      throw new Error("SDK not initialized. Call initialize() first.");
+    }
+
+    // PATTERN: Idempotent operation
+    if (!this.sessions.has(sessionId)) {
+      this.sessions.set(sessionId, {
+        history: [],
+        lastResult: null,
+      });
+    }
+  }
+
+  /**
+   * Get session state for the specified ID
+   *
+   * Retrieves the current session state including conversation history
+   * and last result. Returns undefined if session doesn't exist.
+   *
+   * @param sessionId - Session identifier to retrieve
+   * @returns Session state or undefined if not found
+   * @remarks
+   * This is a read-only operation - does not modify session state.
+   */
+  getSession(sessionId: string): SessionState | undefined {
+    return this.sessions.get(sessionId);
+  }
+}
+
+/**
+ * Session state for maintaining conversation history
+ *
+ * Stores the conversation context for session-based execution.
+ * Used when request.options.sessionId is provided.
+ *
+ * @internal
+ */
+interface SessionState {
+  /** Conversation history - all user messages in this session */
+  history: import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
+
+  /** Last result message from the most recent execution */
+  lastResult: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
+}
+```
+
+---
+
+**PRP Version**: 1.0
+**Created**: January 25, 2026
+**For**: Subtask P2.M2.T1.S1 - Implement session storage in AnthropicProvider
+**Plan**: 003_dd63ad365ffb - Multi-Provider Agent SDK Support
