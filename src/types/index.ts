@@ -5,7 +5,7 @@ export type { SerializedWorkflowState, StateFieldMetadata } from './snapshot.js'
 export type { WorkflowError } from './error.js';
 export type { WorkflowEvent } from './events.js';
 export type { WorkflowObserver } from './observer.js';
-export type { StepOptions, TaskOptions } from './decorators.js';
+export type { StepOptions, TaskOptions, ErrorCriterion } from './decorators.js';
 export type { ErrorMergeStrategy } from './error-strategy.js';
 
 // SDK primitive types

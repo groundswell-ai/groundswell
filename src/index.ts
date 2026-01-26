@@ -11,6 +11,7 @@ export type {
   WorkflowObserver,
   StepOptions,
   TaskOptions,
+  ErrorCriterion,
   ErrorMergeStrategy,
   // SDK primitive types
   Tool,
