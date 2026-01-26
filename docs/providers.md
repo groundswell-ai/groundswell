@@ -13,6 +13,13 @@ Groundswell supports the Anthropic Agent SDK provider through a unified abstract
 - [Model Specification](#model-specification)
 - [Provider Lifecycle](#provider-lifecycle)
 - [Sessions](#sessions)
+  - [Session Persistence](#session-persistence)
+    - [Session Persistence Overview](#overview)
+    - [Session Lifecycle](#session-lifecycle)
+    - [Session Persistence Configuration](#configuration)
+    - [Storage Backends](#storage-backends)
+    - [TTL and Cleanup](#ttl-and-cleanup)
+    - [Migration Guide](#migration-guide)
 - [Tools & MCP](#tools--mcp)
 - [Hooks](#hooks)
 - [Skills](#skills)
@@ -594,6 +601,677 @@ await agent.prompt(prompt, {
 });
 ```
 
+### Session Persistence
+
+Session persistence enables multi-turn conversations to survive server restarts and provides storage backend flexibility for different deployment scenarios.
+
+#### Overview
+
+Session persistence extends the basic session management by providing configurable storage backends. By default, sessions are stored in-memory and are lost when the process exits. With persistent storage, sessions survive restarts and can be shared across multiple provider instances.
+
+**Key Benefits:**
+
+- **Survives Restarts**: Sessions persist across server restarts and process crashes
+- **Multi-Instance Support**: Multiple processes can share the same session storage
+- **Production Ready**: File-based storage with atomic writes prevents data corruption
+- **Flexible TTL**: Automatic session expiration with configurable time-to-live
+
+**Stateless SDK vs Application Sessions:**
+
+The Anthropic SDK is stateless and has no native session support. Groundswell provides a session abstraction layer at the application level. When you use `sessionId`, the provider:
+
+1. Stores conversation history (`history: SDKUserMessage[]`)
+2. Tracks the last execution result (`lastResult: SDKResultMessage`)
+3. Manages timestamps for TTL enforcement
+4. Persists data to the configured storage backend
+
+See `src/providers/session-store.ts` for implementation details.
+
+#### Session Lifecycle
+
+The session lifecycle integrates with the provider lifecycle to provide seamless persistence and restoration.
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  Session Lifecycle                                               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────┐     ┌─────────────────┐                   │
+│  │  CREATE         │     │  INITIALIZE     │                   │
+│  │  createSession()│────▶│  provider.init()│                   │
+│  │  (lazy, on      │     │  • List stored  │                   │
+│  │   first use)    │     │    sessions     │                   │
+│  └────────┬────────┘     │  • Restore      │                   │
+│           │              │    persistent   │                   │
+│           │              │    sessions     │                   │
+│           ▼              │  • Cleanup      │                   │
+│  ┌─────────────────┐     │    expired      │                   │
+│  │  USE            │     │    sessions     │                   │
+│  │  execute()      │     └────────┬────────┘                   │
+│  │  • Load session │              │                            │
+│  │  • Stream       │              ▼                            │
+│  │    history      │     ┌─────────────────┐                   │
+│  │  • Update       │     │  TERMINATE      │                   │
+│  │    timestamps   │────▶│  provider.term()│                   │
+│  │  • Save state   │     │  • Clear memory │                   │
+│  └────────┬────────┘     │    sessions     │                   │
+│           │              │  • Keep         │                   │
+│           │              │    persistent   │                   │
+│           │              │    sessions     │                   │
+│           ▼              └─────────────────┘                   │
+│  ┌─────────────────┐                                            │
+│  │  CLEANUP        │                                            │
+│  │  deleteExpired()│                                            │
+│  │  • Lazy (on     │                                            │
+│  │    load)        │                                            │
+│  │  • Active       │                                            │
+│  │    (manual)     │                                            │
+│  │  • Automatic    │                                            │
+│  │    (on init)    │                                            │
+│  └─────────────────┘                                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Phase 1: Creation**
+
+Sessions are created lazily on first use. When you provide a `sessionId` that doesn't exist, the provider automatically creates a new session with empty history and current timestamps.
+
+```typescript
+// First call creates the session
+await provider.execute(
+  { prompt: 'Hello', options: { sessionId: 'new-session' } },
+  toolExecutor
+);
+// Session created with: history=[], lastResult=null, createdAt=now, lastAccessedAt=now
+```
+
+**Phase 2: Usage**
+
+Each `execute()` call with a `sessionId` loads the session, streams the history to the SDK, and updates the timestamps.
+
+```typescript
+// Loads existing session, updates lastAccessedAt
+await provider.execute(
+  { prompt: 'Continue', options: { sessionId: 'existing-session' } },
+  toolExecutor
+);
+```
+
+**Phase 3: Persistence**
+
+For persistent stores (FileSessionStore), sessions are automatically saved after each message and result update. Memory sessions are kept in the Map and not persisted to disk.
+
+**Phase 4: Restoration**
+
+When `provider.initialize()` is called with a persistent store, it verifies the store is accessible by listing sessions. Memory sessions are NOT restored (they start empty on each process restart).
+
+**Phase 5: Cleanup**
+
+Expired sessions are removed through three strategies:
+
+- **Lazy Cleanup**: Checked on each `load()` operation
+- **Active Cleanup**: Manual `sessionStore.deleteExpired(ttl)` call
+- **Automatic Cleanup**: Runs on `provider.initialize()` for persistent stores
+
+**See Also:**
+
+- [Configuration](#session-persistence-configuration)
+- [TTL and Cleanup](#ttl-and-cleanup)
+
+#### Configuration
+
+Session persistence is configured through `ProviderOptions` when initializing the provider. Three configuration methods are supported, with a clear priority order.
+
+**Configuration Priority:**
+
+```typescript
+// Priority (highest to lowest):
+// 1. sessionStore (direct injection)
+provider.initialize({ sessionStore: new CustomStore() })
+
+// 2. sessionPersistence (declarative)
+provider.initialize({ sessionPersistence: 'file' })
+
+// 3. MemorySessionStore (default)
+provider.initialize({})  // Uses MemorySessionStore
+```
+
+**Important**: If `sessionStore` is provided, `sessionPersistence` is ignored. Use only one method.
+
+**Options Reference:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `sessionStore` | `SessionStore` | `undefined` | Direct injection of custom store instance |
+| `sessionPersistence` | `'memory' \| 'file' \| 'redis'` | `undefined` | Declarative storage type selection |
+| `sessionPath` | `string` | `'./sessions'` | Directory path for file-based storage |
+| `sessionTtl` | `number` | `86400000` (24h) | Session time-to-live in milliseconds |
+
+**Quick Start (File Persistence):**
+
+```typescript
+import { AnthropicProvider } from 'groundswell';
+
+const provider = new AnthropicProvider();
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionTtl: 3600000  // 1 hour TTL
+});
+
+// Sessions now persist to ./sessions/
+await provider.execute(
+  { prompt: 'Remember my name', options: { sessionId: 'user-123' } },
+  toolExecutor
+);
+
+// Restart server - session is still available
+```
+
+**Development Configuration:**
+
+```typescript
+// Development: In-memory sessions (default)
+await provider.initialize({
+  // No persistence config - uses MemorySessionStore
+});
+
+// Development: File storage in temp directory
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionPath: './dev-sessions',
+  sessionTtl: 0  // Disabled - sessions never expire
+});
+```
+
+**Production Configuration:**
+
+```typescript
+// Production: File-based persistence with cleanup
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionPath: '/var/lib/app/sessions',
+  sessionTtl: 86400000,  // 24 hours
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
+// Production: Custom store implementation
+await provider.initialize({
+  sessionStore: new RedisSessionStore({ url: process.env.REDIS_URL }),
+  sessionTtl: 3600000
+});
+```
+
+**Gotchas:**
+
+```typescript
+// ❌ WRONG: sessionPersistence ignored when sessionStore is provided
+provider.initialize({
+  sessionStore: new CustomStore(),
+  sessionPersistence: 'file'  // IGNORED!
+})
+
+// ✅ CORRECT: Use only one method
+provider.initialize({
+  sessionPersistence: 'file'  // OR
+  // sessionStore: new CustomStore()
+})
+```
+
+**See Also:**
+
+- [Storage Backends](#storage-backends)
+- [TTL and Cleanup](#ttl-and-cleanup)
+
+#### Storage Backends
+
+Groundswell provides pluggable session storage backends. Choose the backend that matches your deployment scenario and scalability requirements.
+
+**Backend Comparison:**
+
+| Backend | Speed | Persistence | Scalability | Use Case |
+|---------|-------|-------------|-------------|----------|
+| `MemorySessionStore` | Fastest | None | Single-process | Development, testing |
+| `FileSessionStore` | Fast | Disk | Multi-process | Production single-server |
+| `RedisSessionStore` | Medium | Redis | Distributed | Production multi-server (future) |
+
+**Memory Session Store**
+
+**File**: `src/providers/session-store.ts:108-183`
+
+In-memory storage using a JavaScript Map. Sessions are lost when the process exits.
+
+**Characteristics:**
+
+- **Speed**: Fastest - direct Map operations
+- **Persistence**: No - data lost on process exit
+- **Scalability**: Single-process only
+- **Use Case**: Development, testing, ephemeral workloads
+
+**Configuration:**
+
+```typescript
+// Default (no config needed)
+await provider.initialize();
+
+// Explicit
+await provider.initialize({
+  sessionPersistence: 'memory'
+});
+```
+
+**Behavior:**
+
+- Cleared on `provider.terminate()`
+- NOT restored on `provider.initialize()`
+- No file I/O overhead
+- No TTL enforcement by default (TTL parameter accepted but not enforced)
+
+---
+
+**File Session Store**
+
+**File**: `src/providers/session-store.ts:198-368`
+
+Disk-based storage with JSON files. Each session is stored as `{sessionId}.json` in the configured directory.
+
+**Characteristics:**
+
+- **Speed**: Fast - local file I/O with atomic writes
+- **Persistence**: Yes - survives process restarts
+- **Scalability**: Multi-process safe (file locking not required due to atomic writes)
+- **Use Case**: Production single-server deployments
+
+**Directory Layout:**
+
+```bash
+./sessions/
+  ├── session-abc123.json      # Active session
+  ├── session-def456.json      # Active session
+  └── session-xyz789.tmp       # Temp file (atomic write in progress)
+```
+
+**Configuration:**
+
+```typescript
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionPath: './sessions',     // Default: './sessions'
+  sessionTtl: 86400000           // Default: 24 hours
+});
+```
+
+**Behavior:**
+
+- Atomic writes: writes to `.tmp` file, then renames
+- Lazy expiration: checked on each `load()` call
+- Directory auto-created if missing
+- 60-second clock skew tolerance for TTL checks
+- Sessions persist across `provider.terminate()` and restart
+
+**Session File Format:**
+
+```json
+{
+  "history": [
+    {
+      "type": "user",
+      "message": { "content": "Hello" },
+      "parent_tool_use_id": null,
+      "session_id": "session-abc123"
+    }
+  ],
+  "lastResult": {
+    "subtype": "success",
+    "result": { "answer": "Hi there!" }
+  },
+  "createdAt": 1706659200000,
+  "lastAccessedAt": 1706662800000
+}
+```
+
+**Gotchas:**
+
+- File sessions require write permissions to `sessionPath`
+- Ensure sufficient disk space for session storage
+- Corrupted session files are skipped (not deleted) during cleanup
+- Use absolute paths for `sessionPath` in production to avoid confusion
+
+---
+
+**Redis Session Store (Future)**
+
+**File**: `src/providers/session-store.ts:380-411`
+
+Interface stub for future Redis implementation. Currently NOT implemented.
+
+**Status**: Interface only - do not use in production.
+
+**Planned Characteristics:**
+
+- **Speed**: Medium - network I/O to Redis
+- **Persistence**: Yes - Redis persistence
+- **Scalability**: Distributed - multiple servers
+- **Use Case**: Production multi-server deployments
+
+**See Also:**
+
+- [Session Persistence Configuration](#session-persistence-configuration)
+- [Migration Guide](#session-migration-guide)
+
+#### TTL and Cleanup
+
+Session time-to-live (TTL) automatically expires inactive sessions. Understanding TTL behavior is critical for managing session lifecycle and storage cleanup.
+
+**TTL Behavior (Sliding Window):**
+
+TTL uses a **sliding window** based on `lastAccessedAt`, NOT `createdAt`. This means active sessions never expire.
+
+```typescript
+// sessionTtl = 3600000 (1 hour)
+
+// Session created at 12:00
+// lastAccessedAt = 12:00, expires at 13:00
+
+// User accesses at 12:30
+// lastAccessedAt = 12:30, expires at 13:30  ← Window slides forward
+
+// User accesses at 13:00
+// lastAccessedAt = 13:00, expires at 14:00  ← Still active!
+
+// User stops accessing
+// Session expires at 14:00
+```
+
+**Important**: If you need fixed-window expiration (e.g., session expires 1 hour after creation regardless of activity), check `createdAt` in application code:
+
+```typescript
+const session = await provider.getSession(sessionId);
+if (session && Date.now() - session.createdAt > MAX_SESSION_AGE) {
+  await provider.deleteSession(sessionId);
+}
+```
+
+**Cleanup Strategies:**
+
+Three complementary strategies handle expired session removal:
+
+**1. Lazy Cleanup (On Load)**
+
+Sessions are checked for expiration on every `load()` operation. Expired sessions are deleted immediately and `null` is returned.
+
+```typescript
+// In FileSessionStore.load()
+const sessionState = await this.load(sessionId);
+if (sessionState === null) {
+  // Session was expired and deleted during load
+  console.log('Session not found or expired');
+}
+```
+
+**2. Active Cleanup (Manual)**
+
+Manually trigger cleanup of all expired sessions:
+
+```typescript
+const provider = new AnthropicProvider();
+await provider.initialize({ sessionPersistence: 'file', sessionTtl: 3600000 });
+
+// Get the session store
+const sessionStore = provider['sessionStore'];  // Access private property
+
+// Delete all expired sessions
+const deletedIds = await sessionStore.deleteExpired(3600000);
+console.log(`Deleted ${deletedIds.length} expired sessions`);
+```
+
+**3. Automatic Cleanup (On Initialize)**
+
+Expired sessions are automatically cleaned up when the provider initializes with a persistent store:
+
+```typescript
+// Automatic cleanup runs here
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionTtl: 86400000
+});
+// Cleanup log: "Cleaned up 15 expired sessions" (via console.debug)
+```
+
+**Edge Cases and Gotchas:**
+
+**Clock Skew Tolerance:**
+
+FileSessionStore adds a 60-second buffer to TTL checks to prevent premature expiration from clock synchronization issues.
+
+```typescript
+// In FileSessionStore
+const CLOCK_SKEW_TOLERANCE = 60000; // 60 seconds
+const expirationTime = lastAccessedAt + ttl + CLOCK_SKEW_TOLERANCE;
+
+// Example: If session should expire at 12:00:00
+// It actually expires at 12:01:00
+```
+
+**Legacy Session Handling:**
+
+Sessions loaded without `createdAt` or `lastAccessedAt` timestamps get them added automatically on first load. This prevents crashes when loading old session files.
+
+```typescript
+// Legacy session file (no timestamps)
+{
+  "history": [...],
+  "lastResult": {...}
+  // No createdAt or lastAccessedAt
+}
+
+// On load, timestamps are added
+const loaded = await sessionStore.load('legacy-session');
+// loaded.createdAt = Date.now()
+// loaded.lastAccessedAt = Date.now()
+```
+
+**Zero or Negative TTL:**
+
+Setting `sessionTtl` to `0` or a negative value disables expiration. Sessions live forever until manually deleted.
+
+```typescript
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionTtl: 0  // Disabled - sessions never expire
+});
+```
+
+**Configuration Examples:**
+
+```typescript
+// Development: No expiration
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionTtl: 0
+});
+
+// Testing: 5 minute expiration
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionTtl: 300000  // 5 minutes
+});
+
+// Production: 24 hour expiration
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionTtl: 86400000  // 24 hours
+});
+
+// Production: 7 day expiration
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionTtl: 604800000  // 7 days
+});
+```
+
+**See Also:**
+
+- [Session Lifecycle](#session-lifecycle)
+- [Configuration](#session-persistence-configuration)
+
+#### Migration Guide
+
+Migrating from in-memory to persistent session storage requires careful planning to avoid data loss. This guide provides a step-by-step process for migrating existing sessions.
+
+**Scenario: Migrating from Memory to File Storage**
+
+**Before:**
+
+```typescript
+// Current configuration (in-memory)
+await provider.initialize({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+```
+
+**After:**
+
+```typescript
+// New configuration (file-based)
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionPath: './sessions',
+  sessionTtl: 86400000,
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+```
+
+**Migration Steps:**
+
+**Step 1: Export Existing Session Data (Optional)**
+
+If you have active in-memory sessions that must be preserved:
+
+```typescript
+import { writeFile } from 'fs/promises';
+
+// Get all in-memory sessions
+const provider = new AnthropicProvider();
+await provider.initialize({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Access private session store
+const sessionStore = provider['sessionStore'];
+const sessionIds = await sessionStore.list();
+
+const exportData: Record<string, SessionState> = {};
+for (const id of sessionIds) {
+  const state = await sessionStore.load(id);
+  if (state) {
+    exportData[id] = state;
+  }
+}
+
+// Write to backup file
+await writeFile('./session-backup.json', JSON.stringify(exportData, null, 2));
+console.log(`Exported ${Object.keys(exportData).length} sessions`);
+```
+
+**Step 2: Update Configuration**
+
+Change the provider initialization to use file persistence:
+
+```typescript
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionPath: './sessions',
+  sessionTtl: 86400000,
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+```
+
+**Step 3: Import Sessions (If Exported)**
+
+Load the exported sessions into the file store:
+
+```typescript
+import { readFile } from 'fs/promises';
+
+// Read backup
+const backupData = JSON.parse(await readFile('./session-backup.json', 'utf-8'));
+
+// Import each session
+const sessionStore = provider['sessionStore'];
+let imported = 0;
+for (const [id, state] of Object.entries(backupData)) {
+  await sessionStore.save(id, state as SessionState);
+  imported++;
+}
+
+console.log(`Imported ${imported} sessions to file store`);
+```
+
+**Step 4: Verify Migration**
+
+Test that sessions persist across restarts:
+
+```typescript
+// Create a test session
+await provider.execute(
+  { prompt: 'Test persistence', options: { sessionId: 'migration-test' } },
+  toolExecutor
+);
+
+// Restart process (simulate by re-initializing)
+await provider.terminate();
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionPath: './sessions'
+});
+
+// Verify session exists
+const session = await provider.getSession('migration-test');
+if (session && session.history.length > 0) {
+  console.log('✓ Migration successful - session persisted');
+} else {
+  console.log('✗ Migration failed - session not found');
+}
+```
+
+**Rollback Plan:**
+
+If issues occur, rollback to in-memory storage:
+
+```typescript
+// Rollback configuration
+await provider.initialize({
+  sessionPersistence: 'memory',  // Explicit rollback
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
+// Import backup if sessions were exported
+// (Follow Step 3 from migration process)
+```
+
+**Production Migration Checklist:**
+
+- [ ] Schedule maintenance window (if 24/7 service)
+- [ ] Backup current in-memory sessions (if any)
+- [ ] Test migration in staging environment first
+- [ ] Ensure `sessionPath` directory has write permissions
+- [ ] Monitor disk space after migration
+- [ ] Verify session restoration after process restart
+- [ ] Have rollback plan ready
+- [ ] Update deployment documentation
+- [ ] Train operations team on new behavior
+
+**Gotchas:**
+
+- **In-memory sessions are lost** on process exit - they cannot be recovered after migration without exporting first
+- **Session IDs don't change** - existing session IDs continue to work after migration
+- **Timestamps are auto-added** - legacy sessions without timestamps get them on first load
+- **File permissions matter** - ensure the process has write access to `sessionPath`
+- **Disk space planning** - estimate storage requirements based on expected session count and average size
+
+**See Also:**
+
+- [Storage Backends](#storage-backends)
+- [Configuration](#session-persistence-configuration)
+
 ## Tools & MCP
 
 Tools are executed via Groundswell's MCPHandler regardless of provider. Providers delegate tool execution back to the Agent's tool executor.
@@ -995,12 +1673,14 @@ npm run start:provider-features
 **Run**: `npx tsx examples/providers/01-basic-provider-usage.ts`
 
 **What you'll learn**:
+
 - Provider registration with `ProviderRegistry.getInstance()`
 - Provider initialization with `initializeProvider()`
 - Creating Agent with provider configuration
 - Executing prompts via configured providers
 
 **Code snippet**:
+
 ```typescript
 import { Agent, AnthropicProvider, ProviderRegistry } from 'groundswell';
 
@@ -1029,12 +1709,14 @@ const response = await agent.prompt(prompt);
 **Run**: `npx tsx examples/providers/02-provider-configuration.ts`
 
 **What you'll learn**:
+
 - Global configuration with `configureProviders()`
 - Agent-level configuration in `new Agent({ provider })`
 - Prompt-level overrides in `agent.prompt(prompt, { provider })`
 - Configuration cascade priority (Prompt > Agent > Global)
 
 **Code snippet**:
+
 ```typescript
 import { configureProviders, Agent } from 'groundswell';
 
@@ -1064,12 +1746,14 @@ await agent.prompt(prompt, {
 **Run**: `npx tsx examples/providers/03-provider-switching.ts`
 
 **What you'll learn**:
+
 - Agent-level switching for different agent instances
 - Prompt-level switching for temporary changes
 - Verifying which provider is being used
 - Choosing the right switching pattern
 
 **Code snippet**:
+
 ```typescript
 // Agent-level switching with different models
 const fastAgent = new Agent({ provider: 'anthropic', model: 'claude-haiku-4-20250514' });
@@ -1093,12 +1777,14 @@ await flexibleAgent.prompt(prompt);
 **Run**: `npx tsx examples/providers/04-multi-model-scenarios.ts`
 
 **What you'll learn**:
+
 - Cost optimization based on task complexity
 - Model selection strategies
 - Fallback patterns for resilience
 - Production architecture patterns
 
 **Code snippet**:
+
 ```typescript
 // Cost optimization
 const complexity = analyzeTask(task);
@@ -1126,12 +1812,14 @@ for (const model of models) {
 **Run**: `npx tsx examples/providers/05-provider-sessions.ts`
 
 **What you'll learn**:
+
 - Creating sessions with `sessionId`
 - Continuing existing sessions
 - Retrieving session state with `getSession()`
 - Provider session model differences
 
 **Code snippet**:
+
 ```typescript
 const sessionId = `session-${Date.now()}`;
 
@@ -1156,6 +1844,7 @@ console.log(session.history);
 **Run**: `npx tsx examples/providers/06-provider-with-mcp-skills.ts`
 
 **What you'll learn**:
+
 - MCP server registration (AnthropicProvider)
 - Using MCP tools in agent prompts
 - Loading skills from SKILL.md files
@@ -1163,6 +1852,7 @@ console.log(session.history);
 - Feature comparison across providers
 
 **Code snippet**:
+
 ```typescript
 // Register MCP server
 const provider = registry.get('anthropic');
@@ -1217,14 +1907,17 @@ The provider system API consists of:
 Provider identifier union type defining supported Agent SDK providers.
 
 **Type Signature:**
+
 ```typescript
 type ProviderId = 'anthropic';
 ```
 
 **Description:**
+
 - `'anthropic'`: Anthropic Claude provider via `@anthropic-ai/claude-agent-sdk`
 
 **Example:**
+
 ```typescript
 import type { ProviderId } from 'groundswell';
 
@@ -1233,6 +1926,7 @@ const invalid: ProviderId = 'openai';      // TypeScript error
 ```
 
 **See Also:**
+
 - [Provider Interface](#provider-interface)
 - [GlobalProviderConfig](#globalproviderconfig)
 
@@ -1243,6 +1937,7 @@ const invalid: ProviderId = 'openai';      // TypeScript error
 Provider capability flags indicating which features a provider supports.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderCapabilities {
   mcp: boolean;
@@ -1255,6 +1950,7 @@ interface ProviderCapabilities {
 ```
 
 **Properties:**
+
 - `mcp`: `boolean` - MCP server connections support
 - `skills`: `boolean` - Skill loading support
 - `lsp`: `boolean` - Language Server Protocol integration support
@@ -1263,6 +1959,7 @@ interface ProviderCapabilities {
 - `extendedThinking`: `boolean` - Extended thinking/reasoning tokens support
 
 **Example:**
+
 ```typescript
 import { AnthropicProvider } from 'groundswell';
 
@@ -1273,6 +1970,7 @@ console.log(provider.capabilities.extendedThinking); // true
 ```
 
 **See Also:**
+
 - [Provider Interface](#provider-interface)
 - [Supported Providers](#supported-providers)
 
@@ -1283,6 +1981,7 @@ console.log(provider.capabilities.extendedThinking); // true
 Configuration options for provider initialization and runtime behavior.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderOptions {
   endpoint?: string;
@@ -1290,17 +1989,27 @@ interface ProviderOptions {
   sessionId?: string;
   timeout?: number;
   headers?: Record<string, string>;
+  sessionStore?: SessionStore<SessionState>;
+  sessionPersistence?: 'memory' | 'file' | 'redis';
+  sessionTtl?: number;
+  sessionPath?: string;
 }
 ```
 
 **Properties:**
+
 - `endpoint`: `string` (optional) - Override the default API endpoint for the provider
 - `apiKey`: `string` (optional) - API key for authentication (if not set via environment variable)
 - `sessionId`: `string` (optional) - Session identifier for session-based providers
 - `timeout`: `number` (optional) - Request timeout in milliseconds
 - `headers`: `Record<string, string>` (optional) - Custom HTTP headers to include in requests
+- `sessionStore`: `SessionStore<SessionState>` (optional) - Direct injection of custom session store instance
+- `sessionPersistence`: `'memory' | 'file' | 'redis'` (optional) - Declarative storage type selection for session persistence
+- `sessionTtl`: `number` (optional) - Session time-to-live in milliseconds (default: 86400000 / 24 hours)
+- `sessionPath`: `string` (optional) - Directory path for file-based session storage (default: './sessions')
 
 **Example:**
+
 ```typescript
 import type { ProviderOptions } from 'groundswell';
 
@@ -1310,16 +2019,44 @@ const options: ProviderOptions = {
   timeout: 30000,
   headers: {
     'X-Custom-Header': 'custom-value'
-  }
+  },
+  sessionPersistence: 'file',
+  sessionPath: './sessions',
+  sessionTtl: 86400000  // 24 hours
 };
 
 await provider.initialize(options);
 ```
 
+**Session Persistence Configuration:**
+
+Session persistence options control how sessions are stored and managed. Choose one configuration method:
+
+```typescript
+// Method 1: Declarative (recommended)
+await provider.initialize({
+  sessionPersistence: 'file',
+  sessionPath: './sessions',
+  sessionTtl: 86400000
+});
+
+// Method 2: Direct injection (custom stores)
+await provider.initialize({
+  sessionStore: new CustomSessionStore()
+});
+
+// Method 3: Default (in-memory)
+await provider.initialize({});  // Uses MemorySessionStore
+```
+
+**Important**: If `sessionStore` is provided, `sessionPersistence` is ignored. Use only one method.
+
 **See Also:**
+
 - [GlobalProviderConfig](#globalproviderconfig)
 - [configureProviders()](#configureproviders)
 - [Configuration Cascade](#configuration-cascade)
+- [Session Persistence](#session-persistence)
 
 ---
 
@@ -1328,6 +2065,7 @@ await provider.initialize(options);
 Provider interface for LLM backend abstraction. Defines the contract all providers must implement.
 
 **Type Signature:**
+
 ```typescript
 interface Provider {
   readonly id: ProviderId;
@@ -1349,6 +2087,7 @@ interface Provider {
 ```
 
 **Properties:**
+
 - `id`: `ProviderId` (readonly) - Unique provider identifier used for provider selection and model qualification
 - `capabilities`: `ProviderCapabilities` (readonly) - Provider capability flags for feature detection
 
@@ -1359,6 +2098,7 @@ interface Provider {
 Initialize the provider with optional configuration. Called when provider is first instantiated or registered.
 
 **Parameters:**
+
 - `options`: `ProviderOptions` (optional) - Provider-specific configuration
 
 **Returns:** `Promise<void>`
@@ -1366,6 +2106,7 @@ Initialize the provider with optional configuration. Called when provider is fir
 **Throws:** `Error` if initialization fails
 
 **Example:**
+
 ```typescript
 const provider = new AnthropicProvider();
 await provider.initialize({
@@ -1384,6 +2125,7 @@ Terminate the provider and cleanup resources. Called when provider is being shut
 **Returns:** `Promise<void>`
 
 **Example:**
+
 ```typescript
 await provider.terminate();
 ```
@@ -1395,9 +2137,11 @@ await provider.terminate();
 Execute a prompt request with type-safe response. Core method for LLM execution.
 
 **Type Parameters:**
+
 - `T` - The expected response data type
 
 **Parameters:**
+
 - `request`: `ProviderRequest` - The prompt request with options
 - `toolExecutor`: `ToolExecutor` - Callback for executing tools (delegated to MCPHandler)
 - `hooks`: `ProviderHookEvents` (optional) - Optional lifecycle hooks for events
@@ -1405,6 +2149,7 @@ Execute a prompt request with type-safe response. Core method for LLM execution.
 **Returns:** `Promise<AgentResponse<T>>` or `AsyncGenerator<StreamEvent, AgentResponse<T>>` for streaming
 
 **Example:**
+
 ```typescript
 // Non-streaming
 const response = await provider.execute<{ answer: string }>(
@@ -1434,11 +2179,13 @@ if (Symbol.asyncIterator in stream) {
 Register MCP servers and return available tools. Providers connect to MCP servers and discover all available tools.
 
 **Parameters:**
+
 - `servers`: `MCPServer[]` - Array of MCP server configurations
 
 **Returns:** `Promise<Tool[]>` - Array of discovered Tool definitions
 
 **Example:**
+
 ```typescript
 const tools = await provider.registerMCPs([
   { name: 'filesystem', transport: 'stdio', command: 'python', args: ['mcp_server.py'] }
@@ -1453,11 +2200,13 @@ console.log(`Registered ${tools.length} tools`);
 Load skills into the provider. Skills are reusable prompt templates or capabilities.
 
 **Parameters:**
+
 - `skills`: `Skill[]` - Array of skill definitions to load
 
 **Returns:** `Promise<void>`
 
 **Example:**
+
 ```typescript
 await provider.loadSkills([
   { name: 'web-search', path: '/skills/web-search' }
@@ -1471,11 +2220,13 @@ await provider.loadSkills([
 Normalize a model string to a ModelSpec. Parses model strings in plain or qualified format.
 
 **Parameters:**
+
 - `model`: `string` - Model string to parse
 
 **Returns:** `ModelSpec` with provider, model, and raw string
 
 **Example:**
+
 ```typescript
 provider.normalizeModel('claude-sonnet-4');
 // Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
@@ -1485,6 +2236,7 @@ provider.normalizeModel('anthropic/claude-opus-4');
 ```
 
 **See Also:**
+
 - [ProviderId](#providerid)
 - [ProviderCapabilities](#providercapabilities)
 - [ModelSpec](#modelspec)
@@ -1496,6 +2248,7 @@ provider.normalizeModel('anthropic/claude-opus-4');
 Provider request interface wrapping prompt and execution options.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderRequest {
   prompt: string;
@@ -1504,10 +2257,12 @@ interface ProviderRequest {
 ```
 
 **Properties:**
+
 - `prompt`: `string` - The user prompt/message
 - `options`: `ProviderExecutionOptions` - Execution options
 
 **See Also:**
+
 - [ProviderExecutionOptions](#providerexecutionoptions)
 
 ---
@@ -1517,6 +2272,7 @@ interface ProviderRequest {
 Provider execution options wrapping parameters for provider execution requests.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderExecutionOptions {
   model?: string;
@@ -1529,6 +2285,7 @@ interface ProviderExecutionOptions {
 ```
 
 **Properties:**
+
 - `model`: `string` (optional) - Model identifier
 - `systemPrompt`: `string` (optional) - System prompt override
 - `tools`: `Tool[]` (optional) - Available tools
@@ -1543,6 +2300,7 @@ interface ProviderExecutionOptions {
 Tool execution request for delegating tool execution to the MCPHandler.
 
 **Type Signature:**
+
 ```typescript
 interface ToolExecutionRequest {
   name: string;
@@ -1551,10 +2309,12 @@ interface ToolExecutionRequest {
 ```
 
 **Properties:**
+
 - `name`: `string` - Tool name (may be namespaced: "server__tool")
 - `input`: `unknown` - Tool input parameters
 
 **See Also:**
+
 - [ToolExecutionResult](#toolexecutionresult)
 - [ToolExecutor](#toolexecutor)
 
@@ -1565,6 +2325,7 @@ interface ToolExecutionRequest {
 Tool execution result returned by the ToolExecutor callback.
 
 **Type Signature:**
+
 ```typescript
 interface ToolExecutionResult {
   content: string | unknown;
@@ -1573,10 +2334,12 @@ interface ToolExecutionResult {
 ```
 
 **Properties:**
+
 - `content`: `string | unknown` - Result content
 - `isError`: `boolean` - Whether the execution resulted in an error
 
 **See Also:**
+
 - [ToolExecutionRequest](#toolexecutionrequest)
 - [ToolExecutor](#toolexecutor)
 
@@ -1587,6 +2350,7 @@ interface ToolExecutionResult {
 Tool executor callback function type that delegates tool execution to the MCPHandler.
 
 **Type Signature:**
+
 ```typescript
 type ToolExecutor = (
   request: ToolExecutionRequest
@@ -1594,6 +2358,7 @@ type ToolExecutor = (
 ```
 
 **Parameters:**
+
 - `request`: `ToolExecutionRequest` - Tool execution request with name and input
 
 **Returns:** `Promise<ToolExecutionResult>` - Tool execution result
@@ -1602,6 +2367,7 @@ type ToolExecutor = (
 Provider implementations receive this callback and use it to execute tools. The provider does not create or manage its own MCPHandler instance.
 
 **See Also:**
+
 - [ToolExecutionRequest](#toolexecutionrequest)
 - [ToolExecutionResult](#toolexecutionresult)
 
@@ -1612,6 +2378,7 @@ Provider implementations receive this callback and use it to execute tools. The 
 Provider hook events mapping from AgentHooks to provider-specific events.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderHookEvents {
   onToolStart?: (tool: ToolExecutionRequest) => Promise<void> | void;
@@ -1627,6 +2394,7 @@ interface ProviderHookEvents {
 ```
 
 **Properties:**
+
 - `onToolStart`: `(tool: ToolExecutionRequest) => Promise<void> | void` (optional) - Called before tool execution
 - `onToolEnd`: `(tool, result, duration) => Promise<void> | void` (optional) - Called after tool execution
 - `onSessionStart`: `() => Promise<void> | void` (optional) - Called when provider session starts
@@ -1634,6 +2402,7 @@ interface ProviderHookEvents {
 - `onStream`: `(chunk: string) => void` (optional) - Called for each streaming chunk
 
 **Example:**
+
 ```typescript
 const hooks: ProviderHookEvents = {
   onToolStart: async (tool) => {
@@ -1646,6 +2415,7 @@ const hooks: ProviderHookEvents = {
 ```
 
 **See Also:**
+
 - [Hooks](#hooks)
 
 ---
@@ -1655,6 +2425,7 @@ const hooks: ProviderHookEvents = {
 Model specification representing a parsed model identifier with provider and model name.
 
 **Type Signature:**
+
 ```typescript
 interface ModelSpec {
   provider: ProviderId;
@@ -1664,6 +2435,7 @@ interface ModelSpec {
 ```
 
 **Properties:**
+
 - `provider`: `ProviderId` - Provider identifier
 - `model`: `string` - Model name (without provider prefix)
 - `raw`: `string` - Original raw model string (preserves user input)
@@ -1672,6 +2444,7 @@ interface ModelSpec {
 Supports both plain ("claude-sonnet-4") and qualified ("anthropic/claude-opus-4") formats per PRD 7.8.
 
 **Example:**
+
 ```typescript
 // Plain format (uses default provider)
 parseModelSpec('claude-sonnet-4', 'anthropic')
@@ -1683,6 +2456,7 @@ parseModelSpec('anthropic/claude-opus-4-20250514')
 ```
 
 **See Also:**
+
 - [parseModelSpec()](#parsemodelspec)
 - [formatModelForProvider()](#formatmodelforprovider)
 - [Model Specification](#model-specification)
@@ -1694,6 +2468,7 @@ parseModelSpec('anthropic/claude-opus-4-20250514')
 Global provider configuration for default provider and per-provider options.
 
 **Type Signature:**
+
 ```typescript
 interface GlobalProviderConfig {
   defaultProvider: ProviderId;
@@ -1702,6 +2477,7 @@ interface GlobalProviderConfig {
 ```
 
 **Properties:**
+
 - `defaultProvider`: `ProviderId` - Default provider to use when none specified
 - `providerDefaults`: `Partial<Record<ProviderId, ProviderOptions>>` (optional) - Per-provider default options mapped by provider ID
 
@@ -1709,6 +2485,7 @@ interface GlobalProviderConfig {
 Configures default provider and per-provider options that cascade to all agents unless explicitly overridden. Part of the configuration cascade (PRD 7.7).
 
 **Example:**
+
 ```typescript
 import { configureProviders } from 'groundswell';
 
@@ -1721,6 +2498,7 @@ configureProviders({
 ```
 
 **See Also:**
+
 - [configureProviders()](#configureproviders)
 - [ProviderOptions](#provideroptions)
 - [Configuration Cascade](#configuration-cascade)
@@ -1732,6 +2510,7 @@ configureProviders({
 Provider execution result wrapper using discriminated union pattern for type safety.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderResult<T = unknown> {
   status: ProviderResponseStatus;
@@ -1742,6 +2521,7 @@ interface ProviderResult<T = unknown> {
 ```
 
 **Properties:**
+
 - `status`: `ProviderResponseStatus` - Response status discriminator ('success' | 'error' | 'partial')
 - `data`: `T | null` - Response data (present on success and partial, null on error)
 - `error`: `ProviderErrorDetails | null` - Error details (present on error, null on success)
@@ -1749,11 +2529,13 @@ interface ProviderResult<T = unknown> {
 
 **Type Narrowing:**
 The status field is a discriminant. Use type guards to narrow:
+
 - `status='success'` → data is T (not null), error is null
 - `status='error'` → data is null, error is ProviderErrorDetails (not null)
 - `status='partial'` → data is T (not null), error may be null
 
 **Example:**
+
 ```typescript
 const result: ProviderResult<{ answer: string }> = {
   status: 'success',
@@ -1769,6 +2551,7 @@ if (result.status === 'success') {
 ```
 
 **See Also:**
+
 - [ProviderResponseStatus](#providerresponsestatus)
 - [ProviderErrorDetails](#providererrordetails)
 - [ProviderResponseMetadata](#providerresponsemetadata)
@@ -1780,16 +2563,19 @@ if (result.status === 'success') {
 Provider response status indicating the outcome of a provider operation.
 
 **Type Signature:**
+
 ```typescript
 type ProviderResponseStatus = 'success' | 'error' | 'partial';
 ```
 
 **Values:**
+
 - `'success'`: Operation completed successfully with valid data
 - `'error'`: Operation failed with error details
 - `'partial'`: Operation partially completed (streaming, incremental)
 
 **See Also:**
+
 - [ProviderResult](#providerresult)
 
 ---
@@ -1799,6 +2585,7 @@ type ProviderResponseStatus = 'success' | 'error' | 'partial';
 Detailed error information for provider operations.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderErrorDetails {
   code: string;
@@ -1809,12 +2596,14 @@ interface ProviderErrorDetails {
 ```
 
 **Properties:**
+
 - `code`: `string` - Machine-readable error code (e.g., VALIDATION_FAILED, EXECUTION_FAILED)
 - `message`: `string` - Human-readable error description
 - `details`: `Record<string, unknown> | null` (optional) - Additional error context for debugging
 - `recoverable`: `boolean` - Whether the error is recoverable (hint for retry logic)
 
 **See Also:**
+
 - [ProviderResult](#providerresult)
 
 ---
@@ -1824,6 +2613,7 @@ interface ProviderErrorDetails {
 Metadata about provider operation execution.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderResponseMetadata {
   providerId: string;
@@ -1836,6 +2626,7 @@ interface ProviderResponseMetadata {
 ```
 
 **Properties:**
+
 - `providerId`: `string` - ID of the provider that generated this response
 - `timestamp`: `number` - Unix timestamp in milliseconds
 - `duration`: `number | null` (optional) - Execution duration in milliseconds
@@ -1844,6 +2635,7 @@ interface ProviderResponseMetadata {
 - `toolCalls`: `number` (optional) - Number of tool invocations
 
 **See Also:**
+
 - [ProviderResult](#providerresult)
 
 ---
@@ -1855,14 +2647,17 @@ interface ProviderResponseMetadata {
 Configure global provider settings for the application.
 
 **Type Signature:**
+
 ```typescript
 function configureProviders(config: GlobalProviderConfig): void
 ```
 
 **Parameters:**
+
 - `config`: `GlobalProviderConfig` - Configuration object containing default provider and optional provider-specific defaults
 
 **Throws:**
+
 - `Error` - If `defaultProvider` is not a valid ProviderId ('anthropic')
 - `Error` - If `providerDefaults` contains invalid provider IDs
 
@@ -1872,6 +2667,7 @@ function configureProviders(config: GlobalProviderConfig): void
 Validates the configuration and stores it in the module-private globalConfig variable. This function should be called once at application startup. This global config is the lowest priority in the configuration cascade.
 
 **Example:**
+
 ```typescript
 import { configureProviders } from 'groundswell';
 
@@ -1893,6 +2689,7 @@ configureProviders({
 ```
 
 **See Also:**
+
 - [GlobalProviderConfig](#globalproviderconfig)
 - [getGlobalProviderConfig()](#getglobalproviderconfig)
 - [resolveProviderConfig()](#resolveproviderconfig)
@@ -1905,6 +2702,7 @@ configureProviders({
 Get the current global provider configuration.
 
 **Type Signature:**
+
 ```typescript
 function getGlobalProviderConfig(): GlobalProviderConfig
 ```
@@ -1915,11 +2713,13 @@ function getGlobalProviderConfig(): GlobalProviderConfig
 Provides controlled access to the module-private globalConfig variable. Guarantees a non-null return by providing sensible defaults when no configuration has been set.
 
 **Behavior:**
+
 - If `configureProviders()` was called: returns the configured value
 - If never configured: returns default configuration
 - **Never returns null**: Always returns a valid `GlobalProviderConfig`
 
 **Example:**
+
 ```typescript
 import { getGlobalProviderConfig } from 'groundswell';
 
@@ -1937,6 +2737,7 @@ console.log(config2.defaultProvider); // 'anthropic'
 ```
 
 **See Also:**
+
 - [configureProviders()](#configureproviders)
 - [resolveProviderConfig()](#resolveproviderconfig)
 - [GlobalProviderConfig](#globalproviderconfig)
@@ -1948,6 +2749,7 @@ console.log(config2.defaultProvider); // 'anthropic'
 Resolve provider configuration with cascade priority.
 
 **Type Signature:**
+
 ```typescript
 function resolveProviderConfig(
   globalConfig: GlobalProviderConfig,
@@ -1959,6 +2761,7 @@ function resolveProviderConfig(
 ```
 
 **Parameters:**
+
 - `globalConfig`: `GlobalProviderConfig` - Global provider configuration from configureProviders()
 - `agentProvider`: `ProviderId` (optional) - Agent-level provider override
 - `agentOptions`: `ProviderOptions` (optional) - Agent-level options override
@@ -1971,11 +2774,13 @@ function resolveProviderConfig(
 Implements the PRD 7.7 configuration cascade with nullish coalescing for provider resolution and object spread for options merge.
 
 **Provider Resolution Priority (highest to lowest):**
+
 1. Prompt-level provider override
 2. Agent-level provider override
 3. Global default provider
 
 **Options Merge Priority (highest to lowest):**
+
 1. Prompt-level options (override everything)
 2. Agent-level options (override global defaults)
 3. Global provider-specific defaults (base layer)
@@ -1984,6 +2789,7 @@ Implements the PRD 7.7 configuration cascade with nullish coalescing for provide
 Creates a new options object and does not mutate any input parameters.
 
 **Example:**
+
 ```typescript
 import { resolveProviderConfig, getGlobalProviderConfig } from 'groundswell';
 
@@ -2021,6 +2827,7 @@ console.log(options);
 ```
 
 **See Also:**
+
 - [configureProviders()](#configureproviders)
 - [getGlobalProviderConfig()](#getglobalproviderconfig)
 - [ProviderOptions](#provideroptions)
@@ -2035,6 +2842,7 @@ console.log(options);
 Parse a model specification string into a ModelSpec object.
 
 **Type Signature:**
+
 ```typescript
 function parseModelSpec(
   model: string,
@@ -2043,12 +2851,14 @@ function parseModelSpec(
 ```
 
 **Parameters:**
+
 - `model`: `string` - Model specification string to parse
 - `defaultProvider`: `ProviderId` (optional) - Default provider to use when none specified (default: 'anthropic')
 
 **Returns:** `ModelSpec` - Parsed ModelSpec object with provider, model, and raw string
 
 **Throws:**
+
 - `Error` - When model specification is empty or whitespace-only
 - `Error` - When provider is invalid (not 'anthropic')
 - `Error` - When provider or model parts are empty
@@ -2058,15 +2868,18 @@ Parses model specification strings in two formats:
 
 **Qualified Format (provider/model):**
 Explicit provider specification with "/" separator.
+
 - Input: `"anthropic/claude-3-5-sonnet"`
 - Output: `{ provider: 'anthropic', model: 'claude-3-5-sonnet', raw: 'anthropic/claude-3-5-sonnet' }`
 
 **Plain Format (model only):**
 Uses default provider when no provider specified.
+
 - Input: `"claude-sonnet-4"` with defaultProvider: `'anthropic'`
 - Output: `{ provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }`
 
 **Validation Rules:**
+
 1. Input cannot be empty or whitespace-only
 2. Provider must be one of: `'anthropic'`
 3. Model name cannot be empty after provider split
@@ -2074,6 +2887,7 @@ Uses default provider when no provider specified.
 5. Input is trimmed before parsing, original preserved in `raw` field
 
 **Example:**
+
 ```typescript
 import { parseModelSpec } from 'groundswell';
 
@@ -2103,6 +2917,7 @@ try {
 ```
 
 **See Also:**
+
 - [ModelSpec](#modelspec)
 - [formatModelForProvider()](#formatmodelforprovider)
 - [Model Specification](#model-specification)
@@ -2114,6 +2929,7 @@ try {
 Format a ModelSpec for a specific target provider.
 
 **Type Signature:**
+
 ```typescript
 function formatModelForProvider(
   spec: ModelSpec,
@@ -2122,12 +2938,14 @@ function formatModelForProvider(
 ```
 
 **Parameters:**
+
 - `spec`: `ModelSpec` - ModelSpec from parseModelSpec() or Provider.normalizeModel()
 - `targetProvider`: `ProviderId` - The provider to format the model for
 
 **Returns:** `string` - Formatted model string for target provider (model name only)
 
 **Throws:**
+
 - `Error` - When providers differ with message: "Cannot translate {source}/{model} to {target} provider. Cross-provider model translation is not supported."
 
 **Description:**
@@ -2139,11 +2957,13 @@ When `spec.provider` matches `targetProvider`, returns the model name only.
 When providers differ, throws an error. Cross-provider model translation is not supported in the MVP.
 
 **Use Cases:**
+
 1. Model Validation: Validate that a model spec is compatible with a target provider
 2. API Preparation: Format model names for provider-specific API requests
 3. Configuration: Prepare model strings for provider initialization
 
 **Example:**
+
 ```typescript
 import { formatModelForProvider, parseModelSpec } from 'groundswell';
 
@@ -2163,6 +2983,7 @@ console.log(model); // "claude-opus-4"
 ```
 
 **See Also:**
+
 - [parseModelSpec()](#parsemodelspec)
 - [ModelSpec](#modelspec)
 - [ProviderId](#providerid)
@@ -2174,6 +2995,7 @@ console.log(model); // "claude-opus-4"
 Singleton registry for managing provider instances throughout the application lifecycle.
 
 **Type Signature:**
+
 ```typescript
 class ProviderRegistry {
   static getInstance(): ProviderRegistry;
@@ -2201,6 +3023,7 @@ class ProviderRegistry {
 Maintains a single instance of itself and stores provider instances in a Map for efficient lookup by ProviderId. Uses private constructor with static getInstance() for singleton pattern.
 
 **Example:**
+
 ```typescript
 import { ProviderRegistry } from 'groundswell';
 import { AnthropicProvider } from 'groundswell';
@@ -2225,6 +3048,7 @@ if (anthropic) {
 Get the singleton ProviderRegistry instance.
 
 **Type Signature:**
+
 ```typescript
 static getInstance(): ProviderRegistry
 ```
@@ -2235,6 +3059,7 @@ static getInstance(): ProviderRegistry
 Creates the instance on first call (lazy initialization). Returns the same instance on subsequent calls.
 
 **Example:**
+
 ```typescript
 const registry1 = ProviderRegistry.getInstance();
 const registry2 = ProviderRegistry.getInstance();
@@ -2242,6 +3067,7 @@ console.log(registry1 === registry2); // true
 ```
 
 **See Also:**
+
 - [Provider Registry](#provider-registry)
 
 ---
@@ -2251,20 +3077,24 @@ console.log(registry1 === registry2); // true
 Register a provider instance.
 
 **Type Signature:**
+
 ```typescript
 register(provider: Provider): void
 ```
 
 **Parameters:**
+
 - `provider`: `Provider` - The provider instance to register
 
 **Throws:**
+
 - `Error` - If a provider with the same id is already registered
 
 **Description:**
 Stores the provider in the registry using its id as the key.
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 const anthropic = new AnthropicProvider();
@@ -2272,6 +3102,7 @@ registry.register(anthropic);
 ```
 
 **See Also:**
+
 - [get()](#getid)
 - [has()](#hasid)
 
@@ -2282,11 +3113,13 @@ registry.register(anthropic);
 Get a registered provider by id.
 
 **Type Signature:**
+
 ```typescript
 get(id: ProviderId): Provider | undefined
 ```
 
 **Parameters:**
+
 - `id`: `ProviderId` - The provider id to look up
 
 **Returns:** `Provider | undefined` - The provider instance, or undefined if not registered
@@ -2295,6 +3128,7 @@ get(id: ProviderId): Provider | undefined
 Returns the provider instance if registered, otherwise returns undefined. Does NOT throw for missing providers.
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 const anthropic = registry.get('anthropic');
@@ -2304,6 +3138,7 @@ if (anthropic) {
 ```
 
 **See Also:**
+
 - [register()](#registerprovider)
 - [has()](#hasid)
 
@@ -2314,16 +3149,19 @@ if (anthropic) {
 Check if a provider is registered.
 
 **Type Signature:**
+
 ```typescript
 has(id: ProviderId): boolean
 ```
 
 **Parameters:**
+
 - `id`: `ProviderId` - The provider id to check
 
 **Returns:** `boolean` - true if the provider is registered, false otherwise
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 if (registry.has('anthropic')) {
@@ -2332,6 +3170,7 @@ if (registry.has('anthropic')) {
 ```
 
 **See Also:**
+
 - [register()](#registerprovider)
 - [get()](#getid)
 
@@ -2342,17 +3181,20 @@ if (registry.has('anthropic')) {
 Initialize a single provider with promise caching.
 
 **Type Signature:**
+
 ```typescript
 initializeProvider(id: ProviderId, options?: ProviderOptions): Promise<void>
 ```
 
 **Parameters:**
+
 - `id`: `ProviderId` - The provider id to initialize
 - `options`: `ProviderOptions` (optional) - Configuration options for initialization
 
 **Returns:** `Promise<void>` - Resolves when initialization completes
 
 **Throws:**
+
 - `Error` - If provider is not registered
 - `Error` - If provider initialization fails
 
@@ -2363,10 +3205,12 @@ Initializes a provider with the given options. Multiple concurrent calls to init
 The initialization promise is cached in the provider's state. Concurrent calls to initialize the same provider will await the same promise.
 
 **State Transitions:**
+
 - UNINITIALIZED → INITIALIZING → INITIALIZED (success)
 - UNINITIALIZED → INITIALIZING → FAILED (error)
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 await registry.initializeProvider('anthropic', { apiKey: 'sk-...' });
@@ -2380,6 +3224,7 @@ await Promise.all([promise1, promise2]);
 ```
 
 **See Also:**
+
 - [initializeAll()](#initializeallconfig)
 - [getStatus()](#getstatusid)
 - [isReady()](#isreadyid)
@@ -2391,11 +3236,13 @@ await Promise.all([promise1, promise2]);
 Initialize all registered providers in parallel.
 
 **Type Signature:**
+
 ```typescript
 initializeAll(config: GlobalProviderConfig): Promise<BatchInitResult>
 ```
 
 **Parameters:**
+
 - `config`: `GlobalProviderConfig` - Global provider configuration with provider defaults
 
 **Returns:** `Promise<BatchInitResult>` - Promise resolving to success/failure lists
@@ -2410,6 +3257,7 @@ All providers initialize concurrently for faster startup. The method waits for a
 This method never throws - all errors are collected in the returned BatchInitResult.failed array.
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 const config = getGlobalProviderConfig();
@@ -2425,6 +3273,7 @@ if (result.failed.length > 0) {
 ```
 
 **See Also:**
+
 - [initializeProvider()](#initializeproviderid-options)
 - [BatchInitResult](#batchinitresult)
 
@@ -2435,11 +3284,13 @@ if (result.failed.length > 0) {
 Get initialization status for a provider.
 
 **Type Signature:**
+
 ```typescript
 getStatus(id: ProviderId): InitializationStatus
 ```
 
 **Parameters:**
+
 - `id`: `ProviderId` - The provider id to check
 
 **Returns:** `InitializationStatus` - Current initialization status
@@ -2448,12 +3299,14 @@ getStatus(id: ProviderId): InitializationStatus
 Returns the current initialization status for the given provider ID. Unknown providers return UNINITIALIZED status.
 
 **Possible Values:**
+
 - `'uninitialized'`: Provider not yet initialized
 - `'initializing'`: Currently initializing (in progress)
 - `'initialized'`: Successfully initialized
 - `'failed'`: Initialization failed
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 const status = registry.getStatus('anthropic');
@@ -2461,6 +3314,7 @@ console.log(status); // 'initialized' | 'initializing' | 'failed' | 'uninitializ
 ```
 
 **See Also:**
+
 - [isReady()](#isreadyid)
 - [getAllStatuses()](#getallstatuses)
 - [InitializationStatus](#initializationstatus)
@@ -2472,11 +3326,13 @@ console.log(status); // 'initialized' | 'initializing' | 'failed' | 'uninitializ
 Check if a provider is ready to use.
 
 **Type Signature:**
+
 ```typescript
 isReady(id: ProviderId): boolean
 ```
 
 **Parameters:**
+
 - `id`: `ProviderId` - The provider id to check
 
 **Returns:** `boolean` - true if provider is initialized and ready, false otherwise
@@ -2485,6 +3341,7 @@ isReady(id: ProviderId): boolean
 Returns true only if the provider has successfully initialized. Use this method to check provider readiness before use.
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 if (registry.isReady('anthropic')) {
@@ -2494,6 +3351,7 @@ if (registry.isReady('anthropic')) {
 ```
 
 **See Also:**
+
 - [getStatus()](#getstatusid)
 - [getAllStatuses()](#getallstatuses)
 
@@ -2504,6 +3362,7 @@ if (registry.isReady('anthropic')) {
 Get all provider initialization states.
 
 **Type Signature:**
+
 ```typescript
 getAllStatuses(): Map<ProviderId, ProviderInitState>
 ```
@@ -2514,6 +3373,7 @@ getAllStatuses(): Map<ProviderId, ProviderInitState>
 Returns a copy of the internal states Map for health checks, monitoring, and debugging. The returned Map is a shallow copy - modifications to it won't affect internal state.
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 const statuses = registry.getAllStatuses();
@@ -2527,6 +3387,7 @@ for (const [id, state] of statuses.entries()) {
 ```
 
 **See Also:**
+
 - [getStatus()](#getstatusid)
 - [isReady()](#isreadyid)
 - [ProviderInitState](#providerinitstate)
@@ -2538,6 +3399,7 @@ for (const [id, state] of statuses.entries()) {
 Terminate all registered providers with error tolerance.
 
 **Type Signature:**
+
 ```typescript
 terminateAll(): Promise<void>
 ```
@@ -2557,6 +3419,7 @@ If a provider's terminate() throws, the error is logged but other providers cont
 After all termination attempts complete, the providers and states maps are cleared. This releases references and allows re-initialization.
 
 **Example:**
+
 ```typescript
 const registry = ProviderRegistry.getInstance();
 
@@ -2572,6 +3435,7 @@ console.log(registry.has('anthropic')); // false
 ```
 
 **See Also:**
+
 - [Provider Lifecycle](#provider-lifecycle)
 
 ---
@@ -2583,6 +3447,7 @@ console.log(registry.has('anthropic')); // false
 Provider initialization status enum defining all possible initialization states.
 
 **Type Signature:**
+
 ```typescript
 enum InitializationStatus {
   UNINITIALIZED = 'uninitialized',
@@ -2593,12 +3458,14 @@ enum InitializationStatus {
 ```
 
 **Values:**
+
 - `UNINITIALIZED`: Provider not yet initialized
 - `INITIALIZING`: Currently initializing (in progress)
 - `INITIALIZED`: Successfully initialized
 - `FAILED`: Initialization failed
 
 **See Also:**
+
 - [getStatus()](#getstatusid)
 - [isReady()](#isreadyid)
 
@@ -2609,6 +3476,7 @@ enum InitializationStatus {
 Provider initialization state with metadata.
 
 **Type Signature:**
+
 ```typescript
 interface ProviderInitState {
   status: InitializationStatus;
@@ -2619,12 +3487,14 @@ interface ProviderInitState {
 ```
 
 **Properties:**
+
 - `status`: `InitializationStatus` - Current initialization status
 - `initPromise`: `Promise<void>` (optional) - Cached initialization promise (prevents duplicate init)
 - `error`: `Error` (optional) - Error from failed initialization
 - `initializedAt`: `number` (optional) - Timestamp when initialization completed
 
 **See Also:**
+
 - [getAllStatuses()](#getallstatuses)
 
 ---
@@ -2634,6 +3504,7 @@ interface ProviderInitState {
 Batch initialization result with aggregated status.
 
 **Type Signature:**
+
 ```typescript
 interface BatchInitResult {
   success: ProviderId[];
@@ -2642,8 +3513,10 @@ interface BatchInitResult {
 ```
 
 **Properties:**
+
 - `success`: `ProviderId[]` - Successfully initialized provider IDs
 - `failed`: `Array<{ providerId: ProviderId; error: Error }>` - Failed providers with errors
 
 **See Also:**
+
 - [initializeAll()](#initializeallconfig)

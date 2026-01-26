@@ -69,6 +69,7 @@
     "@types/react": "^19.2.9",
     "@vitest/coverage-v8": "^1.6.1",
     "ink-testing-library": "^4.0.0",
+    "markdownlint-cli": "^0.47.0",
     "tsx": "^4.21.0",
     "typescript": "^5.2.0",
     "vitest": "^1.0.0"

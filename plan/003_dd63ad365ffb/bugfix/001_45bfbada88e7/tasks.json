@@ -392,7 +392,7 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Milestone 2.2: Session Persistence Implementation",
-          "status": "Ready",
+          "status": "Complete",
           "description": "Implement session persistence to maintain conversation state across provider lifecycle (initialize → terminate → initialize). Currently sessions are in-memory only and lost on terminate.",
           "tasks": [
             {
@@ -449,7 +449,7 @@
               "type": "Task",
               "id": "P2.M2.T2",
               "title": "Add Session Configuration and Lifecycle Management",
-              "status": "Ready",
+              "status": "Complete",
               "description": "Add configuration options for session persistence and implement session TTL, cleanup, and lifecycle management.",
               "subtasks": [
                 {
@@ -476,7 +476,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T2.S3",
                   "title": "Write documentation for session persistence",
-                  "status": "Ready",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M2.T2.S2"
@@ -505,7 +505,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T1.S1",
                   "title": "Audit state-changing methods in Workflow class",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - Workflow class in src/core/workflow.ts has methods that change state: setStatus(), snapshotState(), attachChild(), detachChild(). Inconsistent treeUpdated emission reported.\n2. INPUT: Workflow class source code.\n3. LOGIC: Read through src/core/workflow.ts and identify all methods that modify: status, stateSnapshot, children array, parent reference, logs array. Create list of methods with current treeUpdated emission status (yes/no). Document in plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/architecture/tree-update-audit.md.\n4. OUTPUT: Audit document listing all state-changing methods and their treeUpdated emission status."
