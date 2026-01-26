@@ -720,7 +720,7 @@
           "type": "Milestone",
           "id": "P5.M1",
           "title": "Milestone 5.1: Unit Tests",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Write unit tests for provider system components",
           "tasks": [
             {
@@ -789,7 +789,7 @@
               "type": "Task",
               "id": "P5.M1.T3",
               "title": "Task: Test Anthropic Provider",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Write tests for AnthropicProvider implementation",
               "subtasks": [
                 {
@@ -807,7 +807,7 @@
                   "type": "Subtask",
                   "id": "P5.M1.T3.S2",
                   "title": "Test AnthropicProvider execute() method",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M1.T1.S6"
