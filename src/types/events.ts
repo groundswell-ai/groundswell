@@ -1,6 +1,7 @@
 import type { WorkflowNode } from './workflow.js';
 import type { WorkflowError } from './error.js';
 import type { TokenUsage } from './sdk-primitives.js';
+import type { RestartAnalysis } from './restart.js';
 
 /**
  * Discriminated union of all workflow events
@@ -11,7 +12,7 @@ export type WorkflowEvent =
   | { type: 'childDetached'; parentId: string; childId: string }
   | { type: 'stateSnapshot'; node: WorkflowNode }
   | { type: 'stepStart'; node: WorkflowNode; step: string }
-  | { type: 'stepRetry'; node: WorkflowNode; step: string; retryCount: number; error: WorkflowError }
+  | { type: 'stepRetry'; node: WorkflowNode; stepName: string; retryCount: number; analysis: RestartAnalysis; error: WorkflowError; timestamp: number }
   | { type: 'stepEnd'; node: WorkflowNode; step: string; duration: number }
   | { type: 'error'; node: WorkflowNode; error: WorkflowError }
   | { type: 'taskStart'; node: WorkflowNode; task: string }

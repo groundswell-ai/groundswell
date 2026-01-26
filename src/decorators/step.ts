@@ -1,4 +1,4 @@
-import type { StepOptions, WorkflowError, WorkflowNode, LogEntry, WorkflowEvent, ErrorCriterion } from '../types/index.js';
+import type { StepOptions, WorkflowError, WorkflowNode, LogEntry, WorkflowEvent, ErrorCriterion, RestartAnalysis } from '../types/index.js';
 import { getObservedState } from './observed-state.js';
 import { runInContext, type AgentExecutionContext } from '../core/context.js';
 import { generateId, delay } from '../utils/index.js';
@@ -191,13 +191,23 @@ export function Step(opts: StepOptions = {}) {
           // ============================================================
           const nextRetryCount = retryCount + 1;
 
+          // Create restart analysis for the retry event
+          const analysis: RestartAnalysis = {
+            shouldRestart: true,
+            reason: `Error matches retry criteria (attempt ${nextRetryCount}/${maxRetries})`,
+            suggestedAction: 'retry',
+            estimatedSuccessProbability: 0.7,
+          };
+
           // Emit step retry event
           wf.emitEvent({
             type: 'stepRetry',
             node: wf.node,
-            step: stepName,
+            stepName: stepName,
             retryCount: nextRetryCount,
+            analysis,
             error: workflowError,
+            timestamp: Date.now(),
           });
 
           // Log retry if logging enabled

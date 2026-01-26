@@ -122,7 +122,15 @@ describe('@Step decorator with retry options', () => {
 
     if (retryEvents[0]?.type === 'stepRetry') {
       expect(retryEvents[0].retryCount).toBe(1);
-      expect(retryEvents[0].step).toBe('retryableStep');
+      expect(retryEvents[0].stepName).toBe('retryableStep');
+      expect(retryEvents[0].analysis).toBeDefined();
+      expect(retryEvents[0].analysis).toMatchObject({
+        shouldRestart: expect.any(Boolean),
+        reason: expect.any(String),
+        suggestedAction: expect.stringMatching(/^(retry|abort|rebuild)$/),
+        estimatedSuccessProbability: expect.any(Number),
+      });
+      expect(retryEvents[0].timestamp).toBeGreaterThan(0);
     }
   });
 
