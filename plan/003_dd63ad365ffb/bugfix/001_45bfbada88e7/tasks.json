@@ -68,7 +68,7 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "Implement Error Analysis Utility for Restart Decisions",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Create utility to analyze WorkflowErrors and determine if restart is appropriate based on error characteristics and step configuration.",
               "subtasks": [
                 {
@@ -95,7 +95,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S3",
                   "title": "Write unit tests for error analysis utility",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T2.S2"
