@@ -392,7 +392,7 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Milestone 2.2: Session Persistence Implementation",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Implement session persistence to maintain conversation state across provider lifecycle (initialize → terminate → initialize). Currently sessions are in-memory only and lost on terminate.",
           "tasks": [
             {
@@ -449,7 +449,7 @@
               "type": "Task",
               "id": "P2.M2.T2",
               "title": "Add Session Configuration and Lifecycle Management",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Add configuration options for session persistence and implement session TTL, cleanup, and lifecycle management.",
               "subtasks": [
                 {
@@ -465,7 +465,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T2.S2",
                   "title": "Implement session TTL and cleanup",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T2.S1"
@@ -476,7 +476,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T2.S3",
                   "title": "Write documentation for session persistence",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M2.T2.S2"

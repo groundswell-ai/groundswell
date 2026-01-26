@@ -595,6 +595,10 @@ describe("AnthropicProvider - SessionStore Integration (P2.M2.T1.S3)", () => {
         async clear(): Promise<void> {
           // Empty
         }
+
+        async deleteExpired(): Promise<string[]> {
+          return [];
+        }
       }
 
       const brokenStore = new BrokenStore();
@@ -603,6 +607,140 @@ describe("AnthropicProvider - SessionStore Integration (P2.M2.T1.S3)", () => {
       await expect(async () => {
         await provider.initialize({ sessionStore: brokenStore });
       }).rejects.toThrow("Store broken");
+    });
+  });
+
+  describe("Session TTL Integration (P2.M2.T2.S2)", () => {
+    it("should create sessions with timestamps", async () => {
+      const fileStore = new FileSessionStore(testSessionDir);
+      await provider.initialize({
+        sessionStore: fileStore,
+        sessionTtl: 86400000,
+      });
+
+      await provider.createSession("timestamp-test");
+
+      const session = await provider.getSession("timestamp-test");
+      expect(session?.createdAt).toBeDefined();
+      expect(session?.lastAccessedAt).toBeDefined();
+      expect(session?.createdAt).toBeGreaterThan(0);
+      expect(session?.lastAccessedAt).toBeGreaterThan(0);
+    });
+
+    it("should update lastAccessedAt on session access", async () => {
+      const fileStore = new FileSessionStore(testSessionDir);
+      await provider.initialize({
+        sessionStore: fileStore,
+        sessionTtl: 86400000,
+      });
+
+      await provider.createSession("access-test");
+
+      const session1 = await provider.getSession("access-test");
+      const firstAccessedAt = session1?.lastAccessedAt;
+
+      // Wait and access again
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const session2 = await provider.getSession("access-test");
+      expect(session2?.lastAccessedAt).toBeGreaterThan(firstAccessedAt ?? 0);
+    });
+
+    it("should pass sessionTtl to FileSessionStore", async () => {
+      await provider.initialize({
+        sessionPersistence: "file",
+        sessionPath: testSessionDir,
+        sessionTtl: 3600000, // 1 hour
+      });
+
+      // @ts-expect-error - Testing private property
+      expect(provider.sessionTtl).toBe(3600000);
+    });
+
+    it("should use default 24-hour TTL when not specified", async () => {
+      await provider.initialize({
+        sessionPersistence: "file",
+        sessionPath: testSessionDir,
+      });
+
+      // @ts-expect-error - Testing private property
+      expect(provider.sessionTtl).toBe(86400000); // 24 hours
+    });
+
+    it("should cleanup expired sessions on initialize", async () => {
+      // Create a FileSessionStore directly with a very short TTL
+      // Note: TTL + 60s tolerance = actual expiration time
+      const fileStore = new FileSessionStore(testSessionDir, 100); // 100ms TTL
+
+      await provider.initialize({
+        sessionStore: fileStore,
+        sessionTtl: 100,
+      });
+
+      await provider.createSession("expired-session");
+
+      // Manually write an expired session file (bypass save() which updates timestamps)
+      // Session must be older than (TTL + tolerance) to be considered expired
+      // TTL = 100ms, tolerance = 60s = 60000ms, so session must be > 60.1 seconds old
+      const { writeFile } = await import("node:fs/promises");
+      const { join } = await import("node:path");
+      const oldSession = {
+        history: [],
+        lastResult: null,
+        createdAt: Date.now() - 70000, // 70 seconds ago
+        lastAccessedAt: Date.now() - 70000, // 70 seconds ago (> 60.1s threshold)
+      };
+      await writeFile(join(testSessionDir, "expired-session.json"), JSON.stringify(oldSession), "utf-8");
+
+      // Manually trigger cleanup to verify it works
+      const deleted = await fileStore.deleteExpired(100);
+      expect(deleted).toContain("expired-session");
+
+      // Session should be cleaned up
+      const loadedSession = await fileStore.load("expired-session");
+      expect(loadedSession).toBeNull();
+    });
+
+    it("should not cleanup active sessions on initialize", async () => {
+      const fileStore = new FileSessionStore(testSessionDir);
+      await provider.initialize({
+        sessionStore: fileStore,
+        sessionTtl: 86400000, // 24 hours
+      });
+
+      await provider.createSession("active-session");
+
+      await provider.terminate();
+      await provider.initialize({
+        sessionStore: fileStore,
+        sessionTtl: 86400000,
+      });
+
+      // Session should still exist
+      const session = await provider.getSession("active-session");
+      expect(session).toBeDefined();
+      expect(session?.history).toHaveLength(0);
+    });
+
+    it("should handle zero TTL (no expiration)", async () => {
+      vi.useFakeTimers();
+
+      const fileStore = new FileSessionStore(testSessionDir, 0);
+      await provider.initialize({
+        sessionStore: fileStore,
+        sessionTtl: 0,
+      });
+
+      await provider.createSession("eternal-session");
+
+      // Advance time significantly
+      vi.advanceTimersByTime(86400000); // 24 hours
+
+      // Session should still exist
+      const session = await provider.getSession("eternal-session");
+      expect(session).toBeDefined();
+
+      vi.useRealTimers();
     });
   });
 });

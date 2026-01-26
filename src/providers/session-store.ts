@@ -76,6 +76,21 @@ export interface SessionStore<T = SessionState> {
    * @throws {Error} If clear operation fails
    */
   clear(): Promise<void>;
+
+  /**
+   * Delete expired sessions from storage
+   *
+   * @param ttl - Optional time-to-live in milliseconds. Sessions older than
+   *             (lastAccessedAt + ttl) are deleted. If not provided, uses
+   *             the store's default TTL if configured.
+   * @returns Array of session IDs that were deleted
+   * @throws {Error} If delete operation fails
+   * @remarks
+   * For FileSessionStore, this scans all session files and removes expired ones.
+   * For MemorySessionStore, this clears expired entries from the in-memory Map.
+   * Uses a 60-second tolerance window for clock skew handling.
+   */
+  deleteExpired(ttl?: number): Promise<string[]>;
 }
 
 /**
@@ -122,6 +137,42 @@ export class MemorySessionStore<T = SessionState> implements SessionStore<T> {
   }
 
   /**
+   * Delete expired sessions from in-memory storage
+   *
+   * @param ttl - Optional time-to-live in milliseconds
+   * @returns Array of session IDs that were deleted
+   * @remarks
+   * MemorySessionStore is cleared on terminate, so TTL is less critical.
+   * This method is provided for interface consistency and can be used
+   * for manual cleanup or testing purposes.
+   */
+  async deleteExpired(ttl?: number): Promise<string[]> {
+    // MemorySessionStore doesn't have a configured TTL by default
+    // Only delete if explicit TTL is provided and valid
+    if (ttl === undefined || ttl <= 0) {
+      return [];
+    }
+
+    const now = Date.now();
+    const expiredIds: string[] = [];
+    const CLOCK_SKEW_TOLERANCE = 60000; // 60 seconds
+
+    for (const [sessionId, state] of this.sessions.entries()) {
+      // Access timestamps from SessionState if available
+      const sessionState = state as unknown as SessionState;
+      const lastAccessedAt = sessionState.lastAccessedAt ?? sessionState.createdAt ?? now;
+      const expirationTime = lastAccessedAt + ttl + CLOCK_SKEW_TOLERANCE;
+
+      if (expirationTime < now) {
+        this.sessions.delete(sessionId);
+        expiredIds.push(sessionId);
+      }
+    }
+
+    return expiredIds;
+  }
+
+  /**
    * Get the underlying Map (for backward compatibility)
    *
    * @internal
@@ -139,15 +190,19 @@ export class MemorySessionStore<T = SessionState> implements SessionStore<T> {
  * as a separate file: `{directory}/{sessionId}.json`
  *
  * Uses atomic writes (temp file + rename) for data safety.
+ * Supports TTL-based session expiration with lazy and active cleanup.
  *
  * @template T - The session state type
  * @public
  */
 export class FileSessionStore<T = SessionState> implements SessionStore<T> {
   private directory: string;
+  private ttl?: number;
+  private static readonly CLOCK_SKEW_TOLERANCE = 60000; // 60 seconds
 
-  constructor(directory: string = './sessions') {
+  constructor(directory: string = './sessions', ttl?: number) {
     this.directory = directory;
+    this.ttl = ttl;
   }
 
   private getPath(sessionId: string): string {
@@ -160,6 +215,12 @@ export class FileSessionStore<T = SessionState> implements SessionStore<T> {
 
   async save(sessionId: string, state: T): Promise<void> {
     await this.ensureDirectory();
+
+    // Update timestamps before saving
+    const now = Date.now();
+    const sessionState = state as unknown as SessionState;
+    sessionState.lastAccessedAt = now;
+    sessionState.createdAt = sessionState.createdAt ?? now;
 
     const path = this.getPath(sessionId);
     const json = JSON.stringify(state, null, 2);
@@ -180,7 +241,22 @@ export class FileSessionStore<T = SessionState> implements SessionStore<T> {
 
     try {
       const content = await readFile(path, 'utf-8');
-      return JSON.parse(content) as T;
+      const parsed = JSON.parse(content) as T;
+      const sessionState = parsed as unknown as SessionState;
+
+      // Check expiration if TTL is configured
+      if (this.ttl !== undefined && this.ttl > 0) {
+        const lastAccessedAt = sessionState.lastAccessedAt ?? sessionState.createdAt ?? Date.now();
+        const expirationTime = lastAccessedAt + this.ttl + FileSessionStore.CLOCK_SKEW_TOLERANCE;
+
+        if (expirationTime < Date.now()) {
+          // Session expired, delete and return null
+          await this.delete(sessionId);
+          return null;
+        }
+      }
+
+      return parsed;
     } catch (error: unknown) {
       const err = error as NodeJS.ErrnoException;
       if (err.code === 'ENOENT') {
@@ -232,6 +308,63 @@ export class FileSessionStore<T = SessionState> implements SessionStore<T> {
       throw new Error(`Failed to clear sessions: ${err.message}`);
     }
   }
+
+  /**
+   * Delete expired sessions from file storage
+   *
+   * @param ttl - Optional time-to-live in milliseconds. If not provided,
+   *             uses the store's configured TTL.
+   * @returns Array of session IDs that were deleted
+   * @remarks
+   * Scans all session files in the directory, checks expiration based on
+   * lastAccessedAt timestamp, and deletes expired files. Uses a 60-second
+   * tolerance window for clock skew handling.
+   */
+  async deleteExpired(ttl?: number): Promise<string[]> {
+    const effectiveTtl = ttl ?? this.ttl;
+    if (effectiveTtl === undefined || effectiveTtl <= 0) {
+      // No expiration or TTL disabled
+      return [];
+    }
+
+    const now = Date.now();
+    const expiredIds: string[] = [];
+
+    try {
+      await this.ensureDirectory();
+      const files = await readdir(this.directory);
+
+      for (const file of files) {
+        if (!file.endsWith('.json')) continue;
+
+        const sessionId = file.replace('.json', '');
+        const path = this.getPath(sessionId);
+
+        try {
+          const content = await readFile(path, 'utf-8');
+          const state = JSON.parse(content) as T;
+          const sessionState = state as unknown as SessionState;
+
+          // Check expiration with tolerance
+          const lastAccessedAt = sessionState.lastAccessedAt ?? sessionState.createdAt ?? now;
+          const expirationTime = lastAccessedAt + effectiveTtl + FileSessionStore.CLOCK_SKEW_TOLERANCE;
+
+          if (expirationTime < now) {
+            await this.delete(sessionId);
+            expiredIds.push(sessionId);
+          }
+        } catch {
+          // Skip files that can't be read or parsed
+          continue;
+        }
+      }
+
+      return expiredIds;
+    } catch (error: unknown) {
+      const err = error as NodeJS.ErrnoException;
+      throw new Error(`Failed to delete expired sessions: ${err.message}`);
+    }
+  }
 }
 
 /**
@@ -262,4 +395,16 @@ export interface RedisSessionStore<T = SessionState> extends SessionStore<T> {
    * @param ttlSeconds - Time to live in seconds
    */
   setTTL(sessionId: string, ttlSeconds: number): Promise<void>;
+
+  /**
+   * Delete expired sessions from storage
+   *
+   * @param ttl - Optional time-to-live in milliseconds
+   * @returns Array of session IDs that were deleted
+   * @remarks
+   * Redis implementation will use native TTL expiration.
+   * This method is provided for interface consistency and may be a no-op
+   * since Redis handles expiration automatically.
+   */
+  deleteExpired(ttl?: number): Promise<string[]>;
 }

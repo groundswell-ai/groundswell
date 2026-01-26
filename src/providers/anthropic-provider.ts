@@ -151,6 +151,13 @@ export class AnthropicProvider implements Provider {
   private sessionStore: SessionStore<SessionState> = new MemorySessionStore();
 
   /**
+   * Session TTL in milliseconds from ProviderOptions
+   *
+   * @internal
+   */
+  private sessionTtl?: number;
+
+  /**
    * Initialize the Anthropic provider
    *
    * Loads the Anthropic SDK and initializes the client.
@@ -188,6 +195,8 @@ export class AnthropicProvider implements Provider {
     if (options?.sessionStore) {
       // Direct injection (backward compatibility)
       this.sessionStore = options.sessionStore;
+      // Store sessionTtl for cleanup operations
+      this.sessionTtl = options.sessionTtl ?? 86400000; // 24 hours default
     } else if (options?.sessionPersistence) {
       // Create SessionStore from sessionPersistence option
       switch (options.sessionPersistence) {
@@ -196,7 +205,9 @@ export class AnthropicProvider implements Provider {
           break;
         case "file": {
           const path = options.sessionPath ?? "./sessions";
-          this.sessionStore = new FileSessionStore<SessionState>(path);
+          const ttl = options.sessionTtl ?? 86400000; // 24 hours default
+          this.sessionTtl = ttl;
+          this.sessionStore = new FileSessionStore<SessionState>(path, ttl);
           break;
         }
         case "redis":
@@ -209,8 +220,10 @@ export class AnthropicProvider implements Provider {
           throw new Error(`Unknown session persistence type: ${_exhaustiveCheck}`);
         }
       }
+    } else {
+      // If neither sessionStore nor sessionPersistence provided, keep existing default (MemorySessionStore)
+      this.sessionTtl = options?.sessionTtl ?? 86400000; // 24 hours default
     }
-    // If neither sessionStore nor sessionPersistence provided, keep existing default (MemorySessionStore)
 
     // Restore sessions from persistent store (non-memory stores)
     // For persistent stores (File, Redis, custom), verify the store is accessible
@@ -218,6 +231,15 @@ export class AnthropicProvider implements Provider {
       const sessionIds = await this.sessionStore.list();
       // Sessions are already in store - no need to load into memory
       // Just verify store is accessible by listing sessions
+
+      // Cleanup expired sessions on initialization for persistent stores
+      if (this.sessionTtl !== undefined && 'deleteExpired' in this.sessionStore) {
+        const deletedIds = await this.sessionStore.deleteExpired(this.sessionTtl);
+        if (deletedIds.length > 0) {
+          // Log cleanup (optional, for debugging)
+          console.debug(`Cleaned up ${deletedIds.length} expired sessions`);
+        }
+      }
     }
 
     // Note: Options are stored for later use in execute() method
@@ -1154,9 +1176,12 @@ Each skill provides specific capabilities and guidelines.
     // Only create if doesn't exist
     const exists = await this.sessionStore.has(sessionId);
     if (!exists) {
+      const now = Date.now();
       const emptyState: SessionState = {
         history: [],
         lastResult: null,
+        createdAt: now,
+        lastAccessedAt: now,
       };
       await this.sessionStore.save(sessionId, emptyState);
     }
@@ -1172,10 +1197,18 @@ Each skill provides specific capabilities and guidelines.
    * @param sessionId - Session identifier to retrieve
    * @returns Session state or undefined if not found
    * @remarks
-   * This is a read-only operation - does not modify session state.
+   * Updates lastAccessedAt timestamp and saves back to persistent stores.
    */
   async getSession(sessionId: string): Promise<SessionState | undefined> {
     const state = await this.sessionStore.load(sessionId);
+    if (state) {
+      // Update lastAccessedAt timestamp
+      state.lastAccessedAt = Date.now();
+      // Save back to store for persistent stores
+      if (!(this.sessionStore instanceof MemorySessionStore)) {
+        await this.sessionStore.save(sessionId, state);
+      }
+    }
     // Convert null to undefined for consistency
     return state ?? undefined;
   }

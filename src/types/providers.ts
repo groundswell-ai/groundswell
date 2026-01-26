@@ -121,6 +121,28 @@ export interface SessionState {
 
   /** Last result message from the most recent execution */
   lastResult: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
+
+  /**
+   * Unix timestamp in milliseconds when session was created
+   *
+   * @remarks
+   * Set automatically on session creation. Used for TTL expiration
+   * calculations alongside lastAccessedAt.
+   *
+   * Optional for backward compatibility with legacy sessions.
+   */
+  createdAt?: number;
+
+  /**
+   * Unix timestamp in milliseconds when session was last accessed
+   *
+   * @remarks
+   * Updated automatically on session load/save operations. Used for
+   * sliding TTL expiration - sessions expire after lastAccessedAt + TTL.
+   *
+   * Optional for backward compatibility with legacy sessions.
+   */
+  lastAccessedAt?: number;
 }
 
 /**
