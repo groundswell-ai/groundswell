@@ -336,7 +336,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Phase 2: Major Issues - Next Release",
-      "status": "Researching",
+      "status": "Complete",
       "description": "Address major issues that impact system quality and type safety but do not completely block release. These should be resolved in the next release cycle.",
       "milestones": [
         {
@@ -540,14 +540,14 @@
           "type": "Milestone",
           "id": "P2.M4",
           "title": "Milestone 2.4: Workflow-Level Error Merge Strategy",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Extend error merge strategy from @Task concurrent execution to workflow-level configuration, enabling consistent error handling across the entire workflow.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M4.T1",
               "title": "Add Error Merge Strategy to WorkflowConfig",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Enable error merge strategy configuration at workflow level, not just for @Task concurrent execution.",
               "subtasks": [
                 {
@@ -574,7 +574,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S3",
                   "title": "Write tests for workflow-level error merge",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M4.T1.S2"
@@ -612,7 +612,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T1.S1",
                   "title": "Implement supports() and requiresFeatures() methods",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/external_deps.md - Provider.capabilities object exists but no helper methods. Users must manually check provider.capabilities.mcp.\n2. INPUT: Provider interface, ProviderCapabilities type.\n3. LOGIC: Add methods to Provider interface: supports(capability: keyof ProviderCapabilities): boolean - returns this.capabilities[capability], requiresFeatures(features: (keyof ProviderCapabilities)[]): boolean - returns features.every(f => this.capabilities[f]). Implement in both AnthropicProvider and OpenCodeProvider.\n4. OUTPUT: Enhanced Provider interface with capability checking helpers. Must be implemented by all providers."
