@@ -822,14 +822,14 @@
           "type": "Milestone",
           "id": "P5.M2",
           "title": "Milestone 5.2: Integration Tests",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Write integration tests for provider system end-to-end",
           "tasks": [
             {
               "type": "Task",
               "id": "P5.M2.T1",
               "title": "Task: Test Agent with Provider Integration",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Write integration tests for Agent using provider system",
               "subtasks": [
                 {
@@ -847,7 +847,7 @@
                   "type": "Subtask",
                   "id": "P5.M2.T1.S2",
                   "title": "Test provider switching",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P5.M2.T1.S1"
