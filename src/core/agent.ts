@@ -48,6 +48,7 @@ import { getExecutionContext } from './context.js';
 import { generateCacheKey, defaultCache } from '../cache/index.js';
 import type { CacheKeyInputs } from '../cache/index.js';
 import type { ProviderId, ProviderOptions } from '../types/providers.js';
+import type { ToolExecutionRequest, ToolExecutionResult } from '../types/providers.js';
 import { ProviderRegistry } from '../providers/index.js';
 import type { Provider } from '../types/providers.js';
 import { resolveProviderConfig, getGlobalProviderConfig } from '../utils/provider-config.js';
@@ -145,6 +146,105 @@ export class Agent {
         this.mcpHandler.registerServer(mcp);
       }
     }
+  }
+
+  /**
+   * Execute tool via MCPHandler delegation
+   *
+   * This method implements the ToolExecutor callback signature for provider
+   * integration. Providers delegate tool execution back to the Agent's
+   * MCPHandler, maintaining centralized tool management.
+   *
+   * Tool names use the serverName__toolName format (double underscore)
+   * created during MCP server registration. The full name is passed
+   * directly to MCPHandler without parsing.
+   *
+   * ## Tool Resolution Order
+   *
+   * 1. Delegated handlers (this.mcpHandlers[]) - Custom MCPHandler instances
+   * 2. Main handler (this.mcpHandler) - Primary tool registry
+   *
+   * ## Error Handling
+   *
+   * Tool errors are returned in ToolExecutionResult format with isError: true.
+   * The method never throws - errors are wrapped in result objects.
+   *
+   * @param req - Tool execution request with name (serverName__toolName) and input
+   * @returns Promise resolving to tool execution result with content and error flag
+   * @private
+   * @remarks
+   * Used internally by provider.execute() for tool delegation.
+   * Tool execution flow: Provider → Agent.toolExecutor → MCPHandler.executeTool()
+   */
+  private async toolExecutor(req: ToolExecutionRequest): Promise<ToolExecutionResult> {
+    try {
+      // Check delegated MCPHandlers first (preserve custom executors)
+      for (const handler of this.mcpHandlers) {
+        if (handler.hasTool(req.name)) {
+          const toolResult = await handler.executeTool(req.name, req.input);
+          return this.convertToToolExecutionResult(toolResult);
+        }
+      }
+
+      // Check main MCPHandler
+      if (this.mcpHandler.hasTool(req.name)) {
+        const toolResult = await this.mcpHandler.executeTool(req.name, req.input);
+        return this.convertToToolExecutionResult(toolResult);
+      }
+
+      // Tool not found in any handler
+      return {
+        content: `Tool '${req.name}' not found`,
+        isError: true,
+      };
+    } catch (error) {
+      // Handle unexpected errors (defensive programming)
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        content: `Tool execution error: ${message}`,
+        isError: true,
+      };
+    }
+  }
+
+  /**
+   * Convert MCPHandler ToolResult to ToolExecutionResult
+   *
+   * Maps the MCPHandler's internal ToolResult format to the
+   * provider-facing ToolExecutionResult format.
+   *
+   * Tries to parse JSON strings back to objects for better usability.
+   *
+   * @param toolResult - Result from MCPHandler.executeTool()
+   * @returns ToolExecutionResult with content and isError flag
+   * @private
+   */
+  private convertToToolExecutionResult(toolResult: {
+    type: 'tool_result';
+    tool_use_id: string;
+    content: string | unknown;
+    is_error?: boolean;
+  }): ToolExecutionResult {
+    let content: string | unknown = toolResult.content;
+
+    // If content is a string, try to parse it as JSON
+    // This restores objects that were stringified by MCPHandler.executeTool()
+    if (typeof content === 'string') {
+      try {
+        const parsed = JSON.parse(content);
+        // Only use parsed value if it's an object or array (not primitive)
+        if (typeof parsed === 'object' && parsed !== null) {
+          content = parsed;
+        }
+      } catch {
+        // Content is not valid JSON, keep original string
+      }
+    }
+
+    return {
+      content,
+      isError: toolResult.is_error ?? false,
+    };
   }
 
   /**
