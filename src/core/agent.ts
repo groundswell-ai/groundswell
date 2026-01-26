@@ -48,6 +48,9 @@ import { getExecutionContext } from './context.js';
 import { generateCacheKey, defaultCache } from '../cache/index.js';
 import type { CacheKeyInputs } from '../cache/index.js';
 import type { ProviderId, ProviderOptions } from '../types/providers.js';
+import { ProviderRegistry } from '../providers/index.js';
+import type { Provider } from '../types/providers.js';
+import { resolveProviderConfig, getGlobalProviderConfig } from '../utils/provider-config.js';
 
 /**
  * Result from a prompt execution including metadata
@@ -91,6 +94,9 @@ export class Agent {
   /** Provider-specific options for this agent (optional) */
   private readonly providerOptions?: ProviderOptions;
 
+  /** Provider instance from registry (resolved at construction) */
+  private readonly provider: Provider;
+
   /**
    * Create a new Agent instance
    * @param config Agent configuration
@@ -105,6 +111,24 @@ export class Agent {
     // Full provider resolution (global + agent + prompt) happens later during execution
     this.providerId = config.provider;
     this.providerOptions = config.providerOptions;
+
+    // Resolve effective provider using configuration cascade
+    // Priority: agent provider -> global default provider
+    const globalConfig = getGlobalProviderConfig();
+    const resolved = resolveProviderConfig(
+      globalConfig,
+      this.providerId,
+      this.providerOptions
+    );
+    const effectiveProvider = resolved.provider;
+
+    // Get provider instance from registry
+    const registry = ProviderRegistry.getInstance();
+    const providerInstance = registry.get(effectiveProvider);
+    if (!providerInstance) {
+      throw new Error(`Provider '${effectiveProvider}' is not registered`);
+    }
+    this.provider = providerInstance;
 
     // Initialize MCP handler
     this.mcpHandler = new MCPHandler();

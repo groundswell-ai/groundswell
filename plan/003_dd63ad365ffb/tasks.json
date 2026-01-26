@@ -620,7 +620,7 @@
                   "type": "Subtask",
                   "id": "P4.M2.T1.S1",
                   "title": "Get provider instance in Agent constructor",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P4.M1.T1.S2",

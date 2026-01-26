@@ -1,7 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '../../core/agent.js';
 import { MCPHandler } from '../../core/mcp-handler.js';
 import { Prompt } from '../../core/prompt.js';
+import { ProviderRegistry } from '../../providers/provider-registry.js';
+import type { Provider, ProviderId, ProviderCapabilities } from '../../types/providers.js';
+import type { ModelSpec } from '../../types/providers.js';
 import { z } from 'zod';
 import {
   isSuccess,
@@ -10,7 +13,46 @@ import {
   type AgentResponse,
 } from '../../types/agent.js';
 
+/**
+ * Helper function to create mock Provider for testing
+ */
+function createMockProvider(id: ProviderId): Provider {
+  const capabilities: ProviderCapabilities = {
+    mcp: true,
+    skills: true,
+    lsp: false,
+    streaming: true,
+    sessions: false,
+    extendedThinking: false,
+  };
+
+  return {
+    id,
+    capabilities,
+    initialize: vi.fn().mockResolvedValue(undefined),
+    terminate: vi.fn().mockResolvedValue(undefined),
+    execute: vi.fn(),
+    registerMCPs: vi.fn().mockResolvedValue([]),
+    loadSkills: vi.fn().mockResolvedValue(undefined),
+    normalizeModel: vi.fn((model: string): ModelSpec => ({
+      provider: id,
+      model,
+      raw: model,
+    })),
+  };
+}
+
 describe('Agent', () => {
+  beforeEach(() => {
+    // Register mock anthropic provider before each test
+    const mockProvider = createMockProvider('anthropic');
+    ProviderRegistry.getInstance().register(mockProvider);
+  });
+
+  afterEach(() => {
+    // Clean up registry after each test
+    ProviderRegistry['_resetForTesting']();
+  });
   it('should create with unique id', () => {
     const a1 = new Agent();
     const a2 = new Agent();
@@ -179,6 +221,17 @@ describe('MCPHandler', () => {
 // These tests demonstrate proper AgentResponse assertion patterns
 // using mock responses to avoid real API calls
 describe('Agent.prompt()', () => {
+  beforeEach(() => {
+    // Register mock provider before each test
+    const mockProvider = createMockProvider('anthropic');
+    ProviderRegistry.getInstance().register(mockProvider);
+  });
+
+  afterEach(() => {
+    // Clean up registry after each test
+    ProviderRegistry['_resetForTesting']();
+  });
+
   describe('Success Cases', () => {
     it('should return AgentResponse<string> for simple prompt', () => {
       // Arrange - Mock the response structure that agent.prompt() returns
@@ -573,7 +626,15 @@ describe('Agent.prompt() response validation', () => {
   let agent: Agent;
 
   beforeEach(() => {
+    // Register mock provider before creating Agent
+    const mockProvider = createMockProvider('anthropic');
+    ProviderRegistry.getInstance().register(mockProvider);
     agent = new Agent({ name: 'Test Agent' });
+  });
+
+  afterEach(() => {
+    // Clean up registry after each test
+    ProviderRegistry['_resetForTesting']();
   });
 
   it('should have INTERNAL_ERROR in AGENT_ERROR_CODES', async () => {
