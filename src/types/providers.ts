@@ -1,5 +1,6 @@
 import type { Tool, MCPServer, Skill, TokenUsage } from './sdk-primitives.js';
 import type { AgentResponse } from './agent.js';
+import type { StreamEvent } from './streaming.js';
 
 /**
  * Provider identifier union type
@@ -115,6 +116,9 @@ export interface ProviderExecutionOptions {
 
   /** Session identifier for session-based providers */
   sessionId?: string;
+
+  /** Enable streaming mode (returns AsyncGenerator instead of complete response) */
+  streaming?: boolean;
 }
 
 /**
@@ -507,13 +511,13 @@ export interface Provider {
    * 1. Construct the appropriate SDK query/request
    * 2. Handle tool execution via the toolExecutor callback
    * 3. Invoke hooks at appropriate lifecycle points
-   * 4. Return an AgentResponse with validated data
+   * 4. Return an AgentResponse with validated data (or AsyncGenerator for streaming)
    *
    * @typeParam T - The expected response data type (inferred from schema or explicit)
    * @param request - The prompt request with options
    * @param toolExecutor - Callback for executing tools (delegated to MCPHandler)
    * @param hooks - Optional lifecycle hooks for events
-   * @returns Promise resolving to AgentResponse with status, data, error, metadata
+   * @returns Promise resolving to AgentResponse or AsyncGenerator for streaming
    *
    * @example <caption>Explicit type parameter</caption>
    * ```ts
@@ -534,12 +538,25 @@ export interface Provider {
    *   toolExecutor
    * );
    * ```
+   *
+   * @example <caption>Streaming mode</caption>
+   * ```ts
+   * const stream = await provider.execute(
+   *   { prompt: '...', options: { streaming: true } },
+   *   toolExecutor
+   * );
+   * if (Symbol.asyncIterator in stream) {
+   *   for await (const event of stream) {
+   *     // Handle streaming events
+   *   }
+   * }
+   * ```
    */
   execute<T>(
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
     hooks?: ProviderHookEvents
-  ): Promise<AgentResponse<T>>;
+  ): Promise<AgentResponse<T> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>>;
 
   /**
    * Register MCP servers and return available tools

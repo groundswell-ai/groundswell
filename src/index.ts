@@ -68,6 +68,9 @@ export type {
   ReflectionContext,
   ReflectionResult,
   ReflectionEntry,
+  // Streaming types
+  StreamEvent,
+  AsyncStream,
 } from './types/index.js';
 
 // Re-export reflection utilities
@@ -93,6 +96,13 @@ export {
   AgentErrorDetailsSchema,
   AgentResponseMetadataSchema,
   AgentResponseSchema,
+} from './types/index.js';
+
+// Re-export streaming type guards
+export {
+  isTextDeltaEvent,
+  isToolCallEvent,
+  isErrorEvent,
 } from './types/index.js';
 
 // Core classes

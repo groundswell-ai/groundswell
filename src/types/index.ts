@@ -103,3 +103,14 @@ export {
   DEFAULT_REFLECTION_CONFIG,
   createReflectionConfig,
 } from './reflection.js';
+
+// Streaming types
+export type {
+  StreamEvent,
+  AsyncStream,
+} from './streaming.js';
+export {
+  isTextDeltaEvent,
+  isToolCallEvent,
+  isErrorEvent,
+} from './streaming.js';

@@ -71,6 +71,7 @@ import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
 import { parseModelSpec } from "../utils/model-spec.js";
 import { readFile } from "fs/promises";
 import { join } from "path";
+import type { StreamEvent } from "../types/streaming.js";
 
 export class OpenCodeProvider implements Provider {
   /**
@@ -372,10 +373,13 @@ export class OpenCodeProvider implements Provider {
    * Implements multi-provider LLM execution using the OpenCode SDK.
    * Supports 75+ providers via the providerID/modelID format.
    *
+   * When options.streaming is true, returns an AsyncGenerator that yields StreamEvent objects.
+   * When options.streaming is false or undefined, returns a complete AgentResponse.
+   *
    * @param request - Provider request with prompt and options
    * @param toolExecutor - Callback for executing tools (NOT USED - OpenCode limitation)
    * @param hooks - Optional lifecycle hooks
-   * @returns Typed agent response
+   * @returns Typed agent response or AsyncGenerator for streaming
    * @throws {Error} When SDK is not initialized
    * @remarks
    * **Tool Execution Limitation:** OpenCode executes tools server-side with no
@@ -384,12 +388,13 @@ export class OpenCodeProvider implements Provider {
    * LLM-only mode.
    *
    * Full implementation in P3.M2.T1.S3
+   * Streaming: Returns AsyncGenerator<StreamEvent> when options.streaming = true
    */
   async execute<T>(
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
     hooks?: ProviderHookEvents,
-  ): Promise<AgentResponse<T>> {
+  ): Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
     // ===== STEP 1: SDK initialization check =====
     // PATTERN: Follow AnthropicProvider pattern (anthropic-provider.ts:248-252)
     // CRITICAL: Validate client is initialized before attempting to use it
@@ -397,6 +402,12 @@ export class OpenCodeProvider implements Provider {
       throw new Error(
         "OpenCode provider not initialized. Call initialize() first.",
       );
+    }
+
+    // STREAMING MODE: Check if streaming is enabled
+    // When options.streaming is true, return an AsyncGenerator that yields StreamEvent objects
+    if (request.options.streaming) {
+      return this.executeStreaming<T>(request, hooks);
     }
 
     // ===== STEP 2: Session creation/retrieval =====
@@ -570,6 +581,204 @@ export class OpenCodeProvider implements Provider {
       timestamp: Date.now(),
       duration,
       usage,
+    });
+  }
+
+  /**
+   * Execute a prompt request with streaming
+   *
+   * Returns an AsyncGenerator that yields StreamEvent objects during execution.
+   * Implements streaming mode using OpenCode's Server-Sent Events (SSE) system.
+   *
+   * @param request - Provider request with prompt and options
+   * @param hooks - Optional lifecycle hooks
+   * @returns AsyncGenerator yielding StreamEvent objects, returning final AgentResponse
+   * @private
+   * @remarks
+   * Streaming mode implementation following PRP P4.M2.T1.S4 specification.
+   * Uses OpenCode's event subscription system for SSE streaming.
+   */
+  private async *executeStreaming<T>(
+    request: ProviderRequest,
+    hooks?: ProviderHookEvents,
+  ): AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
+    // Session creation/retrieval
+    let sessionId = request.options.sessionId;
+    if (!sessionId) {
+      const sessionResult = await this.client!.session.create({});
+      if (!sessionResult.data) {
+        yield {
+          type: 'error',
+          error: new Error("Failed to create session: no data returned"),
+          code: 'EXECUTION_FAILED',
+          retryable: false,
+        };
+        throw new Error("Failed to create session: no data returned");
+      }
+      sessionId = sessionResult.data.id;
+    }
+
+    // Model parsing
+    const modelSpec = this.normalizeModel(
+      request.options.model ?? "claude-opus-4-5-20251101",
+    );
+
+    // Extract providerID and modelID
+    const parts = modelSpec.model.split("/");
+    if (parts.length !== 2) {
+      yield {
+        type: 'error',
+        error: new Error(`Model must be in 'provider/model' format: ${modelSpec.model}`),
+        code: 'INVALID_MODEL_FORMAT',
+        retryable: false,
+      };
+      throw new Error(`Model must be in 'provider/model' format: ${modelSpec.model}`);
+    }
+    const [providerID, modelID] = parts;
+
+    const startTime = Date.now();
+
+    // Yield metadata event first
+    yield {
+      type: 'metadata',
+      metadata: {
+        requestId: `${this.id}-${Date.now()}`,
+        model: modelSpec.model,
+        provider: this.id,
+      },
+    };
+
+    // Setup event subscription for streaming
+    const eventStreamResult = await this.client!.event.subscribe();
+
+    // Start the prompt execution (non-blocking)
+    const promptPromise = this.client!.session.prompt({
+      body: {
+        parts: [{ type: "text", text: request.prompt }],
+        model: { providerID, modelID },
+        ...(request.options.systemPrompt || this.skillsPrompt ? {
+          system: this.buildSystemPromptWithSkills(request.options.systemPrompt),
+        } : {}),
+      },
+      path: { id: sessionId },
+    });
+
+    // Track accumulated text for delta calculation
+    let fullText = '';
+    let textIndex = 0;
+
+    // Process SSE events
+    try {
+      for await (const event of eventStreamResult.stream) {
+        // Process text delta events
+        if (event.type === "message.part.updated") {
+          const part = (
+            event as {
+              properties?: { part?: { type: string; text?: string; delta?: string } };
+            }
+          ).properties?.part;
+
+          if (part?.type === "text") {
+            if (part.delta) {
+              // Yield text delta event
+              fullText += part.delta;
+              yield {
+                type: 'text_delta',
+                delta: part.delta,
+                index: textIndex++,
+              };
+            } else if (part.text) {
+              // Full text update (not delta)
+              const delta = part.text.slice(fullText.length);
+              if (delta) {
+                fullText = part.text;
+                yield {
+                  type: 'text_delta',
+                  delta,
+                  index: textIndex++,
+                };
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      yield {
+        type: 'error',
+        error: error instanceof Error ? error : new Error(String(error)),
+        code: 'STREAM_ERROR',
+        retryable: true,
+      };
+      throw error;
+    } finally {
+      // Ensure event stream is properly closed
+      // Note: OpenCode SDK handles cleanup automatically
+    }
+
+    // Wait for prompt completion
+    const result = await promptPromise;
+    const duration = Date.now() - startTime;
+
+    // Handle error response
+    if (!result.data || result.error) {
+      if (hooks?.onSessionEnd) {
+        await hooks.onSessionEnd(duration);
+      }
+      yield {
+        type: 'error',
+        error: new Error(result.error ? String(result.error) : "Unknown error"),
+        code: 'EXECUTION_FAILED',
+        retryable: false,
+      };
+      throw new Error(result.error ? String(result.error) : "Unknown error");
+    }
+
+    // Extract message and check for errors
+    const responseData = result.data as {
+      info: import("@opencode-ai/sdk").AssistantMessage;
+      parts: unknown[];
+    };
+    const assistantMessage = responseData.info;
+
+    if (assistantMessage.error) {
+      yield {
+        type: 'error',
+        error: new Error(`${assistantMessage.error.name}: ${assistantMessage.error.data?.message ?? "Unknown error"}`),
+        code: 'EXECUTION_FAILED',
+        retryable: false,
+      };
+      throw new Error(`${assistantMessage.error.name}: ${assistantMessage.error.data?.message ?? "Unknown error"}`);
+    }
+
+    // Yield usage event
+    if (assistantMessage.tokens) {
+      yield {
+        type: 'usage',
+        inputTokens: assistantMessage.tokens.input ?? 0,
+        outputTokens: assistantMessage.tokens.output ?? 0,
+      };
+    }
+
+    // Yield done event
+    yield {
+      type: 'done',
+      finishReason: 'stop',
+    };
+
+    // Call onSessionEnd hook
+    if (hooks?.onSessionEnd) {
+      await hooks.onSessionEnd(duration);
+    }
+
+    // Return final AgentResponse
+    return createSuccessResponse(assistantMessage as T, {
+      agentId: this.id,
+      timestamp: Date.now(),
+      duration,
+      usage: {
+        input_tokens: assistantMessage.tokens?.input ?? 0,
+        output_tokens: assistantMessage.tokens?.output ?? 0,
+      },
     });
   }
 

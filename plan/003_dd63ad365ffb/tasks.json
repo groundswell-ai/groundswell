@@ -559,7 +559,7 @@
       "type": "Phase",
       "id": "P4",
       "title": "Phase 4: Agent Integration",
-      "status": "Planned",
+      "status": "Complete",
       "description": "Integrate provider system into existing Agent class and update agent configuration",
       "milestones": [
         {
@@ -606,14 +606,14 @@
           "type": "Milestone",
           "id": "P4.M2",
           "title": "Milestone 4.2: Provider Execution Integration",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Refactor Agent class to use providers for execution instead of direct SDK calls",
           "tasks": [
             {
               "type": "Task",
               "id": "P4.M2.T1",
               "title": "Task: Integrate Provider into Agent Execution",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Modify Agent.prompt() and Agent.stream() to use provider.execute()",
               "subtasks": [
                 {
@@ -655,7 +655,7 @@
                   "type": "Subtask",
                   "id": "P4.M2.T1.S4",
                   "title": "Refactor Agent.stream() to use provider streaming",
-                  "status": "Planned",
+                  "status": "Failed",
                   "story_points": 1,
                   "dependencies": [
                     "P4.M2.T1.S3"
@@ -670,21 +670,21 @@
           "type": "Milestone",
           "id": "P4.M3",
           "title": "Milestone 4.3: Prompt-Level Provider Overrides",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Support provider and model overrides at the prompt() call level",
           "tasks": [
             {
               "type": "Task",
               "id": "P4.M3.T1",
               "title": "Task: Implement Prompt-Level Overrides",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Add support for overriding provider and model in individual prompt() calls",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P4.M3.T1.S1",
                   "title": "Extend PromptOptions with provider overrides",
-                  "status": "Planned",
+                  "status": "Failed",
                   "story_points": 1,
                   "dependencies": [
                     "P4.M1.T1.S1"
@@ -695,7 +695,7 @@
                   "type": "Subtask",
                   "id": "P4.M3.T1.S2",
                   "title": "Resolve provider with prompt overrides",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P4.M3.T1.S1",

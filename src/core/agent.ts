@@ -43,6 +43,7 @@ import type {
 import { ProviderRegistry } from '../providers/index.js';
 import type { Provider } from '../types/providers.js';
 import { resolveProviderConfig, getGlobalProviderConfig } from '../utils/provider-config.js';
+import type { AsyncStream, StreamEvent } from '../types/streaming.js';
 
 /**
  * Result from a prompt execution including metadata
@@ -303,6 +304,223 @@ export class Agent {
     };
 
     return this.executePrompt(prompt, effectiveOverrides);
+  }
+
+  /**
+   * Execute a prompt with streaming response
+   *
+   * Returns an AsyncStream that yields StreamEvent objects during execution.
+   * Enables real-time response generation with text deltas, tool calls, and metadata.
+   *
+   * @param prompt Prompt to execute
+   * @param overrides Optional overrides for this execution
+   * @returns AsyncStream with AsyncGenerator for for-await...of consumption
+   *
+   * @example
+   * ```ts
+   * const agent = new Agent({ provider: 'anthropic' });
+   * const prompt = new Prompt({ user: 'Tell me a story' });
+   *
+   * const streamResult = agent.stream(prompt);
+   *
+   * for await (const event of streamResult.stream) {
+   *   switch (event.type) {
+   *     case 'text_delta':
+   *       process.stdout.write(event.delta);
+   *       break;
+   *     case 'tool_call_start':
+   *       console.log(`Tool: ${event.name}`);
+   *       break;
+   *     case 'done':
+   *       console.log('Complete!');
+   *       break;
+   *     case 'error':
+   *       console.error('Error:', event.error.message);
+   *       break;
+   *   }
+   * }
+   * ```
+   */
+  public stream<T>(
+    prompt: Prompt<T>,
+    overrides?: PromptOverrides
+  ): AsyncStream<T> {
+    // Extract prompt-level provider overrides
+    const promptProvider = overrides?.provider;
+    const promptProviderOptions = overrides?.providerOptions;
+
+    // Resolve provider configuration with cascade: global → agent → prompt
+    const globalConfig = getGlobalProviderConfig();
+    const { provider: resolvedProvider, options: resolvedProviderOptions } = resolveProviderConfig(
+      globalConfig,
+      this.providerId,
+      this.providerOptions,
+      promptProvider,
+      promptProviderOptions
+    );
+
+    // Get provider instance for resolved provider (may differ from this.provider)
+    const registry = ProviderRegistry.getInstance();
+    const providerInstance = registry.get(resolvedProvider);
+    if (!providerInstance) {
+      throw new Error(`Provider '${resolvedProvider}' is not registered`);
+    }
+
+    // Merge configuration: Prompt > Overrides > Config
+    const effectiveSystem =
+      prompt.systemOverride ?? overrides?.system ?? this.config.system;
+
+    const effectiveModel = overrides?.model ?? this.model;
+    const effectiveMaxTokens = overrides?.maxTokens ?? this.config.maxTokens ?? 4096;
+    const effectiveTemperature =
+      overrides?.temperature ?? this.config.temperature;
+
+    const effectiveTools = this.mergeTools(
+      prompt.toolsOverride ?? overrides?.tools ?? this.config.tools
+    );
+
+    const effectiveHooks = this.mergeHooks(
+      prompt.hooksOverride,
+      overrides?.hooks,
+      this.config.hooks
+    );
+
+    // Build user message
+    const userMessage = prompt.buildUserMessage();
+
+    // Convert Agent.hooks to ProviderHookEvents
+    const providerHooks: ProviderHookEvents = {};
+    if (effectiveHooks.preToolUse && effectiveHooks.preToolUse.length > 0) {
+      providerHooks.onToolStart = async (tool: ToolExecutionRequest) => {
+        for (const hook of effectiveHooks.preToolUse!) {
+          await hook({
+            toolName: tool.name,
+            toolInput: tool.input as Record<string, unknown>,
+            agentId: this.id,
+          });
+        }
+      };
+    }
+    if (effectiveHooks.postToolUse && effectiveHooks.postToolUse.length > 0) {
+      providerHooks.onToolEnd = async (
+        tool: ToolExecutionRequest,
+        result: ToolExecutionResult,
+        duration: number
+      ) => {
+        for (const hook of effectiveHooks.postToolUse!) {
+          await hook({
+            toolName: tool.name,
+            toolInput: tool.input as Record<string, unknown>,
+            toolOutput: result.content,
+            agentId: this.id,
+            duration,
+          });
+        }
+      };
+    }
+    if (effectiveHooks.sessionStart && effectiveHooks.sessionStart.length > 0) {
+      providerHooks.onSessionStart = async () => {
+        for (const hook of effectiveHooks.sessionStart!) {
+          await hook({
+            agentId: this.id,
+            agentName: this.name,
+          });
+        }
+      };
+    }
+    if (effectiveHooks.sessionEnd && effectiveHooks.sessionEnd.length > 0) {
+      providerHooks.onSessionEnd = async (totalDuration: number) => {
+        for (const hook of effectiveHooks.sessionEnd!) {
+          await hook({
+            agentId: this.id,
+            agentName: this.name,
+            totalDuration,
+          });
+        }
+      };
+    }
+
+    // Create AbortController for cancellation support
+    const controller = new AbortController();
+
+    // Build ProviderRequest with streaming enabled
+    const providerRequest: ProviderRequest = {
+      prompt: userMessage,
+      options: {
+        model: effectiveModel,
+        systemPrompt: effectiveSystem,
+        tools: effectiveTools,
+        sessionId: resolvedProviderOptions.sessionId,
+        hooks: providerHooks,
+        streaming: true, // CRITICAL: Enable streaming mode
+      },
+    };
+
+    // Create async generator that wraps provider streaming
+    const self = this;
+    async function* streamGenerator(): AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
+      try {
+        // Call provider with streaming enabled
+        const providerStream = await providerInstance.execute<T>(
+          providerRequest,
+          self.toolExecutor.bind(self),
+          providerHooks
+        );
+
+        // Check if provider returned an AsyncGenerator (streaming mode)
+        if (Symbol.asyncIterator in providerStream) {
+          // Provider is in streaming mode - iterate and yield events
+          for await (const event of providerStream as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>) {
+            // Check for cancellation
+            if (controller.signal.aborted) {
+              yield {
+                type: 'error',
+                error: new Error('Stream cancelled'),
+                code: 'CANCELLED',
+                retryable: false,
+              };
+              break;
+            }
+
+            // Yield event from provider
+            yield event;
+          }
+
+          // Return final AgentResponse from generator
+          // The provider's generator will return the final response
+          return (await (providerStream as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>).next()).value;
+        } else {
+          // Provider returned a regular AgentResponse (non-streaming mode)
+          // This shouldn't happen with streaming: true, but handle it gracefully
+          const response = await providerStream as AgentResponse<T>;
+          yield {
+            type: 'done',
+            finishReason: response.status === 'error' ? 'error' : 'stop',
+          };
+          return response;
+        }
+      } catch (error) {
+        // Yield error event instead of throwing
+        yield {
+          type: 'error',
+          error: error instanceof Error ? error : new Error(String(error)),
+          code: 'STREAM_ERROR',
+          retryable: false,
+        };
+        // Return error response for AsyncGenerator completion
+        return createErrorResponse(
+          'STREAM_ERROR',
+          error instanceof Error ? error.message : String(error),
+          {},
+          false
+        ) as AgentResponse<T>;
+      }
+    }
+
+    return {
+      stream: streamGenerator.call(this),
+      controller,
+    };
   }
 
   /**

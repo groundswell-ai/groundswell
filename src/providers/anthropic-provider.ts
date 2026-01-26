@@ -55,6 +55,7 @@ import { MCPHandler } from "../core/mcp-handler.js";
 import { parseModelSpec } from "../utils/model-spec.js";
 import { readFile } from "fs/promises";
 import { join } from "path";
+import type { StreamEvent } from "../types/streaming.js";
 
 export class AnthropicProvider implements Provider {
   /**
@@ -232,23 +233,33 @@ export class AnthropicProvider implements Provider {
    *
    * Constructs the SDK query from ProviderRequest and executes it via the Anthropic SDK.
    *
+   * When options.streaming is true, returns an AsyncGenerator that yields StreamEvent objects.
+   * When options.streaming is false or undefined, returns a complete AgentResponse.
+   *
    * @param request - Provider request with prompt and options
    * @param toolExecutor - Callback for executing tools (used in P2.M1.T1.S6)
    * @param hooks - Optional lifecycle hooks (adapter in P2.M1.T2.S1)
-   * @returns Typed agent response
+   * @returns Typed agent response or AsyncGenerator for streaming
    * @remarks
    * P2.M1.T1.S5: Query construction - builds AgentSDKOptions and calls SDK query()
    * P2.M1.T1.S6: Message iteration - iterates AsyncGenerator and builds AgentResponse
+   * Streaming: Returns AsyncGenerator<StreamEvent> when options.streaming = true
    */
   async execute<T>(
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
     hooks?: ProviderHookEvents,
-  ): Promise<AgentResponse<T>> {
+  ): Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
     // PATTERN: SDK initialization check (follow initialize() pattern at lines 107-110)
     // CRITICAL: Validate SDK is loaded before attempting to use it
     if (!this.sdk) {
       throw new Error("SDK not initialized. Call initialize() first.");
+    }
+
+    // STREAMING MODE: Check if streaming is enabled
+    // When options.streaming is true, return an AsyncGenerator that yields StreamEvent objects
+    if (request.options.streaming) {
+      return this.executeStreaming<T>(request, toolExecutor, hooks);
     }
 
     // P2.M2.T1.S2: Session detection and retrieval
@@ -441,6 +452,225 @@ export class AnthropicProvider implements Provider {
       timestamp: Date.now(),
       duration,
       usage,
+      toolCalls: toolCallCount,
+    });
+  }
+
+  /**
+   * Execute a prompt request with streaming
+   *
+   * Returns an AsyncGenerator that yields StreamEvent objects during execution.
+   * Implements streaming mode for real-time response generation.
+   *
+   * @param request - Provider request with prompt and options
+   * @param toolExecutor - Callback for executing tools
+   * @param hooks - Optional lifecycle hooks
+   * @returns AsyncGenerator yielding StreamEvent objects, returning final AgentResponse
+   * @private
+   * @remarks
+   * Streaming mode implementation following PRP P4.M2.T1.S4 specification.
+   */
+  private async *executeStreaming<T>(
+    request: ProviderRequest,
+    toolExecutor: ToolExecutor,
+    hooks?: ProviderHookEvents,
+  ): AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
+    // P2.M2.T1.S2: Session detection and retrieval
+    const sessionId = request.options.sessionId;
+    let session: SessionState | undefined;
+    let isContinuation = false;
+
+    if (sessionId) {
+      session = this.getSession(sessionId);
+      if (session && session.history.length > 0) {
+        isContinuation = true;
+      }
+      if (!session) {
+        this.createSession(sessionId);
+        session = this.getSession(sessionId);
+      }
+    }
+
+    // Model resolution
+    const modelSpec = this.normalizeModel(
+      request.options.model ?? "claude-sonnet-4-20250514",
+    );
+
+    // Build SDK hooks
+    const sdkHooks = this.buildAgentSDKHooks(hooks);
+
+    // Build SDK options
+    const sdkOptions = {
+      model: modelSpec.model,
+      systemPrompt: this.buildSystemPromptWithSkills(request.options.systemPrompt),
+      ...(isContinuation && { continue: true }),
+      ...(request.options.tools &&
+        request.options.tools.length > 0 && {
+          allowedTools: request.options.tools.map((t) => t.name),
+        }),
+      ...(this.mcpServerConfig && {
+        mcpServers: {
+          "groundswell-mcp": this.mcpServerConfig,
+        },
+      }),
+      ...(Object.keys(sdkHooks).length > 0 && {
+        hooks: sdkHooks,
+      }),
+    };
+
+    const startTime = Date.now();
+
+    // Yield metadata event first
+    yield {
+      type: 'metadata',
+      metadata: {
+        requestId: `${this.id}-${Date.now()}`,
+        model: modelSpec.model,
+        provider: this.id,
+      },
+    };
+
+    // Create SDK query
+    const queryResult = this.sdk.query({
+      prompt: isContinuation ? '' : request.prompt,
+      options: sdkOptions,
+    });
+
+    // Stream session history for continuation
+    if (isContinuation && session) {
+      await queryResult.streamInput(
+        async function* historyStream() {
+          for (const msg of session!.history) {
+            yield msg;
+          }
+        }()
+      );
+
+      await queryResult.streamInput(
+        async function* newMessageStream() {
+          yield {
+            type: 'user',
+            message: { content: request.prompt },
+            parent_tool_use_id: null,
+            session_id: session!.history[0]?.session_id ?? '',
+          } as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage;
+        }()
+      );
+    }
+
+    let resultMessage: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null = null;
+    let toolCallCount = 0;
+    let fullText = '';
+    let textIndex = 0;
+
+    // Iterate over the AsyncGenerator of SDK messages
+    for await (const message of queryResult) {
+      // Process assistant messages for text content
+      if (message.type === "assistant") {
+        const content = message.message?.content;
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === "text") {
+              // Yield text delta event
+              const text = block.text;
+              if (text && text !== fullText) {
+                const delta = text.slice(fullText.length);
+                fullText = text;
+                yield {
+                  type: 'text_delta',
+                  delta,
+                  index: textIndex++,
+                };
+              }
+            } else if (block.type === "tool_use") {
+              toolCallCount++;
+              // Yield tool call start event
+              yield {
+                type: 'tool_call_start',
+                id: block.id,
+                name: block.name,
+                index: 0,
+              };
+              // Tool execution happens via SDK, toolExecutor is called through hooks
+              // Yield tool call done event
+              yield {
+                type: 'tool_call_done',
+                id: block.id,
+                result: null, // Results come back in subsequent messages
+              };
+            }
+          }
+        }
+      }
+
+      // Capture user messages for session history
+      if (message.type === "user" && session) {
+        session.history.push(message as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage);
+      }
+
+      // Capture the final result message
+      if (message.type === "result") {
+        resultMessage = message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
+        if (session) {
+          session.lastResult = resultMessage;
+        }
+      }
+    }
+
+    const duration = Date.now() - startTime;
+
+    // Handle missing result message
+    if (!resultMessage) {
+      yield {
+        type: 'error',
+        error: new Error("No result message received from Agent SDK"),
+        code: 'INVALID_RESPONSE_FORMAT',
+        retryable: false,
+      };
+      throw new Error("No result message received from Agent SDK");
+    }
+
+    // Handle error subtypes
+    if (resultMessage.subtype !== "success") {
+      const errorResult = resultMessage as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage & {
+        subtype: string;
+        errors?: string[];
+      };
+      yield {
+        type: 'error',
+        error: new Error(`Agent SDK execution failed: ${errorResult.subtype}`),
+        code: 'EXECUTION_FAILED',
+        retryable: errorResult.subtype === "error_max_turns",
+      };
+      throw new Error(`Agent SDK execution failed: ${errorResult.subtype}`);
+    }
+
+    // Yield usage event
+    if (resultMessage.usage) {
+      yield {
+        type: 'usage',
+        inputTokens: resultMessage.usage.input_tokens ?? 0,
+        outputTokens: resultMessage.usage.output_tokens ?? 0,
+        cacheTokens: resultMessage.usage.cache_read_tokens ?? resultMessage.usage.cache_write_tokens,
+      };
+    }
+
+    // Yield done event
+    yield {
+      type: 'done',
+      finishReason: 'stop',
+    };
+
+    // Extract data and return final AgentResponse
+    const data = (resultMessage.structured_output ?? resultMessage.result) as T;
+    return createSuccessResponse(data, {
+      agentId: this.id,
+      timestamp: Date.now(),
+      duration,
+      usage: {
+        input_tokens: resultMessage.usage?.input_tokens ?? 0,
+        output_tokens: resultMessage.usage?.output_tokens ?? 0,
+      },
       toolCalls: toolCallCount,
     });
   }
