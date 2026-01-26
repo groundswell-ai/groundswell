@@ -3,6 +3,8 @@ import type { WorkflowError } from './error.js';
 import type { TokenUsage } from './sdk-primitives.js';
 import type { RestartAnalysis } from './restart.js';
 import type { SerializedWorkflowState } from './snapshot.js';
+import type { AgentResponse } from './agent.js';
+import type { z } from 'zod';
 
 /**
  * Discriminated union of all workflow events
@@ -17,6 +19,7 @@ export type WorkflowEvent =
   | { type: 'stepRestarted'; node: WorkflowNode; stepName: string; retryCount: number; restoredState: SerializedWorkflowState; timestamp: number }
   | { type: 'stepEnd'; node: WorkflowNode; step: string; duration: number }
   | { type: 'error'; node: WorkflowNode; error: WorkflowError }
+  | { type: 'invalidResponse'; node: WorkflowNode; response: AgentResponse<unknown>; agentId: string; errors: z.ZodError; timestamp: number }
   | { type: 'taskStart'; node: WorkflowNode; task: string }
   | { type: 'taskEnd'; node: WorkflowNode; task: string }
   | { type: 'treeUpdated'; root: WorkflowNode }

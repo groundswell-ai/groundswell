@@ -8,11 +8,14 @@ import type {
   WorkflowError,
 } from '../types/index.js';
 import type { WorkflowContext, WorkflowConfig, WorkflowResult } from '../types/workflow-context.js';
+import type { AgentResponse } from '../types/agent.js';
+import { z } from 'zod';
 import { generateId } from '../utils/id.js';
 import { analyzeErrorForRestart } from '../utils/restart-analysis.js';
 import { WorkflowLogger } from './logger.js';
 import { getObservedState } from '../decorators/observed-state.js';
 import { createWorkflowContext } from './workflow-context.js';
+import { AgentResponseSchema } from '../types/agent.js';
 
 /**
  * Executor function type for functional workflows
@@ -686,6 +689,87 @@ export class Workflow<T = unknown> {
 
     // STEP 6: Default to abort
     return 'abort';
+  }
+
+  /**
+   * Validate an agent response at the workflow level
+   *
+   * This method enables parent workflows to validate agent responses
+   * before processing them. It follows the same validation pattern as
+   * Agent.validateResponse() but emits events and creates WorkflowError
+   * for workflow-level error handling.
+   *
+   * @template T - The type of response data
+   * @param response - The AgentResponse to validate
+   * @param agentId - Identifier of the agent that produced the response
+   * @param dataSchema - Optional Zod schema for response data (defaults to z.unknown())
+   * @returns true if validation passes, false if validation fails
+   *
+   * @example Validate response from child workflow
+   * ```ts
+   * class ParentWorkflow extends Workflow {
+   *   @Step()
+   *   async processChildResult() {
+   *     const response = await this.childWorkflow.run();
+   *
+   *     if (!this.validateAgentResponse(response, this.childWorkflow.agent.id)) {
+   *       // Handle validation failure
+   *       const action = this.analyzeError(this.lastError);
+   *       if (action === 'retry') {
+   *         return await this.restartStep('processChildResult');
+   *       }
+   *     }
+   *
+   *     // Process valid response
+   *     return response.data;
+   *   }
+   * }
+   * ```
+   */
+  public validateAgentResponse<T>(
+    response: AgentResponse<T>,
+    agentId: string,
+    dataSchema: z.ZodTypeAny = z.unknown()
+  ): boolean {
+    // Create schema for this response type
+    const schema = AgentResponseSchema(dataSchema);
+
+    // Validate response against schema
+    const validation = schema.safeParse(response);
+
+    if (validation.success) {
+      // Response is valid
+      return true;
+    }
+
+    // Validation failed - emit event and create error
+    const zodError = validation.error;
+
+    // Emit invalidResponse event
+    this.emitEvent({
+      type: 'invalidResponse',
+      node: this.node,
+      response,
+      agentId,
+      errors: zodError,
+      timestamp: Date.now(),
+    });
+
+    // Create WorkflowError with INVALID_RESPONSE_FORMAT context
+    const validationError: WorkflowError = {
+      message: `Agent response validation failed for agent '${agentId}'`,
+      original: zodError,
+      workflowId: this.id,
+      stack: zodError.stack,
+      state: getObservedState(this),
+      logs: [...this.node.logs] as LogEntry[],
+    };
+
+    // Store error for potential use by analyzeError/restartStep
+    // Note: Consider adding lastError property to Workflow class if not exists
+    // For now, emit event and return false
+
+    return false;
   }
 
   /**

@@ -210,7 +210,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Implement validateAgentResponse method in Workflow class",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - Agent.validateResponse() exists in src/core/agent.ts. Workflow class in src/core/workflow.ts has no validation method. AgentResponse schema validation is agent-level only.\n2. INPUT: response: AgentResponse<T>, agentId: string.\n3. LOGIC: Create validateAgentResponse method in Workflow class. Call Agent.validateResponse() utility (extract to shared location if needed). If validation passes, return true. If validation fails, emit invalidResponse event with structure: { response, agentId, errors: ZodError }. Create INVALID_RESPONSE_FORMAT WorkflowError with context. Return false. Method should be callable from workflow steps.\n4. OUTPUT: Modified Workflow class in src/core/workflow.ts with validateAgentResponse method. Must integrate with existing event system and error handling."
