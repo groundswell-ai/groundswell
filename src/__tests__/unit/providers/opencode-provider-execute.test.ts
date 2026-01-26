@@ -291,24 +291,24 @@ describe('OpenCodeProvider - execute()', () => {
       expect(result).toEqual({});
     });
 
-    it('should return config with onToolStart when hook provided', () => {
+    it('should ignore onToolStart (not supported - server-side execution)', () => {
       const hooks: ProviderHookEvents = {
         onToolStart: vi.fn()
       };
 
       // @ts-expect-error - Testing private method
       const result = provider.buildOpenCodeHooks(hooks);
-      expect(result).toEqual({ onToolStart: true });
+      expect(result).toEqual({});
     });
 
-    it('should return config with onToolEnd when hook provided', () => {
+    it('should ignore onToolEnd (not supported - server-side execution)', () => {
       const hooks: ProviderHookEvents = {
         onToolEnd: vi.fn()
       };
 
       // @ts-expect-error - Testing private method
       const result = provider.buildOpenCodeHooks(hooks);
-      expect(result).toEqual({ onToolEnd: true });
+      expect(result).toEqual({});
     });
 
     it('should return config with onStream when hook provided', () => {
@@ -321,7 +321,7 @@ describe('OpenCodeProvider - execute()', () => {
       expect(result).toEqual({ onStream: true });
     });
 
-    it('should return config with all hooks when all provided', () => {
+    it('should return only onStream when all hooks provided', () => {
       const hooks: ProviderHookEvents = {
         onToolStart: vi.fn(),
         onToolEnd: vi.fn(),
@@ -330,14 +330,13 @@ describe('OpenCodeProvider - execute()', () => {
 
       // @ts-expect-error - Testing private method
       const result = provider.buildOpenCodeHooks(hooks);
+      // Only onStream is supported via SSE events
       expect(result).toEqual({
-        onToolStart: true,
-        onToolEnd: true,
         onStream: true
       });
     });
 
-    it('should ignore onSessionStart and onSessionEnd in hook config', () => {
+    it('should ignore onSessionStart and onSessionEnd (manually called)', () => {
       const hooks: ProviderHookEvents = {
         onSessionStart: vi.fn(),
         onSessionEnd: vi.fn()
@@ -345,7 +344,7 @@ describe('OpenCodeProvider - execute()', () => {
 
       // @ts-expect-error - Testing private method
       const result = provider.buildOpenCodeHooks(hooks);
-      // onSessionStart and onSessionEnd are called directly, not via event config
+      // onSessionStart and onSessionEnd are called directly in execute(), not via event config
       expect(result).toEqual({});
     });
   });

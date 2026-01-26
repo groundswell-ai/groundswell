@@ -408,7 +408,7 @@
       "type": "Phase",
       "id": "P3",
       "title": "Phase 3: OpenCode Provider Implementation",
-      "status": "Planned",
+      "status": "Complete",
       "description": "Implement OpenCode provider with multi-provider support (75+ providers). Status depends on OpenCode SDK verification.",
       "milestones": [
         {
@@ -464,7 +464,7 @@
           "type": "Milestone",
           "id": "P3.M2",
           "title": "Milestone 3.2: OpenCode Provider Core (Conditional)",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Implement OpenCodeProvider class (only if OpenCode SDK is verified as available)",
           "tasks": [
             {
@@ -535,14 +535,14 @@
               "type": "Task",
               "id": "P3.M2.T2",
               "title": "Task: Implement OpenCode Hooks Adapter",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Create hooks-adapter.ts to convert between ProviderHookEvents and OpenCode SDK hooks",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T2.S1",
                   "title": "Implement buildOpenCodeHooks() adapter function",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M2.T1.S2"

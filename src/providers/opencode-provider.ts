@@ -298,36 +298,70 @@ export class OpenCodeProvider implements Provider {
   }
 
   /**
-   * Build OpenCode event handler configuration
+   * Build OpenCode event subscription configuration
    *
-   * Unlike Anthropic SDK hooks (passed to query()), OpenCode uses
-   * event subscriptions. This returns a configuration object
-   * that execute() uses to determine which event types to subscribe to.
+   * Adapts ProviderHookEvents to OpenCode SDK event system.
+   * OpenCode uses Server-Sent Events (SSE) for real-time updates,
+   * not callback hooks like the Anthropic SDK.
+   *
+   * ## Supported Hooks
+   *
+   * - **onStream**: Supported via `message.part.updated` SSE events
+   * - **onSessionStart**: Manually called in execute() (no adapter mapping)
+   * - **onSessionEnd**: Manually called in execute() (no adapter mapping)
+   *
+   * ## Unsupported Hooks
+   *
+   * - **onToolStart**: NOT SUPPORTED - OpenCode executes tools server-side
+   * - **onToolEnd**: NOT SUPPORTED - No client-side tool execution events
+   *
+   * ## Architecture Notes
+   *
+   * OpenCode SDK uses a client-server architecture where tools are
+   * executed on the server. The client receives SSE events for
+   * message updates but cannot observe individual tool execution.
+   * This is a fundamental architectural difference from Anthropic SDK.
    *
    * @param hooks - Optional provider hook events to adapt
-   * @returns Event subscription configuration
+   * @returns Event subscription configuration for execute() method
    * @internal
+   * @remarks
+   * This method only returns configuration flags. Actual event handling
+   * is done in execute() method (lines 415-453) which subscribes to
+   * client.event.subscribe() and processes SSE events.
+   *
+   * @example
+   * ```ts
+   * const hookConfig = this.buildOpenCodeHooks(hooks);
+   * // Returns: { onStream: true } if hooks.onStream exists
+   * // Returns: {} if no hooks or only unsupported hooks
+   * ```
    */
   private buildOpenCodeHooks(hooks?: ProviderHookEvents): {
-    onToolStart?: boolean;
-    onToolEnd?: boolean;
     onStream?: boolean;
   } {
+    // Early return: no hooks to convert
     if (!hooks) {
       return {};
     }
 
-    const config: Record<string, boolean> = {};
+    const config: { onStream?: boolean } = {};
 
-    if (hooks.onToolStart) {
-      config.onToolStart = true;
-    }
-    if (hooks.onToolEnd) {
-      config.onToolEnd = true;
-    }
+    // Map onStream → SSE event subscription
+    // OpenCode emits message.part.updated events during streaming
+    // Event processing happens in execute() method (lines 426-443)
     if (hooks.onStream) {
       config.onStream = true;
     }
+
+    // NOTE: Session hooks are manually called in execute()
+    // - onSessionStart: Line 456 (before session.prompt())
+    // - onSessionEnd: Lines 484, 527 (after response/error)
+
+    // NOTE: Tool hooks NOT SUPPORTED
+    // OpenCode executes tools server-side with no client events
+    // - onToolStart: No equivalent event
+    // - onToolEnd: No equivalent event
 
     return config;
   }
