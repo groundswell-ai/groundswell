@@ -566,14 +566,14 @@
           "type": "Milestone",
           "id": "P4.M1",
           "title": "Milestone 4.1: AgentConfig Extension",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Extend AgentConfig interface to support provider options",
           "tasks": [
             {
               "type": "Task",
               "id": "P4.M1.T1",
               "title": "Task: Update AgentConfig Interface",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Add provider-related fields to AgentConfig in src/types/agent.ts",
               "subtasks": [
                 {
@@ -591,7 +591,7 @@
                   "type": "Subtask",
                   "id": "P4.M1.T1.S2",
                   "title": "Update Agent constructor to accept provider config",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P4.M1.T1.S1"

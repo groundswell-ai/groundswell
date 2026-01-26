@@ -47,6 +47,7 @@ import { generateId } from '../utils/id.js';
 import { getExecutionContext } from './context.js';
 import { generateCacheKey, defaultCache } from '../cache/index.js';
 import type { CacheKeyInputs } from '../cache/index.js';
+import type { ProviderId, ProviderOptions } from '../types/providers.js';
 
 /**
  * Result from a prompt execution including metadata
@@ -84,6 +85,12 @@ export class Agent {
   /** Default model to use */
   private readonly model: string;
 
+  /** Provider to use for this agent (optional) */
+  private readonly providerId?: ProviderId;
+
+  /** Provider-specific options for this agent (optional) */
+  private readonly providerOptions?: ProviderOptions;
+
   /**
    * Create a new Agent instance
    * @param config Agent configuration
@@ -93,6 +100,11 @@ export class Agent {
     this.name = config.name ?? 'Agent';
     this.config = config;
     this.model = config.model ?? 'claude-sonnet-4-20250514';
+
+    // Store provider configuration from AgentConfig
+    // Full provider resolution (global + agent + prompt) happens later during execution
+    this.providerId = config.provider;
+    this.providerOptions = config.providerOptions;
 
     // Initialize MCP handler
     this.mcpHandler = new MCPHandler();
