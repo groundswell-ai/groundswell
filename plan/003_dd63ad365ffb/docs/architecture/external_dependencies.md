@@ -433,6 +433,7 @@ const result = await opencode.execute({
 
 | SDK | Providers | TypeScript | MCP Support | Notes |
 |-----|-----------|------------|-------------|-------|
+| **OpenCode SDK** | 75+ | Excellent | **Native** (client-server) | Requires external server |
 | **Vercel AI SDK** | 17+ | Excellent | Via LangChain | Best unified API |
 | **LangChain** | 17+ | Excellent | **Native** (@langchain/mcp-adapters) | Most mature |
 | **Portkey** | 10+ | Excellent | No | Simple proxy |
@@ -451,6 +452,787 @@ const result = await opencode.execute({
 - If OpenCode SDK API doesn't meet requirements, consider Vercel AI SDK
 - LangChain with MCP adapters is another strong alternative
 - Both have excellent TypeScript support and active communities
+
+### Core API Structure
+
+#### Main Entry Point
+```typescript
+import { createOpencode, createOpencodeClient } from '@opencode-ai/sdk';
+
+// Client-only (connects to existing server)
+const client = createOpencodeClient({
+  baseUrl: 'http://localhost:3000',
+  directory: '/path/to/project'
+});
+
+// Server + client (starts local server)
+const { client, server } = await createOpencode({
+  hostname: '127.0.0.1',
+  port: 4096
+});
+```
+
+#### OpencodeClient Class
+```typescript
+class OpencodeClient {
+  session: Session;      // Primary execution API
+  provider: Provider;    // Multi-provider management
+  config: Config;        // Configuration management
+  mcp: Mcp;             // MCP integration
+  lsp: Lsp;             // LSP integration
+  tool: Tool;           // Tool management
+  event: Event;         // Real-time events
+  installation: Installation;
+  permission: Permission;
+  rateLimit: RateLimit;
+  shell: Shell;
+  completion: Completion;
+  diagnostics: Diagnostics;
+  suggestions: Suggestions;
+  patch: Patch;
+}
+```
+
+> **IMPORTANT:** OpenCode SDK uses a **client-server architecture**.
+> Unlike Anthropic Agent SDK (standalone library), this requires:
+> - External `opencode` server process running
+> - HTTP/WebSocket communication
+> - Server-side session storage
+> - No direct tool control (observation-only via events)
+
+### Session API (Primary Execution Interface)
+
+#### Session Lifecycle
+```typescript
+class Session {
+  // Create new session
+  create(options: Options): RequestResult<SessionCreateResponses>;
+
+  // Get session by ID
+  get(options: Options): RequestResult<SessionGetResponses>;
+
+  // List all sessions
+  list(options?: Options): RequestResult<SessionListResponses>;
+
+  // Delete session
+  delete(options: Options): RequestResult<SessionDeleteResponses>;
+
+  // Get session status
+  status(options?: Options): RequestResult<SessionStatusResponses>;
+
+  // Update session properties
+  update(options: Options): RequestResult<SessionUpdateResponses>;
+}
+```
+
+#### Session Execution
+```typescript
+class Session {
+  // Create and send message (synchronous - waits for completion)
+  prompt(options: Options): RequestResult<SessionPromptResponses>;
+
+  // Create and send message (async - returns immediately)
+  promptAsync(options: Options): RequestResult<SessionPromptAsyncResponses>;
+
+  // Send command to session
+  command(options: Options): RequestResult<SessionCommandResponses>;
+
+  // Execute shell command in session context
+  shell(options: Options): RequestResult<SessionShellResponses>;
+
+  // Fork session at specific message
+  fork(options: Options): RequestResult<SessionForkResponses>;
+
+  // Abort running session
+  abort(options: Options): RequestResult<SessionAbortResponses>;
+
+  // Revert/unrevert messages
+  revert(options: Options): RequestResult<SessionRevertResponses>;
+  unrevert(options: Options): RequestResult<SessionUnrevertResponses>;
+}
+```
+
+#### Message Retrieval
+```typescript
+class Session {
+  // List messages in session
+  messages(options: Options): RequestResult<SessionMessagesResponses>;
+
+  // Get specific message
+  message(options: Options): RequestResult<SessionMessageResponses>;
+
+  // Get session children
+  children(options: Options): RequestResult<SessionChildrenResponses>;
+
+  // Get session diff
+  diff(options: Options): RequestResult<SessionDiffResponses>;
+
+  // Get session todo list
+  todo(options: Options): RequestResult<SessionTodoResponses>;
+}
+```
+
+#### Session Features
+```typescript
+class Session {
+  // Initialize session with AGENTS.md
+  init(options: Options): RequestResult<SessionInitResponses>;
+
+  // Summarize session
+  summarize(options: Options): RequestResult<SessionSummarizeResponses>;
+
+  // Share/unshare session
+  share(options: Options): RequestResult<SessionShareResponses>;
+  unshare(options: Options): RequestResult<SessionUnshareResponses>;
+}
+```
+
+#### SessionPromptData Type
+```typescript
+// Request body for session.prompt()
+interface SessionPromptData {
+  sessionID: string;
+  message: string;
+  agent?: string;
+  model?: {
+    providerID: string;
+    modelID: string;
+  };
+  system?: string;
+  tools?: {
+    [key: string]: boolean;
+  };
+  permissions?: {
+    [key: string]: boolean;
+  };
+}
+```
+
+### Multi-Provider Support
+
+#### Provider API
+```typescript
+class Provider {
+  // List all available providers
+  list(options?: Options): RequestResult<ProviderListResponses>;
+
+  // Get provider authentication methods
+  auth(options?: Options): RequestResult<ProviderAuthResponses>;
+
+  // OAuth operations
+  oauth: {
+    authorize(options: Options): RequestResult<ProviderOauthAuthorizeResponses>;
+    callback(options: Options): RequestResult<ProviderOauthCallbackResponses>;
+  };
+}
+```
+
+#### Model Format
+OpenCode uses `providerID/modelID` format for model specification:
+
+```typescript
+// Examples from ai-sdk-provider-opencode-sdk
+"anthropic/claude-opus-4-5-20251101"
+"anthropic/claude-sonnet-4-5-20250929"
+"anthropic/claude-haiku-4-5-20251001"
+
+"openai/gpt-5.1"
+"openai/gpt-5.1-codex"
+"openai/gpt-5.1-codex-mini"
+"openai/gpt-5.1-codex-max"
+
+"google/gemini-3-pro-preview"
+"google/gemini-2.5-flash"
+"google/gemini-2.5-pro"
+
+"ollama/llama3"
+"azure/openai"
+"aws/bedrock"
+"cohere/command"
+"huggingface/mistral"
+
+// 75+ more providers supported
+```
+
+#### Configuration API
+```typescript
+class Config {
+  // Get current configuration
+  get(options?: Options): RequestResult<ConfigGetResponses>;
+
+  // Update configuration
+  update(options?: Options): RequestResult<ConfigUpdateResponses>;
+
+  // List all providers
+  providers(options?: Options): RequestResult<ConfigProvidersResponses>;
+}
+```
+
+### TypeScript Type Definitions
+
+#### Core Message Types
+```typescript
+// User message (input)
+export type UserMessage = {
+  id: string;
+  sessionID: string;
+  role: "user";
+  time: {
+    created: number;
+  };
+  summary?: {
+    title?: string;
+    body?: string;
+    diffs: Array<FileDiff>;
+  };
+  agent: string;
+  model: {
+    providerID: string;  // e.g., "anthropic"
+    modelID: string;     // e.g., "claude-opus-4-5-20251101"
+  };
+  system?: string;
+  tools?: {
+    [key: string]: boolean;
+  };
+};
+
+// Assistant message (response)
+export type AssistantMessage = {
+  id: string;
+  sessionID: string;
+  role: "assistant";
+  time: {
+    created: number;
+    completed?: number;
+  };
+  error?: ProviderAuthError | UnknownError | MessageOutputLengthError | MessageAbortedError | ApiError;
+  parentID: string;
+  modelID: string;
+  providerID: string;
+  mode: string;
+  path: {
+    cwd: string;
+    root: string;
+  };
+  summary?: boolean;
+  cost: number;
+  tokens: {
+    input: number;
+    output: number;
+    reasoning: number;      // ← Extended thinking support
+    cache: {
+      read: number;
+      write: number;
+    };
+  };
+  finish?: string;
+};
+
+export type Message = UserMessage | AssistantMessage;
+```
+
+#### Message Parts (Streaming)
+```typescript
+// Text part
+export type TextPart = {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: "text";
+  text: string;
+  synthetic?: boolean;
+  ignored?: boolean;
+  time?: {
+    start: number;
+    end?: number;
+  };
+  metadata?: {
+    [key: string]: unknown;
+  };
+};
+
+// Reasoning part (extended thinking)
+export type ReasoningPart = {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: "reasoning";
+  text: string;
+  metadata?: {
+    [key: string]: unknown;
+  };
+  time: {
+    start: number;
+    end?: number;
+  };
+};
+
+// Tool execution part
+export type ToolPart = {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: "tool";
+  callID: string;
+  tool: string;
+  state: ToolStatePending | ToolStateRunning | ToolStateCompleted | ToolStateError;
+  metadata?: {
+    [key: string]: unknown;
+  };
+};
+
+// File part
+export type FilePart = {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: "file";
+  mime: string;
+  filename?: string;
+  url: string;
+  source?: FilePartSource;
+};
+
+// Agent part (sub-agent delegation)
+export type AgentPart = {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: "agent";
+  name: string;
+  source?: {
+    value: string;
+    start: number;
+    end: number;
+  };
+};
+
+export type Part = TextPart | ReasoningPart | FilePart | ToolPart | AgentPart | StepStartPart | StepFinishPart | SnapshotPart | PatchPart | RetryPart | CompactionPart;
+```
+
+#### Tool State Types
+```typescript
+export type ToolStatePending = {
+  status: "pending";
+  input: {
+    [key: string]: unknown;
+  };
+  raw: string;
+};
+
+export type ToolStateRunning = {
+  status: "running";
+  input: {
+    [key: string]: unknown;
+  };
+  title?: string;
+  metadata?: {
+    [key: string]: unknown;
+  };
+  time: {
+    start: number;
+  };
+};
+
+export type ToolStateCompleted = {
+  status: "completed";
+  input: {
+    [key: string]: unknown;
+  };
+  output: string;
+  title: string;
+  metadata: {
+    [key: string]: unknown;
+  };
+  time: {
+    start: number;
+    end: number;
+    compacted?: number;
+  };
+  attachments?: Array<FilePart>;
+};
+
+export type ToolStateError = {
+  status: "error";
+  input: {
+    [key: string]: unknown;
+  };
+  error: string;
+  metadata?: {
+    [key: string]: unknown;
+  };
+  time: {
+    start: number;
+    end: number;
+  };
+};
+
+export type ToolState = ToolStatePending | ToolStateRunning | ToolStateCompleted | ToolStateError;
+```
+
+### MCP & LSP Integration
+
+#### MCP API
+```typescript
+class Mcp {
+  // Get MCP server status
+  status(options?: Options): RequestResult<McpStatusResponses>;
+
+  // Add MCP server dynamically
+  add(options?: Options): RequestResult<McpAddResponses>;
+
+  // Connect MCP server
+  connect(options: Options): RequestResult<McpConnectResponses>;
+
+  // Disconnect MCP server
+  disconnect(options: Options): RequestResult<McpDisconnectResponses>;
+
+  // OAuth authentication for MCP servers
+  auth: {
+    remove(options: Options): RequestResult<McpAuthRemoveResponses>;
+    start(options: Options): RequestResult<McpAuthStartResponses>;
+    callback(options: Options): RequestResult<McpAuthCallbackResponses>;
+    authenticate(options: Options): RequestResult<McpAuthAuthenticateResponses>;
+  };
+}
+```
+
+#### Tool API
+```typescript
+class Tool {
+  // List all tool IDs (built-in + dynamically registered)
+  ids(options?: Options): RequestResult<ToolIdsResponses>;
+
+  // List tools with JSON schema for provider/model
+  list(options: Options): RequestResult<ToolListResponses>;
+}
+```
+
+#### LSP API
+```typescript
+class Lsp {
+  // Get LSP server status
+  status(options?: Options): RequestResult<LspStatusResponses>;
+}
+```
+
+#### LSP Events
+```typescript
+export type EventLspClientDiagnostics = {
+  type: "lsp.client.diagnostics";
+  properties: {
+    serverID: string;
+    path: string;
+  };
+};
+
+export type EventLspUpdated = {
+  type: "lsp.updated";
+  properties: {
+    [key: string]: unknown;
+  };
+};
+```
+
+### Real-Time Events (Server-Sent Events)
+
+#### Event Subscription
+```typescript
+class Event {
+  // Subscribe to global events
+  event(options?: Options): Promise<ServerSentEventsResult<GlobalEventResponses>>;
+
+  // Subscribe to all events
+  subscribe(options?: Options): Promise<ServerSentEventsResult<EventSubscribeResponses>>;
+}
+```
+
+#### Event Types
+```typescript
+// Message events
+export type EventMessageUpdated = {
+  type: "message.updated";
+  properties: {
+    info: Message;
+  };
+};
+
+export type EventMessagePartUpdated = {
+  type: "message.part.updated";
+  properties: {
+    part: Part;
+    delta?: string;
+  };
+};
+
+// Permission events
+export type EventPermissionUpdated = {
+  type: "permission.updated";
+  properties: Permission;
+};
+
+export type EventPermissionReplied = {
+  type: "permission.replied";
+  properties: {
+    sessionID: string;
+    permissionID: string;
+    response: string;
+  };
+};
+
+// Installation events
+export type EventInstallationUpdated = {
+  type: "installation.updated";
+  properties: {
+    version: string;
+  };
+};
+
+export type EventInstallationUpdateAvailable = {
+  type: "installation.update-available";
+  properties: {
+    version: string;
+  };
+};
+
+// Server events
+export type EventServerInstanceDisposed = {
+  type: "server.instance.disposed";
+  properties: {
+    directory: string;
+  };
+};
+```
+
+### Code Examples
+
+#### Basic Client Initialization
+```typescript
+import { createOpencode } from '@opencode-ai/sdk';
+
+// Start server and get client
+const { client, server } = await createOpencode({
+  hostname: '127.0.0.1',
+  port: 4096,
+});
+
+// Cleanup when done
+server.close();
+```
+
+#### Session Creation and Prompt
+```typescript
+// Create session
+const sessionResult = await client.session.create({});
+const sessionId = sessionResult.data.id;
+
+// Execute prompt
+const result = await client.session.prompt({
+  body: {
+    sessionID: sessionId,
+    message: "Explain this code",
+  },
+});
+
+// Get messages
+const messages = await client.session.messages({
+  query: {
+    sessionID: sessionId,
+  },
+});
+```
+
+#### Streaming with Events
+```typescript
+// Subscribe to message part events
+const eventStream = await client.event.subscribe({});
+
+for await (const event of eventStream) {
+  if (event.type === 'message.part.updated') {
+    const { part, delta } = event.properties;
+
+    if (part.type === 'text' && delta) {
+      process.stdout.write(delta); // Stream text chunks
+    }
+
+    if (part.type === 'reasoning') {
+      console.log('Reasoning:', part.text);
+    }
+
+    if (part.type === 'tool') {
+      console.log('Tool:', part.tool, 'State:', part.state.status);
+    }
+  }
+}
+```
+
+#### Provider Listing
+```typescript
+// List all available providers
+const providers = await client.provider.list();
+
+console.log('Available providers:', providers.data.providers);
+
+// Get provider auth requirements
+const auth = await client.provider.auth({
+  query: {
+    providerID: 'anthropic',
+  },
+});
+```
+
+#### MCP Integration
+```typescript
+// Check MCP server status
+const status = await client.mcp.status();
+
+// Add MCP server dynamically
+const addResult = await client.mcp.add({
+  body: {
+    name: 'my-mcp-server',
+    command: 'node',
+    args: ['my-mcp-server.js'],
+  },
+});
+
+// Connect to MCP server
+await client.mcp.connect({
+  body: {
+    name: 'my-mcp-server',
+  },
+});
+```
+
+### Architectural Comparison
+
+| Aspect | Anthropic Agent SDK | OpenCode SDK |
+|--------|-------------------|--------------|
+| **Architecture** | Standalone library | Client-server (requires server) |
+| **Execution** | `query()` function | `session.prompt()` method |
+| **Sessions** | `continue: true` flag | Native session objects with IDs |
+| **Tools** | Define with `tool()` function | Server-side, observe via events |
+| **MCP** | `mcpServers` config option | `mcp` namespace with dynamic add/remove |
+| **LSP** | Via MCP plugins | Native `lsp` namespace |
+| **Streaming** | AsyncGenerator return | Server-Sent Events (SSE) |
+| **Events** | Hooks in options | Real-time event subscription |
+| **State** | Stateless (unless using continue) | Server-side session storage |
+| **Tool Control** | Direct tool execution | Observation only (server-side) |
+| **Dependencies** | Has peer dependencies | Zero dependencies |
+| **Type Generation** | Hand-written TypeScript | Auto-generated from OpenAPI |
+
+### Integration Considerations
+
+> **CRITICAL ARCHITECTURAL MISMATCH**
+>
+> OpenCode SDK is a **client library** for the OpenCode server application, not a standalone execution library like Anthropic's Agent SDK.
+
+#### Key Implications
+
+1. **Server Dependency**
+   - Requires running `opencode` server process (installed via `npm install -g opencode`)
+   - All execution happens server-side, SDK is just a client
+   - HTTP/WebSocket communication layer adds complexity
+   - Server must be managed separately from Groundswell process
+
+2. **No Direct Tool Control**
+   - Tools are executed server-side, can't provide custom implementations
+   - Cannot integrate Groundswell's MCPHandler tool execution
+   - Tool registration is dynamic via `mcp.add()` only
+   - Can only observe tool execution via events
+
+3. **Session Management**
+   - Session state stored on server, not in client process
+   - Sessions persist across client restarts (if server running)
+   - Doesn't align with Groundswell's in-memory session abstraction
+   - Requires explicit session cleanup to free server memory
+
+4. **Deployment Complexity**
+   - Users would need to install and configure OpenCode CLI separately
+   - Port conflicts possible (default port 4096)
+   - Server startup time adds initialization cost
+   - Server process may crash independently of Groundswell
+
+#### Gotchas & Special Considerations
+
+```typescript
+// GOTCHA: Package uses ESM format only
+// Cannot use require() - must use import statements
+
+// GOTCHA: All types are auto-generated from OpenAPI spec
+// Result: Complex nested types like RequestResult<TResponses, TErrors, TThrowOnError, TResponseStyle>
+
+// GOTCHA: Session state is stored server-side, not in client
+// Sessions persist across client restarts (if server running)
+
+// GOTCHA: Tool execution is server-side only
+// Cannot provide custom tool implementations - can only observe via events
+
+// GOTCHA: Default port 4096 may conflict with other services
+// Need to handle port conflicts in server creation
+
+// PATTERN: RequestResult always returns { data, error, status }
+// Must check error property before accessing data
+
+// PATTERN: Model format uses providerID/modelID object, not string
+// Groundswell uses "provider/model" string - need conversion
+```
+
+### Recommendation for P3.M1.T1.S3
+
+**STRATEGY C RECOMMENDED: Use Alternative SDK**
+
+Based on comprehensive API analysis, OpenCode SDK presents significant architectural challenges for integration as a Groundswell Provider:
+
+#### Why Not OpenCode SDK?
+
+1. **Architectural Mismatch**: Client-server model doesn't align with Groundswell's standalone Provider pattern
+2. **Server Dependency**: Requires external process management, complicating deployment
+3. **No Direct Tool Control**: Cannot integrate with Groundswell's MCPHandler for tool execution
+4. **Session Management**: Server-side state doesn't match Groundswell's in-memory abstraction
+5. **User Experience**: Users would need separate OpenCode CLI installation
+
+#### Alternative Recommendation: Vercel AI SDK
+
+Use **Vercel AI SDK** (`ai` package) as the multi-provider solution:
+
+```bash
+npm install ai @ai-sdk/anthropic @ai-sdk/openai @ai-sdk/google
+```
+
+**Benefits:**
+- Standalone execution (no server required)
+- Native TypeScript support with hand-written types
+- Direct tool control compatible with Groundswell's architecture
+- Multi-provider support (17+ providers)
+- Can integrate with LangChain MCP adapters for MCP support
+- Compatible with existing Provider interface pattern
+
+**Provider Interface Alignment:**
+- ✅ `initialize(options)` - Simple SDK initialization
+- ✅ `execute<T>(request)` - Direct execution without polling
+- ✅ `registerMCPs(servers)` - Can integrate via LangChain adapters
+- ✅ `loadSkills(skills)` - Compatible with tool definition pattern
+- ✅ `terminate()` - Simple cleanup (no server process)
+
+#### If OpenCode Integration is Still Required
+
+**Recommended Approach: Plugin/Extension (Not Core Provider)**
+
+1. Implement as optional plugin, not core provider
+2. Users explicitly install OpenCode CLI to use it
+3. Document server requirement and limitations clearly
+4. Always default to Anthropic provider for standalone operation
+5. Consider implementing after multi-provider support is stable
+
+### Research References
+
+For complete API documentation and implementation details, see:
+
+- **Complete Research Report**: [`./P3M1T1S2/research/opencode-sdk-complete-research.md`](../P3M1T1S2/research/opencode-sdk-complete-research.md)
+- **NPM Package**: https://www.npmjs.com/package/@opencode-ai/sdk (v1.1.36)
+- **Vercel AI SDK Provider**: https://github.com/ben-vargas/ai-sdk-provider-opencode-sdk
+- **TypeScript Definitions**: `../../../../node_modules/@opencode-ai/sdk/dist/gen/types.gen.d.ts`
+- **Client Class Definition**: `../../../../node_modules/@opencode-ai/sdk/dist/gen/sdk.gen.d.ts`
 
 ---
 

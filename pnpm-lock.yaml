@@ -11,6 +11,9 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.1.0
         version: 0.1.77(zod@3.25.76)
+      '@opencode-ai/sdk':
+        specifier: 1.1.36
+        version: 1.1.36
       ink:
         specifier: ^6.6.0
         version: 6.6.0(@types/react@19.2.9)(react@19.2.3)
@@ -441,6 +444,9 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
+
+  '@opencode-ai/sdk@1.1.36':
+    resolution: {integrity: sha512-feNHWnbxhg03TI2QrWnw3Chc0eYrWSDSmHIy/ejpSVfcKlfXREw1Tpg0L4EjrpeSc4jB1eM673dh+WM/Ko2SFQ==}
 
   '@rollup/rollup-android-arm-eabi@4.56.0':
     resolution: {integrity: sha512-LNKIPA5k8PF1+jAFomGe3qN3bbIgJe/IlpDBwuVjrDKrJhVWywgnJvflMt/zkbVNLFtF1+94SljYQS6e99klnw==}
@@ -1328,6 +1334,8 @@ snapshots:
       '@sinclair/typebox': 0.27.8
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
+
+  '@opencode-ai/sdk@1.1.36': {}
 
   '@rollup/rollup-android-arm-eabi@4.56.0':
     optional: true
