@@ -796,7 +796,7 @@
                   "type": "Subtask",
                   "id": "P5.M1.T3.S1",
                   "title": "Test AnthropicProvider initialization",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T1.S2"
