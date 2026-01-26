@@ -150,4 +150,194 @@ describe('Tree Mirroring Integration', () => {
     expect(treeChangedCalls).toHaveLength(1);
     expect(treeChangedCalls[0]).toBe(parent.getNode());
   });
+
+  it('should emit treeUpdated when child is attached', () => {
+    // ARRANGE: Create parent-child workflow tree (child has no parent initially)
+    const parent = new TDDOrchestrator('Parent');
+    const child = new TDDOrchestrator('Child');
+
+    // ARRANGE: Set up observer with collection arrays
+    const events: WorkflowEvent[] = [];
+    const treeChangedCalls: any[] = [];
+
+    // ARRANGE: Create inline observer
+    const observer: WorkflowObserver = {
+      onLog: () => {},
+      onEvent: (event) => events.push(event),
+      onStateUpdated: () => {},
+      onTreeChanged: (root) => treeChangedCalls.push(root),
+    };
+
+    // ARRANGE: Attach observer to ROOT (parent, not child)
+    parent.addObserver(observer);
+
+    // ACT: Attach child
+    parent.attachChild(child);
+
+    // ASSERT: Verify treeUpdated event was received via onEvent
+    const treeUpdatedEvent = events.find((e) => e.type === 'treeUpdated');
+    expect(treeUpdatedEvent).toBeDefined();
+
+    // ASSERT: Type guard for discriminated union + verify root node
+    if (treeUpdatedEvent && treeUpdatedEvent.type === 'treeUpdated') {
+      expect(treeUpdatedEvent.root).toBe(parent.getNode());
+    }
+
+    // ASSERT: Verify onTreeChanged callback was invoked
+    // NOTE: onTreeChanged is called for BOTH childAttached and treeUpdated events
+    expect(treeChangedCalls).toHaveLength(2);
+    expect(treeChangedCalls[0]).toBe(parent.getNode());
+    expect(treeChangedCalls[1]).toBe(parent.getNode());
+  });
+
+  it('should emit treeUpdated when child is detached', () => {
+    // ARRANGE: Create parent-child relationship via constructor
+    const parent = new TDDOrchestrator('Parent');
+    const child = new TDDOrchestrator('Child', parent);
+
+    // ARRANGE: Set up observer with collection arrays
+    const events: WorkflowEvent[] = [];
+    const treeChangedCalls: any[] = [];
+
+    // ARRANGE: Create inline observer
+    const observer: WorkflowObserver = {
+      onLog: () => {},
+      onEvent: (event) => events.push(event),
+      onStateUpdated: () => {},
+      onTreeChanged: (root) => treeChangedCalls.push(root),
+    };
+
+    // ARRANGE: Attach observer to ROOT (parent, not child)
+    parent.addObserver(observer);
+
+    // ACT: Detach child
+    parent.detachChild(child);
+
+    // ASSERT: Verify treeUpdated event was received via onEvent
+    const treeUpdatedEvent = events.find((e) => e.type === 'treeUpdated');
+    expect(treeUpdatedEvent).toBeDefined();
+
+    // ASSERT: Type guard for discriminated union + verify root node
+    if (treeUpdatedEvent && treeUpdatedEvent.type === 'treeUpdated') {
+      expect(treeUpdatedEvent.root).toBe(parent.getNode());
+    }
+
+    // ASSERT: Verify onTreeChanged callback was invoked
+    // NOTE: onTreeChanged is called for BOTH childDetached and treeUpdated events
+    expect(treeChangedCalls).toHaveLength(2);
+    expect(treeChangedCalls[0]).toBe(parent.getNode());
+    expect(treeChangedCalls[1]).toBe(parent.getNode());
+  });
+});
+
+describe('Tree Mirroring Integration - Multiple Operations', () => {
+  it('should emit treeUpdated for each attachChild operation', () => {
+    // ARRANGE: Create parent and multiple children (no parents initially)
+    const parent = new TDDOrchestrator('Parent');
+    const child1 = new TDDOrchestrator('Child1');
+    const child2 = new TDDOrchestrator('Child2');
+    const child3 = new TDDOrchestrator('Child3');
+
+    const events: WorkflowEvent[] = [];
+    const observer: WorkflowObserver = {
+      onLog: () => {},
+      onEvent: (e) => events.push(e),
+      onStateUpdated: () => {},
+      onTreeChanged: () => {},
+    };
+
+    parent.addObserver(observer);
+
+    // ACT: Multiple attach operations
+    parent.attachChild(child1);
+    parent.attachChild(child2);
+    parent.attachChild(child3);
+
+    // ASSERT: Verify count of treeUpdated events equals number of operations
+    const treeUpdatedEvents = events.filter((e) => e.type === 'treeUpdated');
+    expect(treeUpdatedEvents).toHaveLength(3);
+
+    // ASSERT: Verify each event has correct root
+    treeUpdatedEvents.forEach((event) => {
+      if (event.type === 'treeUpdated') {
+        expect(event.root).toBe(parent.getNode());
+      }
+    });
+  });
+
+  it('should emit treeUpdated for each detachChild operation', () => {
+    // ARRANGE: Create parent with multiple children via constructor
+    const parent = new TDDOrchestrator('Parent');
+    const child1 = new TDDOrchestrator('Child1', parent);
+    const child2 = new TDDOrchestrator('Child2', parent);
+    const child3 = new TDDOrchestrator('Child3', parent);
+
+    const events: WorkflowEvent[] = [];
+    const observer: WorkflowObserver = {
+      onLog: () => {},
+      onEvent: (e) => events.push(e),
+      onStateUpdated: () => {},
+      onTreeChanged: () => {},
+    };
+
+    parent.addObserver(observer);
+
+    // ACT: Multiple detach operations
+    parent.detachChild(child1);
+    parent.detachChild(child2);
+    parent.detachChild(child3);
+
+    // ASSERT: Verify count of treeUpdated events equals number of operations
+    const treeUpdatedEvents = events.filter((e) => e.type === 'treeUpdated');
+    expect(treeUpdatedEvents).toHaveLength(3);
+
+    // ASSERT: Verify each event has correct root
+    treeUpdatedEvents.forEach((event) => {
+      if (event.type === 'treeUpdated') {
+        expect(event.root).toBe(parent.getNode());
+      }
+    });
+  });
+
+  it('should emit treeUpdated for mixed sequential operations', () => {
+    // ARRANGE: Create parent and children
+    const parent = new TDDOrchestrator('Parent');
+    const child1 = new TDDOrchestrator('Child1');
+    const child2 = new TDDOrchestrator('Child2');
+    const child3 = new TDDOrchestrator('Child3', parent);
+
+    const events: WorkflowEvent[] = [];
+    const observer: WorkflowObserver = {
+      onLog: () => {},
+      onEvent: (e) => events.push(e),
+      onStateUpdated: () => {},
+      onTreeChanged: () => {},
+    };
+
+    parent.addObserver(observer);
+
+    // ACT: Mixed sequence: attach, attach, detach, attach, detach
+    parent.attachChild(child1);
+    parent.attachChild(child2);
+    parent.detachChild(child3);
+    parent.detachChild(child1);
+    parent.attachChild(child3);
+
+    // ASSERT: Verify count of treeUpdated events equals number of operations
+    const treeUpdatedEvents = events.filter((e) => e.type === 'treeUpdated');
+    expect(treeUpdatedEvents).toHaveLength(5);
+
+    // ASSERT: Verify each event has correct root
+    treeUpdatedEvents.forEach((event) => {
+      if (event.type === 'treeUpdated') {
+        expect(event.root).toBe(parent.getNode());
+      }
+    });
+
+    // ASSERT: Verify event sequence matches operation sequence
+    const allTreeEvents = events.filter((e) =>
+      e.type === 'treeUpdated' || e.type === 'childAttached' || e.type === 'childDetached'
+    );
+    expect(allTreeEvents).toHaveLength(10); // 5 treeUpdated + 5 child events
+  });
 });

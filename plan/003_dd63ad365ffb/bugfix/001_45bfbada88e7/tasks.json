@@ -491,14 +491,14 @@
           "type": "Milestone",
           "id": "P2.M3",
           "title": "Milestone 2.3: Tree Update Event Consistency",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Ensure treeUpdated event is emitted consistently for all state changes to maintain the PRD's '1:1 tree mirror' guarantee.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M3.T1",
               "title": "Audit and Fix treeUpdated Event Emission",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Identify all state-changing methods in Workflow class and ensure treeUpdated event is emitted after structural changes.",
               "subtasks": [
                 {
@@ -525,7 +525,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T1.S3",
                   "title": "Write integration tests for tree update consistency",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M3.T1.S2"
@@ -554,7 +554,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S1",
                   "title": "Extend WorkflowConfig with errorMergeStrategy",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - ErrorMergeStrategy exists in src/types/error-strategy.ts. @Task decorator supports error merge for concurrent tasks. WorkflowConfig in src/types/workflow-context.ts has no error merge option.\n2. INPUT: Existing ErrorMergeStrategy interface.\n3. LOGIC: Extend WorkflowConfig interface in src/types/workflow-context.ts with optional errorMergeStrategy?: ErrorMergeStrategy field. Pass through to workflow initialization. Default: disabled (matches PRD - 'first error wins').\n4. OUTPUT: Extended WorkflowConfig interface with error merge support."
