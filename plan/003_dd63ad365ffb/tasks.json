@@ -471,7 +471,7 @@
               "type": "Task",
               "id": "P3.M2.T1",
               "title": "Task: Implement OpenCodeProvider Class",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Create OpenCodeProvider class in src/core/providers/opencode/opencode-provider.ts (conditional on SDK availability)",
               "subtasks": [
                 {
@@ -522,7 +522,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S5",
                   "title": "Implement normalizeModel() with provider validation",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M2.T1.S2"

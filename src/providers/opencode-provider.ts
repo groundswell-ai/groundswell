@@ -692,44 +692,40 @@ Each skill provides specific capabilities and guidelines.
    *
    * Parses model strings in two formats:
    * - Plain: "gpt-4" → { provider: 'opencode', model: 'gpt-4', raw: 'gpt-4' }
-   * - Qualified: "opencode/gpt-4" → { provider: 'opencode', model: 'gpt-4', raw: 'opencode/gpt-4' }
+   * - Qualified: "openai/gpt-4" → { provider: 'openai', model: 'gpt-4', raw: 'openai/gpt-4' }
    *
    * Delegates to {@link parseModelSpec} for parsing and validation.
-   * Validates that the provider is 'opencode'.
+   * Unlike AnthropicProvider, accepts ANY provider prefix (OpenCode supports 75+ providers).
    *
    * @param model - Model string to normalize
-   * @returns Parsed ModelSpec with provider='opencode'
+   * @returns Parsed ModelSpec with validated provider and model
    * @throws {Error} When model specification is invalid (delegated to parseModelSpec)
-   * @throws {Error} When provider is not 'opencode'
    *
    * @example
    * ```ts
    * const provider = new OpenCodeProvider();
    *
-   * // Plain format
+   * // Plain format (defaults to 'opencode' provider in Groundswell)
    * provider.normalizeModel('gpt-4');
    * // Returns: { provider: 'opencode', model: 'gpt-4', raw: 'gpt-4' }
    *
-   * // Qualified format
-   * provider.normalizeModel('opencode/claude-opus-4');
-   * // Returns: { provider: 'opencode', model: 'claude-opus-4', raw: 'opencode/claude-opus-4' }
+   * // Qualified format (multi-provider support)
+   * provider.normalizeModel('openai/gpt-4');
+   * // Returns: { provider: 'openai', model: 'gpt-4', raw: 'openai/gpt-4' }
    *
-   * // Error: wrong provider
-   * provider.normalizeModel('anthropic/claude-sonnet-4');
-   * // Throws: "Cannot normalize anthropic/claude-sonnet-4 with OpenCodeProvider..."
+   * provider.normalizeModel('anthropic/claude-3-5-sonnet-20250514');
+   * // Returns: { provider: 'anthropic', model: 'claude-3-5-sonnet-20250514', raw: 'anthropic/claude-3-5-sonnet-20250514' }
    * ```
    */
   normalizeModel(model: string): ModelSpec {
-    // Delegate to existing utility function
+    // PATTERN: Delegate to existing utility function
+    // Use "opencode" as default provider (Groundswell's internal ID for OpenCode provider)
     const spec = parseModelSpec(model, "opencode");
 
-    // Provider-specific validation
-    if (spec.provider !== this.id) {
-      throw new Error(
-        `Cannot normalize ${spec.provider}/${spec.model} with OpenCodeProvider. ` +
-          `Use ProviderRegistry.get('${spec.provider}') instead.`,
-      );
-    }
+    // CRITICAL DIFFERENCE FROM AnthropicProvider:
+    // DO NOT check if spec.provider !== this.id
+    // OpenCode is a multi-provider gateway - accepts any provider
+    // Provider validation happens server-side in OpenCode
 
     return spec;
   }
