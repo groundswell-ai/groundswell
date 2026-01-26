@@ -207,6 +207,50 @@ export interface PromptOverrides {
 
   /** Override model for this prompt */
   model?: string;
+
+  /**
+   * Override provider for this prompt
+   *
+   * ## Configuration Cascade (PRD 7.7)
+   *
+   * This is the highest priority in the provider cascade:
+   * 1. PromptOverrides.provider (this field) - highest
+   * 2. AgentConfig.provider
+   * 3. GlobalProviderConfig.defaultProvider - lowest
+   *
+   * @example
+   * ```ts
+   * const result = await agent.prompt(prompt, {
+   *   provider: 'opencode'  // Override agent's default provider
+   * });
+   * ```
+   */
+  provider?: ProviderId;
+
+  /**
+   * Override provider options for this prompt
+   *
+   * Merged with agent and global provider options using "last write wins"
+   * semantics. These options take highest priority in the cascade.
+   *
+   * ## Options Merge (PRD 7.7)
+   *
+   * Priority (highest to lowest):
+   * 1. PromptOverrides.providerOptions (this field) - highest
+   * 2. AgentConfig.providerOptions
+   * 3. GlobalProviderConfig.providerDefaults[provider] - lowest
+   *
+   * @example
+   * ```ts
+   * const result = await agent.prompt(prompt, {
+   *   providerOptions: {
+   *     temperature: 0.7,
+   *     timeout: 60000
+   *   }
+   * });
+   * ```
+   */
+  providerOptions?: ProviderOptions;
 }
 
 // ========================

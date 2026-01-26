@@ -643,7 +643,7 @@
                   "type": "Subtask",
                   "id": "P4.M2.T1.S3",
                   "title": "Refactor Agent.prompt() to use provider.execute()",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P4.M2.T1.S2",
