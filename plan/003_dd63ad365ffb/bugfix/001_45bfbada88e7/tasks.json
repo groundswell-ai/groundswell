@@ -310,7 +310,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Create decision analysis document",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/external_deps.md and provider system analysis - OpenCode provider has critical gaps (no MCP/LSP) vs PRD requirements. Three options exist: A) Document limitations, B) Implement full support (4-6 weeks), C) Remove provider.\n2. INPUT: PRD Section 7.4 capabilities specification, provider implementation analysis from architecture research.\n3. LOGIC: Create decision document plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/opencode-decision.md (NEW FILE). Analyze: Effort for each option (A: 1-2 days docs, B: 4-6 weeks dev, C: 1 week deprecation), Business impact (multi-provider promise, user expectations), Technical feasibility (SDK limitations, breaking changes), Test coverage implications. Provide recommendation with rationale.\n4. OUTPUT: Decision analysis document with clear recommendation. Must be actionable for product/engineering leadership."
