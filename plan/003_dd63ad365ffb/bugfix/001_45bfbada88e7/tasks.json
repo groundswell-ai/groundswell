@@ -228,7 +228,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S3",
                   "title": "Extract Agent.validateResponse to shared utility",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - Agent.validateResponse() is in src/core/agent.ts. It's a method on Agent class but should be accessible from Workflow class without Agent instance.\n2. INPUT: Existing validateResponse method from Agent class.\n3. LOGIC: Extract validation logic to src/utils/agent-validation.ts (NEW FILE). Create function validateAgentResponse(response: AgentResponse): { valid: boolean, errors?: ZodError }. Keep Agent.validateResponse() as wrapper that calls this utility. Update Workflow class to use utility directly.\n4. OUTPUT: New utility file src/utils/agent-validation.ts with extracted validation logic. Modified Agent class to use utility. Must maintain backward compatibility."

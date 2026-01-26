@@ -11,11 +11,11 @@ import type { WorkflowContext, WorkflowConfig, WorkflowResult } from '../types/w
 import type { AgentResponse } from '../types/agent.js';
 import { z } from 'zod';
 import { generateId } from '../utils/id.js';
+import { validateAgentResponse } from '../utils/agent-validation.js';
 import { analyzeErrorForRestart } from '../utils/restart-analysis.js';
 import { WorkflowLogger } from './logger.js';
 import { getObservedState } from '../decorators/observed-state.js';
 import { createWorkflowContext } from './workflow-context.js';
-import { AgentResponseSchema } from '../types/agent.js';
 
 /**
  * Executor function type for functional workflows
@@ -731,19 +731,16 @@ export class Workflow<T = unknown> {
     agentId: string,
     dataSchema: z.ZodTypeAny = z.unknown()
   ): boolean {
-    // Create schema for this response type
-    const schema = AgentResponseSchema(dataSchema);
+    // Call shared utility for validation
+    const result = validateAgentResponse(response, dataSchema);
 
-    // Validate response against schema
-    const validation = schema.safeParse(response);
-
-    if (validation.success) {
+    if (result.valid) {
       // Response is valid
       return true;
     }
 
     // Validation failed - emit event and create error
-    const zodError = validation.error;
+    const zodError = result.errors!;  // Safe: errors exists when valid is false
 
     // Emit invalidResponse event
     this.emitEvent({

@@ -24,11 +24,11 @@ import type {
 import {
   createSuccessResponse,
   createErrorResponse,
-  AgentResponseSchema,
 } from '../types/index.js';
 import type { Prompt } from './prompt.js';
 import { MCPHandler } from './mcp-handler.js';
 import { generateId } from '../utils/id.js';
+import { validateAgentResponse } from '../utils/agent-validation.js';
 import { getExecutionContext } from './context.js';
 import { generateCacheKey, defaultCache } from '../cache/index.js';
 import type { CacheKeyInputs } from '../cache/index.js';
@@ -890,13 +890,10 @@ export class Agent {
     response: AgentResponse<T>,
     dataSchema: z.ZodTypeAny
   ): AgentResponse<T> {
-    // Create schema for this response type
-    const schema = AgentResponseSchema(dataSchema);
+    // Call shared utility for validation
+    const result = validateAgentResponse(response, dataSchema);
 
-    // Validate response against schema
-    const validation = schema.safeParse(response);
-
-    if (validation.success) {
+    if (result.valid) {
       // Response is valid, return it unchanged
       return response;
     }
@@ -904,14 +901,14 @@ export class Agent {
     // Validation failed - this indicates a bug in our code
     // Log detailed error information for debugging
     console.error('Agent response validation failed', {
-      agentId: this.id,
+      agentId: this.id,  // Agent-specific logging (not in utility)
       timestamp: Date.now(),
-      errorCount: validation.error.errors.length,
-      errors: validation.error.errors.map((err) => ({
+      errorCount: result.errors?.errors.length ?? 0,
+      errors: result.errors?.errors.map((err) => ({
         path: err.path.join('.'),
         message: err.message,
         code: err.code,
-      })),
+      })) ?? [],
     });
 
     // Return INTERNAL_ERROR response
@@ -920,11 +917,11 @@ export class Agent {
       'INTERNAL_ERROR',
       'Internal response validation failed',
       {
-        validationErrors: validation.error.errors.map((err) => ({
+        validationErrors: result.errors?.errors.map((err) => ({
           path: err.path.join('.'),
           message: err.message,
           code: err.code,
-        })),
+        })) ?? [],
       },
       false // Non-recoverable - indicates system bug
     ) as AgentResponse<T>;
