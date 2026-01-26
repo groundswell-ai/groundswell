@@ -51,6 +51,25 @@ export interface ProviderOptions {
 }
 
 /**
+ * Session state for maintaining conversation history
+ *
+ * @remarks
+ * Stores conversation context for session-based execution.
+ * Used when {@link ProviderOptions.sessionId} is provided.
+ *
+ * @see {@link https://docs.anthropic.com/en/api/messages#continuous-conversations | Anthropic Continuous Conversations}
+ *
+ * @public
+ */
+export interface SessionState {
+  /** Conversation history - all user messages in this session */
+  history: import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
+
+  /** Last result message from the most recent execution */
+  lastResult: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
+}
+
+/**
  * Tool execution request
  */
 export interface ToolExecutionRequest {

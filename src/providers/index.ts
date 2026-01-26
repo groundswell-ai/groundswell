@@ -6,3 +6,13 @@
  */
 
 export { ProviderRegistry, InitializationStatus } from './provider-registry.js';
+
+export {
+  MemorySessionStore,
+  FileSessionStore,
+} from './session-store.js';
+
+export type {
+  SessionStore,
+  RedisSessionStore,
+} from './session-store.js';

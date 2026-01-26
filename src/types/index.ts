@@ -45,6 +45,7 @@ export type {
   ProviderErrorDetails,
   ProviderResponseMetadata,
   GlobalProviderConfig,
+  SessionState,
 } from './providers.js';
 
 // Provider classes
