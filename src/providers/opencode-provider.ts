@@ -1,6 +1,12 @@
 /**
  * OpenCode provider implementation (LLM-Only Mode)
  *
+ * @deprecated Since v1.5.0. Will be removed in v2.0.0.
+ * Use AnthropicProvider for full feature support.
+ *
+ * @see AnthropicProvider
+ * @see {@link https://groundswell.dev/docs/migration-opencode-removal | Migration Guide}
+ *
  * Wraps the @opencode-ai/sdk to provide multi-provider LLM access
  * through the unified Provider interface.
  *
@@ -17,6 +23,18 @@
  * - ❌ NO TOOL EXECUTION (tools disabled in execute())
  * - ❌ NO MCP INTEGRATION (managed by Groundswell's MCPHandler)
  * - ❌ NO LSP INTEGRATION (server-side only)
+ *
+ * **Why Removed:**
+ * - Architectural mismatch: OpenCode SDK requires external server process
+ * - PRD non-compliance: Missing required MCP and LSP capabilities
+ * - Technical debt: High maintenance burden for partial implementation
+ *
+ * **Migration:**
+ * Use AnthropicProvider which provides:
+ * - ✅ Full MCP server integration via createSdkMcpServer
+ * - ✅ LSP integration via MCP plugins
+ * - ✅ Client-side tool execution and delegation
+ * - ✅ Full PRD compliance
  *
  * ## Architecture
  *
@@ -42,16 +60,13 @@
  *
  * @example
  * ```ts
+ * // OLD (deprecated)
  * import { OpenCodeProvider } from 'groundswell';
- *
  * const provider = new OpenCodeProvider();
- * await provider.initialize();
  *
- * // LLM-only execution (no tools)
- * const result = await provider.execute(
- *   { prompt: 'Explain quantum computing', options: {} },
- *   toolExecutor  // ← Accepted but not used (LLM-only mode)
- * );
+ * // NEW (use this instead)
+ * import { AnthropicProvider } from 'groundswell';
+ * const provider = new AnthropicProvider();
  * ```
  */
 
@@ -150,6 +165,13 @@ export class OpenCodeProvider implements Provider {
   private skillsPrompt: string = '';
 
   /**
+   * Flag to ensure deprecation warning only shown once
+   *
+   * @internal
+   */
+  private static deprecationWarningShown = false;
+
+  /**
    * Initialize the OpenCode provider
    *
    * Loads the OpenCode SDK and starts the OpenCode server.
@@ -166,6 +188,25 @@ export class OpenCodeProvider implements Provider {
     // FOLLOW: AnthropicProvider pattern at src/providers/anthropic-provider.ts:156-159
     if (this.sdk) {
       return;
+    }
+
+    // One-time deprecation warning
+    if (!OpenCodeProvider.deprecationWarningShown) {
+      console.warn(
+        '\n⚠️  DEPRECATION WARNING ⚠️\n' +
+        'OpenCodeProvider is deprecated since v1.5.0 and will be removed in v2.0.0.\n' +
+        '\n' +
+        'Please migrate to AnthropicProvider for full feature support:\n' +
+        '  - MCP server integration (createSdkMcpServer)\n' +
+        '  - LSP integration via MCP plugins\n' +
+        '  - Client-side tool execution\n' +
+        '  - Full PRD compliance (Section 7.4)\n' +
+        '\n' +
+        'Migration guide: https://groundswell.dev/docs/migration-opencode-removal\n' +
+        '\n' +
+        `Called from: ${new Error().stack?.split('\n')[3]?.trim() || 'unknown'}\n`
+      );
+      OpenCodeProvider.deprecationWarningShown = true;
     }
 
     // Dynamic import of the OpenCode SDK for lazy loading

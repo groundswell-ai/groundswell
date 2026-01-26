@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Phase 1: Critical Bug Fixes - Block Release",
-      "status": "Planned",
+      "status": "Complete",
       "description": "Address critical PRD violations that prevent the system from meeting core specifications. These issues must be resolved before the implementation can be considered production-ready.",
       "milestones": [
         {
@@ -296,14 +296,14 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Milestone 1.3: OpenCode Provider Decision and Resolution",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Decide on the future of OpenCode provider based on feature parity requirements. Choose between: A) Document limitations clearly, B) Implement full MCP/LSP support, or C) Remove provider.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Decision: OpenCode Provider Future",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Make architectural decision on OpenCode provider based on PRD requirements, implementation effort, and business impact. This is a planning task, not an implementation task.",
               "subtasks": [
                 {
@@ -319,7 +319,7 @@
                   "type": "Subtask",
                   "id": "P1.M3.T1.S2",
                   "title": "Execute OpenCode provider resolution",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 8,
                   "dependencies": [
                     "P1.M3.T1.S1"

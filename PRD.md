@@ -30,7 +30,7 @@ This PRD includes:
 ✔️ Observer/event system skeleton
 ✔️ Snapshot system spec
 ✔️ Error/restart semantics
-✔️ Multi-provider Agent SDK support (Anthropic + OpenCode)
+✔️ Single-provider Agent SDK support (Anthropic)
 
 ---
 
@@ -257,12 +257,11 @@ Groundswell supports multiple Agent SDK providers with full feature parity. User
 | Provider | SDK | Package | Description |
 |----------|-----|---------|-------------|
 | `anthropic` | Anthropic Agent SDK | `@anthropic-ai/claude-agent-sdk` | Claude models via Anthropic's official Agent SDK |
-| `opencode` | OpenCode SDK | `@opencode-ai/sdk` | Multi-provider support (Anthropic, OpenAI, Ollama, 75+ providers) |
 
 ## **7.2 ProviderId**
 
 ```ts
-export type ProviderId = 'anthropic' | 'opencode';
+export type ProviderId = 'anthropic';
 ```
 
 ## **7.3 Provider Interface**
@@ -302,14 +301,14 @@ export interface ProviderCapabilities {
 }
 ```
 
-| Capability | Anthropic SDK | OpenCode SDK |
-|------------|--------------|--------------|
-| MCP | ✓ (via MCPHandler) | ✓ (native) |
-| Skills | ✓ (system prompt) | ✓ (native `/skills`) |
-| LSP | ✓ (MCP plugins) | ✓ (explicit `lsp` tool) |
-| Streaming | ✓ (message) | ✓ (SSE) |
-| Sessions | ✗ (stateless) | ✓ |
-| Extended Thinking | ✗ | ✓ |
+| Capability | Anthropic SDK |
+|------------|--------------|
+| MCP | ✓ (via MCPHandler) |
+| Skills | ✓ (system prompt) |
+| LSP | ✓ (MCP plugins) |
+| Streaming | ✓ (message) |
+| Sessions | ✗ (stateless) |
+| Extended Thinking | ✗ |
 
 ## **7.5 ProviderOptions**
 
@@ -341,9 +340,8 @@ import { configureProviders } from 'groundswell';
 
 // Set once at application startup - cascades to all agents
 configureProviders({
-  defaultProvider: 'opencode',
+  defaultProvider: 'anthropic',
   providerDefaults: {
-    opencode: { endpoint: 'http://localhost:8080' },
     anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
   },
 });
@@ -374,14 +372,13 @@ Model strings support two formats:
 | Plain name | `claude-sonnet-4-20250514` | Uses current provider |
 | Provider-qualified | `anthropic/claude-opus-4-20250514` | Explicit provider |
 
-**OpenCode provider/model format:**
+**Model specifications:**
 
 ```ts
-// OpenCode supports 75+ providers
-'anthropic/claude-sonnet-4-20250514'
-'openai/gpt-4'
-'ollama/llama3'
-'google/gemini-pro'
+// Supported Anthropic models
+'claude-sonnet-4-20250514'
+'claude-opus-4-20250514'
+'claude-haiku-4-20250514'
 ```
 
 ```ts
@@ -453,16 +450,9 @@ Mapping from `AgentHooks`:
 
 ## **7.12 LSP Integration**
 
-Both providers support Language Server Protocol for code intelligence:
+Language Server Protocol integration for code intelligence:
 
 **Anthropic SDK:** LSP via MCP plugins (automatic diagnostics after edits)
-
-**OpenCode SDK:** Explicit `lsp` tool with actions:
-- `definition` - Go to definition
-- `references` - Find references
-- `hover` - Hover information
-- `completion` - Code completion
-- `diagnostics` - Get diagnostics
 
 ```ts
 export interface LSPConfig {
@@ -479,19 +469,6 @@ export interface LSPConfig {
 const agent = new Agent({
   name: 'Analyzer',
   model: 'claude-sonnet-4-20250514',
-});
-```
-
-**OpenCode with multi-provider:**
-
-```ts
-const agent = new Agent({
-  name: 'Analyzer',
-  provider: 'opencode',
-  model: 'openai/gpt-4',
-  providerOptions: {
-    endpoint: 'http://localhost:8080',
-  },
 });
 ```
 
@@ -920,6 +897,6 @@ This PRD now includes:
 * error/restart models
 * snapshot system
 * **agent response model (all responses MUST be JSON)**
-* **multi-provider Agent SDK support with cascading configuration**
+* **Single-provider Agent SDK support with cascading configuration**
 
 A senior engineer should be able to implement the full engine from this PRD.

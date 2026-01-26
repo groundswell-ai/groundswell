@@ -1,6 +1,6 @@
 # Provider Examples
 
-Comprehensive examples demonstrating Groundswell's multi-provider system, including provider registration, configuration, switching, and advanced features.
+Comprehensive examples demonstrating Groundswell's provider system, including provider registration, configuration, and advanced features.
 
 ## Quick Start
 
@@ -27,7 +27,6 @@ npm run start:provider-features
 
 - **Node.js 18+** - Required for ES modules and modern TypeScript features
 - **ANTHROPIC_API_KEY** - Set as environment variable for Anthropic provider
-- **OpenCode Server (optional)** - Required for OpenCode provider examples
 
 ## Examples Overview
 
@@ -165,14 +164,14 @@ Priority from highest to lowest:
 
 ### Provider Capabilities Comparison
 
-| Feature         | Anthropic | OpenCode |
-|-----------------|-----------|----------|
-| MCP Support     | ✓         | ✗        |
-| Skills          | ✓         | ✓        |
-| LSP Support     | ✓         | ✗        |
-| Streaming       | ✓         | ✓        |
-| Sessions        | ✓         | ✓        |
-| Extended Thinking| ✓        | ✓        |
+| Feature         | Anthropic |
+|-----------------|-----------|
+| MCP Support     | ✓         |
+| Skills          | ✓         |
+| LSP Support     | ✓         |
+| Streaming       | ✓         |
+| Sessions        | ✓         |
+| Extended Thinking| ✓        |
 
 ## Usage Patterns
 
@@ -194,15 +193,15 @@ await registry.initializeProvider('anthropic', {
 const agent = new Agent({ provider: 'anthropic' });
 ```
 
-### Provider Switching
+### Provider Switching (Model Selection)
 
 ```typescript
-// Agent-level switching
-const anthropicAgent = new Agent({ provider: 'anthropic' });
-const opencodeAgent = new Agent({ provider: 'opencode' });
+// Agent-level switching with different models
+const fastAgent = new Agent({ provider: 'anthropic', model: 'claude-haiku-4-20250514' });
+const smartAgent = new Agent({ provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
 
 // Prompt-level switching
-await agent.prompt(prompt, { provider: 'opencode' });
+await agent.prompt(prompt, { model: 'claude-opus-4-20250514' });
 ```
 
 ### Session Management
@@ -235,19 +234,19 @@ await provider.registerMCPs([{
 ### Cost Optimization
 
 ```typescript
-// Route simple tasks to cheaper provider
+// Route simple tasks to faster model
 const complexity = analyzeTask(task);
-const provider = complexity === 'simple' ? 'opencode' : 'anthropic';
-await agent.prompt(prompt, { provider });
+const model = complexity === 'simple' ? 'claude-haiku-4-20250514' : 'claude-sonnet-4-20250514';
+await agent.prompt(prompt, { model });
 ```
 
 ### Fallback Pattern
 
 ```typescript
 try {
-  return await agent.prompt(prompt, { provider: 'anthropic' });
+  return await agent.prompt(prompt, { model: 'claude-sonnet-4-20250514' });
 } catch (error) {
-  return await agent.prompt(prompt, { provider: 'opencode' });
+  return await agent.prompt(prompt, { model: 'claude-haiku-4-20250514' });
 }
 ```
 
@@ -255,8 +254,9 @@ try {
 
 ```typescript
 const results = {};
-for (const provider of ['anthropic', 'opencode']) {
-  results[provider] = await agent.prompt(prompt, { provider });
+const models = ['claude-sonnet-4-20250514', 'claude-opus-4-20250514'];
+for (const model of models) {
+  results[model] = await agent.prompt(prompt, { model });
 }
 // Compare results
 ```
@@ -294,18 +294,6 @@ Error: ANTHROPIC_API_KEY environment variable not set
 **Solution**: Set the required environment variable:
 ```bash
 export ANTHROPIC_API_KEY=sk-...
-```
-
-### OpenCode Connection Failed
-
-```
-Error: Failed to connect to OpenCode server
-```
-
-**Solution**: Ensure OpenCode server is running:
-```bash
-# Start OpenCode server
-opencode-server --port 4096
 ```
 
 ## Best Practices

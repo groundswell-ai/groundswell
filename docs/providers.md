@@ -1,6 +1,6 @@
 # Providers
 
-Groundswell supports multiple Agent SDK providers through a unified abstraction layer. Providers encapsulate SDK-specific details while presenting a consistent API for LLM execution, tool delegation, and session management.
+Groundswell supports the Anthropic Agent SDK provider through a unified abstraction layer. The provider encapsulates SDK-specific details while presenting a consistent API for LLM execution, tool delegation, and session management.
 
 ## Table of Contents
 
@@ -24,23 +24,21 @@ Groundswell supports multiple Agent SDK providers through a unified abstraction 
 
 ```typescript
 import { configureProviders, ProviderRegistry } from 'groundswell';
-import { AnthropicProvider, OpenCodeProvider } from 'groundswell';
+import { AnthropicProvider } from 'groundswell';
 
 // 1. Configure global defaults
 configureProviders({
   defaultProvider: 'anthropic',
   providerDefaults: {
-    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
-    opencode: { endpoint: 'http://localhost:4096' }
+    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
   }
 });
 
-// 2. Register providers
+// 2. Register provider
 const registry = ProviderRegistry.getInstance();
 registry.register(new AnthropicProvider());
-registry.register(new OpenCodeProvider());
 
-// 3. Initialize all providers
+// 3. Initialize provider
 await registry.initializeAll(getGlobalProviderConfig());
 
 // 4. Use with Agent (provider is resolved via cascade)
@@ -56,15 +54,12 @@ const result = await agent.prompt(prompt);
 | Provider | SDK | Package | MCP | Skills | LSP | Streaming | Sessions | Extended Thinking |
 |----------|-----|---------|-----|--------|-----|-----------|----------|-------------------|
 | `anthropic` | Anthropic Agent SDK | `@anthropic-ai/claude-agent-sdk` | ✓ | ✓ | ✓ | ✓ | ✓ (via abstraction) | ✓ |
-| `opencode` | OpenCode SDK | `@opencode-ai/sdk` | ✗ | ✓ | ✗ | ✓ | ✓ | ✓ |
 
 **Capability Notes:**
 
 - **Anthropic MCP**: Via `createSdkMcpServer` integration with Groundswell's MCPHandler
-- **OpenCode MCP**: Not supported - operates in LLM-only mode (tools executed server-side)
 - **Anthropic Sessions**: Implemented via abstraction layer (in-memory Map), not native to SDK
-- **OpenCode Sessions**: Native session-based state management
-- **Extended Thinking**: Both providers support reasoning tokens for extended thinking
+- **Extended Thinking**: Supports reasoning tokens for extended thinking
 
 ### ProviderId
 
@@ -74,7 +69,7 @@ const result = await agent.prompt(prompt);
  * Provider identifier union type
  * Defines supported Agent SDK providers
  */
-export type ProviderId = 'anthropic' | 'opencode';
+export type ProviderId = 'anthropic';
 ```
 
 ### ProviderCapabilities
@@ -132,14 +127,13 @@ The provider system uses a layered architecture with a unified interface that ab
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│           Provider Implementations                           │
-│  ┌─────────────────────┐  ┌─────────────────────┐          │
-│  │  AnthropicProvider  │  │  OpenCodeProvider   │          │
-│  │  - SDK: claude-     │  │  - SDK: opencode    │          │
-│  │    agent-sdk        │  │    -ai/sdk          │          │
-│  │  - MCP integration  │  │  - LLM-only mode    │          │
-│  │  - Session abstr.   │  │  - Native sessions  │          │
-│  └─────────────────────┘  └─────────────────────┘          │
+│           Provider Implementation                            │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  AnthropicProvider                                  │   │
+│  │  - SDK: @anthropic-ai/claude-agent-sdk             │   │
+│  │  - MCP integration via createSdkMcpServer          │   │
+│  │  - Session abstraction (in-memory Map)              │   │
+│  └─────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -168,10 +162,6 @@ configureProviders({
       apiKey: process.env.ANTHROPIC_API_KEY,
       timeout: 30000,
       headers: { 'X-Custom-Header': 'value' }
-    },
-    opencode: {
-      endpoint: 'http://localhost:4096',
-      timeout: 60000
     }
   }
 });
@@ -206,10 +196,10 @@ export interface GlobalProviderConfig {
 import { Agent } from 'groundswell';
 
 const agent = new Agent({
-  provider: 'opencode',           // Override global default
+  provider: 'anthropic',           // Override global default
   providerOptions: {
-    endpoint: 'http://localhost:8080',
-    timeout: 120000
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    timeout: 60000
   },
   model: 'claude-sonnet-4-20250514'
 });
@@ -256,7 +246,7 @@ Provider configuration uses nullish coalescing (`??`) to resolve values. The fir
              ▼
 ┌─────────────────────────────────────┐
 │  Agent-level Config (Medium)        │
-│  provider: 'opencode'               │
+│  provider: 'anthropic'              │
 │  providerOptions: { ... }           │
 └────────────┬────────────────────────┘
              │ ??
@@ -277,16 +267,15 @@ import { configureProviders, resolveProviderConfig, getGlobalProviderConfig } fr
 configureProviders({
   defaultProvider: 'anthropic',
   providerDefaults: {
-    anthropic: { apiKey: 'sk-global', timeout: 30000 },
-    opencode: { endpoint: 'http://localhost:4096', timeout: 60000 }
+    anthropic: { apiKey: 'sk-global', timeout: 30000 }
   }
 });
 
 // 2. Agent config (inherits from global)
 const agent = new Agent({
-  provider: 'opencode',           // Override global default
+  provider: 'anthropic',           // Override global default
   providerOptions: {
-    timeout: 120000               // Override global timeout for opencode
+    timeout: 60000                 // Override global timeout
   }
 });
 
@@ -302,7 +291,7 @@ const result = await agent.prompt(prompt, {
 // - provider: 'anthropic' (prompt wins)
 // - options: { apiKey: 'sk-prompt', timeout: 30000 }
 //   - apiKey from prompt options
-//   - timeout from anthropic global defaults (agent's timeout was for opencode)
+//   - timeout from anthropic global defaults
 ```
 
 ### Implementation
@@ -328,9 +317,8 @@ import { ProviderRegistry } from 'groundswell';
 // Get the singleton instance
 const registry = ProviderRegistry.getInstance();
 
-// Register providers
+// Register provider
 registry.register(new AnthropicProvider());
-registry.register(new OpenCodeProvider());
 
 // Check if provider exists
 if (registry.has('anthropic')) {
@@ -435,7 +423,6 @@ Model strings support two formats: plain (uses default provider) and qualified (
 |--------|---------|----------|-------|
 | Plain | `claude-sonnet-4-20250514` | (default) | `claude-sonnet-4-20250514` |
 | Qualified | `anthropic/claude-opus-4-20250514` | `anthropic` | `claude-opus-4-20250514` |
-| OpenCode | `openai/gpt-4` | `openai` | `gpt-4` |
 
 ### ModelSpec
 
@@ -470,29 +457,12 @@ provider.normalizeModel('claude-sonnet-4');
 provider.normalizeModel('anthropic/claude-opus-4');
 // Returns: { provider: 'anthropic', model: 'claude-opus-4', raw: 'anthropic/claude-opus-4' }
 
-// Error: wrong provider
-provider.normalizeModel('opencode/gpt-4');
-// Throws: "Cannot normalize opencode/gpt-4 with AnthropicProvider..."
+// Error: invalid provider
+provider.normalizeModel('invalid/gpt-4');
+// Throws: "Cannot normalize invalid/gpt-4 with AnthropicProvider..."
 ```
 
-**OpenCodeProvider:**
-
-```typescript
-const provider = new OpenCodeProvider();
-
-// Plain format (uses 'opencode' as default)
-provider.normalizeModel('gpt-4');
-// Returns: { provider: 'opencode', model: 'gpt-4', raw: 'gpt-4' }
-
-// Multi-provider support (75+ providers)
-provider.normalizeModel('openai/gpt-4');
-// Returns: { provider: 'openai', model: 'gpt-4', raw: 'openai/gpt-4' }
-
-provider.normalizeModel('anthropic/claude-3-5-sonnet-20250514');
-// Returns: { provider: 'anthropic', model: 'claude-3-5-sonnet-20250514', raw: '...' }
-```
-
-**GOTCHA:** OpenCode accepts any provider prefix (multi-provider gateway), while AnthropicProvider only accepts `anthropic`.
+**GOTCHA:** Model strings must use valid Anthropic model names or qualified format with 'anthropic' provider.
 
 ## Provider Lifecycle
 
@@ -560,10 +530,9 @@ await provider.terminate();  // Safe, no-op
 **Termination Behavior:**
 
 - **AnthropicProvider**: Clears SDK reference, MCP config, skills, sessions (stateless SDK)
-- **OpenCodeProvider**: Closes server process, clears client/server references
-- Both are idempotent and never throw (errors logged only)
+- Idempotent and never throws (errors logged only)
 
-See `src/providers/anthropic-provider.ts:147-229` and `src/providers/opencode-provider.ts:259-299`.
+See `src/providers/anthropic-provider.ts:147-229` for implementation details.
 
 ## Sessions
 
@@ -604,40 +573,6 @@ await provider.execute(
 - Each session tracks `history: SDKUserMessage[]` and `lastResult: SDKResultMessage`
 - For continuation: `continue: true` + `streamInput()` with history
 - **CRITICAL**: Anthropic SDK has no native sessions - this is a session abstraction layer provided by Groundswell
-
-### OpenCode Sessions (Native)
-
-```typescript
-const provider = new OpenCodeProvider();
-await provider.initialize();
-
-// Sessions are server-side (managed by OpenCode SDK)
-
-// Create or reuse session
-const result = await provider.execute(
-  {
-    prompt: 'My name is Bob',
-    options: { sessionId: 'session-456' }  // Auto-created if not exists
-  },
-  toolExecutor
-);
-
-// Continue session
-await provider.execute(
-  {
-    prompt: 'What is my name?',
-    options: { sessionId: 'session-456' }  // Reuse session
-  },
-  toolExecutor
-);
-// Response: "Your name is Bob."
-```
-
-**Implementation Details:**
-
-- Sessions are server-side (managed by OpenCode SDK)
-- `client.session.create()` creates new sessions
-- Native session state management via SDK
 
 ### Session ID Propagation
 
@@ -706,36 +641,6 @@ console.log(tools[0].name); // "filesystem__read_file"
 ```
 
 See `src/core/agent.ts:143-200` for tool executor implementation.
-
-### OpenCode LLM-Only Mode
-
-**CRITICAL LIMITATION:** OpenCode executes tools server-side with no client-side delegation mechanism.
-
-```typescript
-/**
- * OpenCode provider implementation (LLM-Only Mode)
- *
- * OpenCode executes tools server-side and does not support client-side
- * tool delegation. This provider operates in LLM-only mode:
- *
- * - ✅ Multi-provider LLM access (75+ providers)
- * - ✅ Session-based state management
- * - ✅ Extended thinking support
- * - ✅ Streaming responses
- * - ✅ Skills via system prompt injection
- * - ❌ NO TOOL EXECUTION (tools disabled in execute())
- * - ❌ NO MCP INTEGRATION (managed by Groundswell's MCPHandler)
- * - ❌ NO LSP INTEGRATION (server-side only)
- */
-```
-
-```typescript
-// OpenCodeProvider.registerMCPs() returns empty array
-const tools = await opencodeProvider.registerMCPs(servers);
-console.log(tools); // [] (LLM-only mode)
-```
-
-See `src/providers/opencode-provider.ts:786-822` for registerMCPs implementation.
 
 ### MCP Integration
 
@@ -808,13 +713,13 @@ export interface ProviderHookEvents {
 
 ### Hook Mapping
 
-| AgentHooks | ProviderHookEvents | Anthropic SDK | OpenCode SDK |
-|------------|-------------------|--------------|--------------|
-| `preToolUse` | `onToolStart` | ✓ PreToolUse | ✗ (server-side) |
-| `postToolUse` | `onToolEnd` | ✓ PostToolUse | ✗ (server-side) |
-| `sessionStart` | `onSessionStart` | ✓ SessionStart | Manual call |
-| `sessionEnd` | `onSessionEnd` | ✓ SessionEnd | Manual call |
-| (N/A) | `onStream` | N/A | ✓ SSE events |
+| AgentHooks | ProviderHookEvents | Anthropic SDK |
+|------------|-------------------|--------------|
+| `preToolUse` | `onToolStart` | ✓ PreToolUse |
+| `postToolUse` | `onToolEnd` | ✓ PostToolUse |
+| `sessionStart` | `onSessionStart` | ✓ SessionStart |
+| `sessionEnd` | `onSessionEnd` | ✓ SessionEnd |
+| (N/A) | `onStream` | N/A |
 
 ### Hook Adaptation
 
@@ -1149,8 +1054,8 @@ const agent = new Agent({
 
 // Prompt-level override (highest priority)
 await agent.prompt(prompt, {
-  provider: 'opencode',
-  providerOptions: { endpoint: 'http://localhost:4096' }
+  provider: 'anthropic',
+  providerOptions: { apiKey: process.env.ANTHROPIC_API_KEY }
 });
 ```
 
@@ -1166,9 +1071,9 @@ await agent.prompt(prompt, {
 
 **Code snippet**:
 ```typescript
-// Agent-level switching
-const anthropicAgent = new Agent({ provider: 'anthropic' });
-const opencodeAgent = new Agent({ provider: 'opencode' });
+// Agent-level switching with different models
+const fastAgent = new Agent({ provider: 'anthropic', model: 'claude-haiku-4-20250514' });
+const smartAgent = new Agent({ provider: 'anthropic', model: 'claude-sonnet-4-20250514' });
 
 // Prompt-level switching
 const flexibleAgent = new Agent({ provider: 'anthropic' });
@@ -1176,41 +1081,43 @@ const flexibleAgent = new Agent({ provider: 'anthropic' });
 // Use agent default
 await flexibleAgent.prompt(prompt);
 
-// Switch for this call only
-await flexibleAgent.prompt(prompt, { provider: 'opencode' });
+// Switch for this call only (different model)
+await flexibleAgent.prompt(prompt, { model: 'claude-haiku-4-20250514' });
 
 // Back to default
 await flexibleAgent.prompt(prompt);
 ```
 
-### Example 4: Multi-Provider Scenarios
+### Example 4: Multi-Model Scenarios
 
-**Run**: `npx tsx examples/providers/04-multi-provider-scenarios.ts`
+**Run**: `npx tsx examples/providers/04-multi-model-scenarios.ts`
 
 **What you'll learn**:
 - Cost optimization based on task complexity
+- Model selection strategies
 - Fallback patterns for resilience
-- A/B testing between providers
 - Production architecture patterns
 
 **Code snippet**:
 ```typescript
 // Cost optimization
 const complexity = analyzeTask(task);
-const provider = complexity === 'simple' ? 'opencode' : 'anthropic';
-await agent.prompt(prompt, { provider });
+const model = complexity === 'simple' ? 'claude-haiku-4-20250514' : 'claude-sonnet-4-20250514';
+await agent.prompt(prompt, { model });
 
 // Fallback pattern
 try {
   return await agent.prompt(prompt, { provider: 'anthropic' });
 } catch (error) {
-  return await agent.prompt(prompt, { provider: 'opencode' });
+  // Retry with different model if needed
+  return await agent.prompt(prompt, { model: 'claude-haiku-4-20250514' });
 }
 
-// A/B testing
+// A/B testing different models
+const models = ['claude-sonnet-4-20250514', 'claude-opus-4-20250514'];
 const results = {};
-for (const provider of ['anthropic', 'opencode']) {
-  results[provider] = await agent.prompt(prompt, { provider });
+for (const model of models) {
+  results[model] = await agent.prompt(prompt, { model });
 }
 ```
 
@@ -1311,12 +1218,11 @@ Provider identifier union type defining supported Agent SDK providers.
 
 **Type Signature:**
 ```typescript
-type ProviderId = 'anthropic' | 'opencode';
+type ProviderId = 'anthropic';
 ```
 
 **Description:**
 - `'anthropic'`: Anthropic Claude provider via `@anthropic-ai/claude-agent-sdk`
-- `'opencode'`: OpenCode multi-provider gateway via `@opencode-ai/sdk`
 
 **Example:**
 ```typescript
@@ -1772,8 +1678,8 @@ parseModelSpec('claude-sonnet-4', 'anthropic')
 // Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
 
 // Qualified format (explicit provider)
-parseModelSpec('opencode/gpt-4')
-// Returns: { provider: 'opencode', model: 'gpt-4', raw: 'opencode/gpt-4' }
+parseModelSpec('anthropic/claude-opus-4-20250514')
+// Returns: { provider: 'anthropic', model: 'claude-opus-4-20250514', raw: 'anthropic/claude-opus-4-20250514' }
 ```
 
 **See Also:**
@@ -1809,8 +1715,7 @@ import { configureProviders } from 'groundswell';
 configureProviders({
   defaultProvider: 'anthropic',
   providerDefaults: {
-    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY },
-    opencode: { endpoint: 'http://localhost:8080' }
+    anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
   }
 });
 ```
@@ -1958,7 +1863,7 @@ function configureProviders(config: GlobalProviderConfig): void
 - `config`: `GlobalProviderConfig` - Configuration object containing default provider and optional provider-specific defaults
 
 **Throws:**
-- `Error` - If `defaultProvider` is not a valid ProviderId ('anthropic' | 'opencode')
+- `Error` - If `defaultProvider` is not a valid ProviderId ('anthropic')
 - `Error` - If `providerDefaults` contains invalid provider IDs
 
 **Returns:** `void`
@@ -1977,15 +1882,11 @@ configureProviders({
 
 // Configuration with provider-specific defaults
 configureProviders({
-  defaultProvider: 'opencode',
+  defaultProvider: 'anthropic',
   providerDefaults: {
     anthropic: {
       apiKey: process.env.ANTHROPIC_API_KEY,
       timeout: 30000
-    },
-    opencode: {
-      endpoint: 'http://localhost:8080',
-      timeout: 60000
     }
   }
 });
@@ -2030,9 +1931,9 @@ console.log(config.defaultProvider); // 'anthropic'
 const providerOptions = config.providerDefaults?.[config.defaultProvider];
 
 // After configuration
-configureProviders({ defaultProvider: 'opencode' });
+configureProviders({ defaultProvider: 'anthropic' });
 const config2 = getGlobalProviderConfig();
-console.log(config2.defaultProvider); // 'opencode'
+console.log(config2.defaultProvider); // 'anthropic'
 ```
 
 **See Also:**
@@ -2090,16 +1991,15 @@ import { resolveProviderConfig, getGlobalProviderConfig } from 'groundswell';
 configureProviders({
   defaultProvider: 'anthropic',
   providerDefaults: {
-    anthropic: { timeout: 30000, apiKey: 'sk-global' },
-    opencode: { endpoint: 'http://localhost:8080' }
+    anthropic: { timeout: 30000, apiKey: 'sk-global' }
   }
 });
 
-// Agent configured with opencode override
-const agentProvider = 'opencode';
+// Agent configured with custom timeout
+const agentProvider = 'anthropic';
 const agentOptions = { timeout: 10000 };
 
-// Prompt with anthropic override
+// Prompt with custom temperature
 const promptProvider = 'anthropic';
 const promptOptions = { temperature: 0.5 };
 
@@ -2115,7 +2015,7 @@ const { provider, options } = resolveProviderConfig(
 console.log(provider); // 'anthropic' (prompt wins)
 console.log(options);
 // { timeout: 30000, apiKey: 'sk-global', temperature: 0.5 }
-// timeout from anthropic global defaults (agent's timeout was for opencode)
+// timeout from anthropic global defaults (agent's timeout was overridden)
 // apiKey from anthropic global defaults
 // temperature from prompt options
 ```
@@ -2150,7 +2050,7 @@ function parseModelSpec(
 
 **Throws:**
 - `Error` - When model specification is empty or whitespace-only
-- `Error` - When provider is invalid (not 'anthropic' or 'opencode')
+- `Error` - When provider is invalid (not 'anthropic')
 - `Error` - When provider or model parts are empty
 
 **Description:**
@@ -2168,7 +2068,7 @@ Uses default provider when no provider specified.
 
 **Validation Rules:**
 1. Input cannot be empty or whitespace-only
-2. Provider must be one of: `'anthropic'`, `'opencode'`
+2. Provider must be one of: `'anthropic'`
 3. Model name cannot be empty after provider split
 4. Only the first slash is considered the provider/model separator
 5. Input is trimmed before parsing, original preserved in `raw` field
@@ -2181,13 +2081,13 @@ import { parseModelSpec } from 'groundswell';
 const spec1 = parseModelSpec('anthropic/claude-3-5-sonnet');
 // Returns: { provider: 'anthropic', model: 'claude-3-5-sonnet', raw: 'anthropic/claude-3-5-sonnet' }
 
-// Qualified format with opencode
-const spec2 = parseModelSpec('opencode/gpt-4');
-// Returns: { provider: 'opencode', model: 'gpt-4', raw: 'opencode/gpt-4' }
+// Qualified format with anthropic
+const spec2 = parseModelSpec('anthropic/claude-opus-4-20250514');
+// Returns: { provider: 'anthropic', model: 'claude-opus-4-20250514', raw: 'anthropic/claude-opus-4-20250514' }
 
 // Plain format with explicit default provider
-const spec3 = parseModelSpec('gpt-4', 'opencode');
-// Returns: { provider: 'opencode', model: 'gpt-4', raw: 'gpt-4' }
+const spec3 = parseModelSpec('claude-sonnet-4', 'anthropic');
+// Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
 
 // Plain format with default provider (anthropic)
 const spec4 = parseModelSpec('claude-sonnet-4');
@@ -2198,7 +2098,7 @@ try {
   parseModelSpec('invalid/model');
 } catch (error) {
   console.error((error as Error).message);
-  // "Invalid provider: "invalid". Supported providers: "anthropic", "opencode""
+  // "Invalid provider: "invalid". Supported providers: "anthropic""
 }
 ```
 
@@ -2252,14 +2152,8 @@ const spec = parseModelSpec('anthropic/claude-3-5-sonnet');
 const model = formatModelForProvider(spec, 'anthropic');
 console.log(model); // "claude-3-5-sonnet"
 
-// Different provider: error
-const spec = parseModelSpec('anthropic/claude-3-5-sonnet');
-try {
-  formatModelForProvider(spec, 'opencode');
-} catch (error) {
-  console.error((error as Error).message);
-  // "Cannot translate anthropic/claude-3-5-sonnet to opencode provider. Cross-provider model translation is not supported."
-}
+// Different provider: error (with single provider, this case doesn't apply)
+// Note: With only 'anthropic' provider, cross-provider translation is not applicable
 
 // Use with Provider.normalizeModel()
 const provider = new AnthropicProvider();
@@ -2309,16 +2203,15 @@ Maintains a single instance of itself and stores provider instances in a Map for
 **Example:**
 ```typescript
 import { ProviderRegistry } from 'groundswell';
-import { AnthropicProvider, OpenCodeProvider } from 'groundswell';
+import { AnthropicProvider } from 'groundswell';
 
 // Get registry instance
 const registry = ProviderRegistry.getInstance();
 
-// Register providers
+// Register provider
 registry.register(new AnthropicProvider());
-registry.register(new OpenCodeProvider());
 
-// Retrieve providers
+// Retrieve provider
 const anthropic = registry.get('anthropic');
 if (anthropic) {
   await anthropic.initialize();
@@ -2667,9 +2560,8 @@ After all termination attempts complete, the providers and states maps are clear
 ```typescript
 const registry = ProviderRegistry.getInstance();
 
-// Register and initialize providers
+// Register and initialize provider
 registry.register(anthropicProvider);
-registry.register(opencodeProvider);
 await registry.initializeAll(config);
 
 // Later, during shutdown

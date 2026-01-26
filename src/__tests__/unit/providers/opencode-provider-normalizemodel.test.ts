@@ -1,4 +1,12 @@
 /**
+ * OpenCodeProvider Tests (DEPRECATED)
+ *
+ * OpenCodeProvider is deprecated since v1.5.0 and will be removed in v2.0.0.
+ * These tests verify the deprecation warning works correctly.
+ *
+ * @see AnthropicProvider
+ * @see {@link https://groundswell.dev/docs/migration-opencode-removal | Migration Guide}
+ *
  * Unit tests for OpenCodeProvider.normalizeModel()
  *
  * Purpose: Comprehensive tests for normalizeModel() method per P3.M2.T1.S5
