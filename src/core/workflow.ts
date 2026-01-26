@@ -9,6 +9,7 @@ import type {
 } from '../types/index.js';
 import type { WorkflowContext, WorkflowConfig, WorkflowResult } from '../types/workflow-context.js';
 import { generateId } from '../utils/id.js';
+import { analyzeErrorForRestart } from '../utils/restart-analysis.js';
 import { WorkflowLogger } from './logger.js';
 import { getObservedState } from '../decorators/observed-state.js';
 import { createWorkflowContext } from './workflow-context.js';
@@ -558,6 +559,132 @@ export class Workflow<T = unknown> {
     });
 
     return result;
+  }
+
+  /**
+   * Analyze a WorkflowError from a child workflow and determine restart action
+   *
+   * This method enables parent workflows to make intelligent decisions about child
+   * workflow failures by analyzing the error and step metadata to determine whether
+   * to retry the child, abort the parent, or rebuild the execution plan.
+   *
+   * **Analysis Flow:**
+   * 1. Check `error.original?.recoverable` - if false, return 'abort'
+   * 2. Extract stepName from error metadata (if available)
+   * 3. Retrieve step metadata from stepMetadata map (if exists)
+   * 4. Check if step is marked as restartable - if not, return 'abort'
+   * 5. Use `analyzeErrorForRestart` utility to check retry criteria
+   * 6. Return 'retry' if any criteria match, otherwise 'abort'
+   *
+   * **Integration with restartStep:**
+   * This method is designed to be used alongside `restartStep()`:
+   * - Call `analyzeError()` to get the decision
+   * - If 'retry', call `restartStep(stepName)` to execute
+   * - If 'abort', throw the error or return early
+   * - If 'rebuild', trigger plan rebuild logic
+   *
+   * @param error - The WorkflowError to analyze (typically from child workflow)
+   * @returns The recommended action: 'retry', 'abort', or 'rebuild'
+   *
+   * @example Parent workflow error handling
+   * ```ts
+   * class ParentWorkflow extends Workflow {
+   *   @Step({ restartable: true, retryOn: [{ code: 'TIMEOUT' }] })
+   *   async childWorkflow(): Promise<void> {
+   *     // Child logic that may fail
+   *   }
+   *
+   *   async run(): Promise<void> {
+   *     try {
+   *       await this.childWorkflow();
+   *     } catch (err) {
+   *       const error = err as WorkflowError;
+   *       const action = this.analyzeError(error);
+   *
+   *       if (action === 'retry') {
+   *         await this.restartStep('childWorkflow');
+   *       } else if (action === 'abort') {
+   *         throw error;
+   *       } else if (action === 'rebuild') {
+   *         // Trigger plan rebuild logic
+   *       }
+   *     }
+   *   }
+   * }
+   * ```
+   *
+   * @example Analyze error from child workflow event
+   * ```ts
+   * class ParentWorkflow extends Workflow {
+   *   private lastError: WorkflowError | null = null;
+   *
+   *   async run(): Promise<void> {
+   *     // Subscribe to error events
+   *     this.on('error', (event) => {
+   *       this.lastError = event.error;
+   *     });
+   *
+   *     // Later, analyze the error
+   *     if (this.lastError) {
+   *       const action = this.analyzeError(this.lastError);
+   *       // Take action based on decision
+   *     }
+   *   }
+   * }
+   * ```
+   *
+   * @remarks
+   * **Known Limitation:**
+   * The `stepMetadata` map is not yet populated by the `@Step` decorator.
+   * This method will return 'abort' if stepMetadata is not available or the step
+   * is not found. This will be improved in a future update to the decorator.
+   *
+   * **Error Metadata:**
+   * The stepName is extracted from `error.state?.stepName`. Ensure child
+   * workflows populate this field when creating WorkflowError instances.
+   *
+   * @see {@link restartStep} - For executing a retry after analysis
+   * @see {@link analyzeErrorForRestart} - For the underlying utility function
+   */
+  public analyzeError(error: WorkflowError): 'retry' | 'abort' | 'rebuild' {
+    // STEP 1: Check recoverable flag
+    const original = error.original as Error | undefined;
+    if (original && 'recoverable' in original && !original.recoverable) {
+      return 'abort';
+    }
+
+    // STEP 2: Extract stepName from error metadata
+    // GOTCHA: WorkflowError doesn't have stepName property
+    // Check if error.state or error.original has step information
+    const stepName = error.state?.stepName as string | undefined;
+    if (!stepName) {
+      return 'abort'; // Can't determine which step failed
+    }
+
+    // STEP 3: Get step metadata with graceful handling
+    // CRITICAL: stepMetadata may not exist yet (decorator doesn't store it)
+    if (!('stepMetadata' in this)) {
+      return 'abort'; // No metadata available
+    }
+
+    const stepMeta = (this as any).stepMetadata.get(stepName);
+    if (!stepMeta) {
+      return 'abort'; // Step not found in metadata
+    }
+
+    // STEP 4: Check if step is restartable
+    if (!stepMeta.options?.restartable) {
+      return 'abort'; // Step not marked as restartable
+    }
+
+    // STEP 5: Use analyzeErrorForRestart for criterion matching
+    const analysis = analyzeErrorForRestart(error, stepMeta.options);
+    if (analysis.shouldRestart) {
+      return 'retry';
+    }
+
+    // STEP 6: Default to abort
+    return 'abort';
   }
 
   /**
