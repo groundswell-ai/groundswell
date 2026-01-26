@@ -8,3 +8,4 @@ export { parseModelSpec, formatModelForProvider } from './model-spec.js';
 export { Observable } from './observable.js';
 export type { Subscription, Observer } from './observable.js';
 export type { ValidationResult } from './agent-validation.js';
+export { serializeSession, deserializeSession, SessionSerializationError } from './session-serialization.js';
