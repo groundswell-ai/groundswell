@@ -989,5 +989,32 @@ export function AgentResponseSchema<T extends z.ZodTypeAny>(dataSchema: T) {
     metadata: AgentResponseMetadataSchema.optional(),
   });
 
-  return z.discriminatedUnion('status', [successSchema, errorSchema, partialSchema]);
+  return z.discriminatedUnion('status', [successSchema, errorSchema, partialSchema]).superRefine((data, ctx) => {
+    // Runtime validation: ensure consistency between status and data/error fields
+    if (data.status === 'success') {
+      if (data.error !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Invalid state: status='success' but error is non-null (must be null)",
+          path: ['error'],
+        });
+      }
+    } else if (data.status === 'error') {
+      if (data.data !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Invalid state: status='error' but data is non-null (must be null)",
+          path: ['data'],
+        });
+      }
+    } else if (data.status === 'partial') {
+      if (data.error !== null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Invalid state: status='partial' but error is non-null (must be null)",
+          path: ['error'],
+        });
+      }
+    }
+  });
 }

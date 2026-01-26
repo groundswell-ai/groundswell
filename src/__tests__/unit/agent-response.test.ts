@@ -649,6 +649,234 @@ describe('AgentResponse Schema Validation', () => {
     });
   });
 
+  describe('Runtime Refinement Validation (P3.M2.T1.S2)', () => {
+    // Helper functions for refinement tests
+    function createSuccessResponse<T>(data: T, error: any = null): any {
+      return {
+        status: 'success',
+        data,
+        error,
+        metadata: { agentId: 'test', timestamp: Date.now() }
+      };
+    }
+
+    function createErrorResponse(data: any = null, error?: any): any {
+      return {
+        status: 'error',
+        data,
+        error: error || { code: 'E', message: 'm', details: null, recoverable: false },
+        metadata: { agentId: 'test', timestamp: Date.now() }
+      };
+    }
+
+    function createPartialResponse<T>(data: T, error: any = null): any {
+      return {
+        status: 'partial',
+        data,
+        error,
+        metadata: { agentId: 'test', timestamp: Date.now() }
+      };
+    }
+
+    describe('success status refinements', () => {
+      it('should accept valid success response', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createSuccessResponse('test', null);
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toBe('success');
+          expect(result.data.data).toBe('test');
+          expect(result.data.error).toBe(null);
+        }
+      });
+
+      it('should reject status=success with error!=null', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createSuccessResponse('test', { code: 'E', message: 'm', details: null, recoverable: false });
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.errors[0].path).toEqual(['error']);
+          // The z.null() validation catches this first with invalid_type error
+          expect(result.error.errors[0].code).toBe('invalid_type');
+        }
+      });
+
+      it('should provide error for success with error', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createSuccessResponse('test', { code: 'ERROR', message: 'test error', details: null, recoverable: false });
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          // Error is caught by z.null() validation
+          expect(result.error.errors[0].code).toBe('invalid_type');
+          expect(result.error.errors[0].path).toEqual(['error']);
+        }
+      });
+    });
+
+    describe('error status refinements', () => {
+      it('should accept valid error response', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createErrorResponse(null);
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toBe('error');
+          expect(result.data.data).toBe(null);
+          expect(result.data.error).toBeDefined();
+        }
+      });
+
+      it('should reject status=error with data!=null', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createErrorResponse('test');
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.errors[0].path).toEqual(['data']);
+          // The z.null() validation catches this first with invalid_type error
+          expect(result.error.errors[0].code).toBe('invalid_type');
+        }
+      });
+
+      it('should provide error for error with data', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createErrorResponse('invalid data');
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          // Error is caught by z.null() validation
+          expect(result.error.errors[0].code).toBe('invalid_type');
+          expect(result.error.errors[0].path).toEqual(['data']);
+        }
+      });
+    });
+
+    describe('partial status refinements', () => {
+      it('should accept valid partial response', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createPartialResponse('test', null);
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.status).toBe('partial');
+          expect(result.data.data).toBe('test');
+          expect(result.data.error).toBe(null);
+        }
+      });
+
+      it('should reject status=partial with error!=null', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createPartialResponse('test', { code: 'E', message: 'm', details: null, recoverable: false });
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.errors[0].path).toEqual(['error']);
+          // The z.null() validation catches this first with invalid_type error
+          expect(result.error.errors[0].code).toBe('invalid_type');
+        }
+      });
+
+      it('should provide error for partial with error', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createPartialResponse('test', { code: 'ERROR', message: 'test error', details: null, recoverable: false });
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          // Error is caught by z.null() validation
+          expect(result.error.errors[0].code).toBe('invalid_type');
+          expect(result.error.errors[0].path).toEqual(['error']);
+        }
+      });
+    });
+
+    describe('refinement error path validation', () => {
+      it('should point error path to error field for success with error', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createSuccessResponse('test', { code: 'E', message: 'm', details: null, recoverable: false });
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.errors[0].path).toEqual(['error']);
+        }
+      });
+
+      it('should point error path to data field for error with data', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createErrorResponse('invalid');
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.errors[0].path).toEqual(['data']);
+        }
+      });
+
+      it('should point error path to error field for partial with error', () => {
+        const schema = AgentResponseSchema(z.string());
+        const response = createPartialResponse('test', { code: 'E', message: 'm', details: null, recoverable: false });
+
+        const result = schema.safeParse(response);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.errors[0].path).toEqual(['error']);
+        }
+      });
+    });
+
+    describe('refinement with external data simulation', () => {
+      it('should catch invalid combinations from JSON parsing', () => {
+        const schema = AgentResponseSchema(z.string());
+
+        // Simulate external JSON data with invalid combination
+        const invalidJson = '{"status":"success","data":"test","error":{"code":"E","message":"m","details":null,"recoverable":false},"metadata":{"agentId":"test","timestamp":123456}}';
+        const parsedData = JSON.parse(invalidJson);
+
+        const result = schema.safeParse(parsedData);
+
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.errors[0].path).toEqual(['error']);
+        }
+      });
+
+      it('should accept valid combinations from JSON parsing', () => {
+        const schema = AgentResponseSchema(z.string());
+
+        const validJson = '{"status":"success","data":"test","error":null,"metadata":{"agentId":"test","timestamp":123456}}';
+        const parsedData = JSON.parse(validJson);
+
+        const result = schema.safeParse(parsedData);
+
+        expect(result.success).toBe(true);
+      });
+    });
+  });
+
   describe('Type Guard Validation', () => {
     it('should narrow type with isSuccess type guard', () => {
       const response: AgentResponse<string> = createSuccessResponse('test', {

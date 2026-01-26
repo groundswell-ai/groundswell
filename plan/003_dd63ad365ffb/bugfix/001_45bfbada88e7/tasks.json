@@ -692,14 +692,14 @@
           "type": "Milestone",
           "id": "P3.M2",
           "title": "Milestone 3.2: AgentResponse Schema Strengthening",
-          "status": "Planned",
+          "status": "Ready",
           "description": "Strengthen AgentResponse JSON schema validation to enforce stricter consistency rules (Issue 7).",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M2.T1",
               "title": "Create Discriminated Union for AgentResponse",
-              "status": "Planned",
+              "status": "Ready",
               "description": "Use discriminated union pattern to enforce status/error/data consistency in AgentResponse schema.",
               "subtasks": [
                 {
@@ -715,7 +715,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S2",
                   "title": "Add Zod refinement for validation",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M2.T1.S1"
@@ -726,7 +726,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S3",
                   "title": "Write tests for schema validation",
-                  "status": "Planned",
+                  "status": "Ready",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M2.T1.S2"
