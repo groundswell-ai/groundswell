@@ -331,21 +331,52 @@ for await (const message of q) {
 
 ---
 
-## OpenCode Agent SDK (To Be Researched)
+## OpenCode Agent SDK
 
-### Status: UNVERIFIED
+### Package Information
+- **Package Name:** `@opencode-ai/sdk`
+- **Current Version:** `1.1.36`
+- **Type:** ESM module
+- **License:** MIT
+- **Maintainers:** adamelmore (adam@terminal.shop), thdxr (d@ironbay.co)
+- **Total Versions Published:** 3,021
+- **Unpacked Size:** 453.8 kB
+- **Dependencies:** None (zero dependencies)
+- **Publication Method:** GitHub Actions (published 7 hours ago as of research date)
 
-**Research required:** Web search needed after rate limit reset (February 1, 2026)
+### Official Resources
+- **NPM:** https://www.npmjs.com/package/@opencode-ai/sdk
+- **Tarball:** https://registry.npmjs.org/@opencode-ai/sdk/-/sdk-1.1.36.tgz
 
-### Potential Package Names
-- `@opencode-ai/sdk`
-- `opencode-agent-sdk`
-- `@opencodehq/agent-sdk`
-- Custom/private package
+### Installation Commands
+
+```bash
+# Core SDK (latest)
+npm install @opencode-ai/sdk
+
+# With specific version
+npm install @opencode-ai/sdk@1.1.36
+
+# Plugin framework for extensions
+npm install @opencode-ai/plugin
+```
+
+### Related Ecosystem Packages
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `@opencode-ai/plugin` | 1.1.36 | Plugin framework for extensions |
+| `ai-sdk-provider-opencode-sdk` | 1.0.0 | Vercel AI SDK v6 provider for OpenCode |
+| `opencode-agent-skills` | 0.6.4 | Dynamic skills plugin |
+| `opencode-orchestrator` | 1.2.14 | Multi-agent workflows |
+| `oh-my-opencode` | 3.0.1 | Batteries-included plugin |
+| `@gitlab/opencode-gitlab-auth` | 1.3.2 | GitLab OAuth plugin |
+| `opencode-openai-codex-auth` | 4.4.0 | OpenAI ChatGPT OAuth |
+| `opencode-gemini-auth` | 1.3.8 | Google Gemini auth |
 
 ### Expected Capabilities (from PRD)
 
-Based on PRD Section 7.4, OpenCode SDK should provide:
+Based on PRD Section 7.4 and ecosystem analysis, OpenCode SDK provides:
 
 #### Multi-Provider Support
 ```typescript
@@ -398,13 +429,28 @@ const result = await opencode.execute({
 });
 ```
 
-### Action Required
+### Alternative Multi-Provider SDKs
 
-1. **Search npmjs.com** for "opencode agent sdk"
-2. **Search GitHub** for "opencode-agent-sdk" repositories
-3. **Contact maintainers** if package is private/custom
-4. **Document actual API** if package exists
-5. **Plan alternative** if package doesn't exist (implement stub or use different multi-provider SDK)
+| SDK | Providers | TypeScript | MCP Support | Notes |
+|-----|-----------|------------|-------------|-------|
+| **Vercel AI SDK** | 17+ | Excellent | Via LangChain | Best unified API |
+| **LangChain** | 17+ | Excellent | **Native** (@langchain/mcp-adapters) | Most mature |
+| **Portkey** | 10+ | Excellent | No | Simple proxy |
+| **LiteLLM** | 100+ | Good | No | Python-first |
+| **OpenRouter** | 300+ | Excellent | No | Aggregator |
+
+### Implementation Strategy
+
+**Strategy A: Package Exists (Recommended)**
+- `@opencode-ai/sdk` is verified and actively maintained
+- Proceed to P3.M1.T1.S2 (Document OpenCode SDK API)
+- Implement OpenCodeProvider in P3.M2 following AnthropicProvider patterns
+- Use lazy loading for the SDK (zero dependencies makes this lightweight)
+
+**Strategy B: Alternative SDK (Fallback)**
+- If OpenCode SDK API doesn't meet requirements, consider Vercel AI SDK
+- LangChain with MCP adapters is another strong alternative
+- Both have excellent TypeScript support and active communities
 
 ---
 

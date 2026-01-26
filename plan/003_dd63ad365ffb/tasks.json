@@ -429,7 +429,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T1.S1",
                   "title": "Search npm registry for OpenCode SDK",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From external_dependencies.md - Need to find exact package name. Candidates: @opencode-ai/sdk, opencode-agent-sdk, @opencodehq/agent-sdk.\n2. INPUT: None.\n3. LOGIC: Use WebSearch tool after rate limit reset (Feb 1, 2026). Search npmjs.com for 'opencode agent sdk'. Check GitHub for repositories. Document package name, version, installation command.\n4. OUTPUT: Document findings in architecture/external_dependencies.md. If package exists, record npm name and install command. If not found, recommend alternative (LangChain, Vercel AI SDK, or custom)."
