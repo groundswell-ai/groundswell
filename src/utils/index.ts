@@ -4,4 +4,5 @@ export { generateId } from './id.js';
 export { mergeWorkflowErrors } from './workflow-error-utils.js';
 export { parseModelSpec, formatModelForProvider } from './model-spec.js';
 export { Observable } from './observable.js';
+export { analyzeErrorForRestart, TRANSIENT_ERROR_CODES, TRANSIENT_ERROR_SET } from './restart-analysis.js';
 export type { Subscription, Observer } from './observable.js';
