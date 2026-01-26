@@ -765,7 +765,7 @@
                   "type": "Subtask",
                   "id": "P5.M1.T2.S1",
                   "title": "Test ProviderRegistry singleton and registration",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S1"
