@@ -18,7 +18,11 @@ import type {
   ReflectionConfig,
   ReflectionContext,
   LogEntry,
+  WorkflowError,
 } from '../types/index.js';
+import type { AgentResponse } from '../types/agent.js';
+import type { ZodError } from 'zod';
+import { validateAgentResponse } from '../utils/agent-validation.js';
 import { EventTreeHandleImpl, createEventTreeHandle } from './event-tree.js';
 import {
   runInContext,
@@ -41,6 +45,27 @@ interface WorkflowLike {
 }
 
 /**
+ * Type guard for detecting AgentResponse objects
+ * Checks if a value has the structure of an AgentResponse
+ *
+ * This is intentionally permissive - it checks for the presence of
+ * AgentResponse fields, and the Zod schema does the actual validation.
+ *
+ * @param value - The value to check
+ * @returns True if the value might be an AgentResponse
+ */
+function isAgentResponse(value: unknown): value is AgentResponse {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'status' in value &&
+    'data' in value &&
+    'error' in value &&
+    'metadata' in value
+  );
+}
+
+/**
  * WorkflowContext implementation
  */
 export class WorkflowContextImpl implements WorkflowContext {
@@ -52,15 +77,18 @@ export class WorkflowContextImpl implements WorkflowContext {
   private workflow: WorkflowLike;
   private eventTreeImpl: EventTreeHandleImpl;
   private reflectionManager: ReflectionManager;
+  private autoValidateResponses: boolean;
 
   constructor(
     workflow: WorkflowLike,
     parentWorkflowId?: string,
-    reflectionConfig?: Partial<ReflectionConfig>
+    reflectionConfig?: Partial<ReflectionConfig>,
+    autoValidateResponses?: boolean
   ) {
     this.workflowId = workflow.id;
     this.parentWorkflowId = parentWorkflowId;
     this.workflow = workflow;
+    this.autoValidateResponses = autoValidateResponses ?? true;
 
     // Create event tree handle
     this.eventTreeImpl = new EventTreeHandleImpl(workflow.node);
@@ -123,6 +151,38 @@ export class WorkflowContextImpl implements WorkflowContext {
         // Execute function in context
         const result = await runInContext(executionContext, fn);
 
+        // Automatic validation for AgentResponse results
+        if (this.autoValidateResponses && isAgentResponse(result)) {
+          const validationResult = validateAgentResponse(result);
+
+          if (!validationResult.valid) {
+            const zodError = validationResult.errors!;
+
+            // Emit invalidResponse event
+            executionContext.emitEvent({
+              type: 'invalidResponse',
+              node: stepNode,
+              response: result,
+              agentId: 'unknown',  // Cannot determine agentId at context level
+              errors: zodError,
+              timestamp: Date.now(),
+            });
+
+            // Create WorkflowError with INVALID_RESPONSE_FORMAT context
+            const validationError: WorkflowError = {
+              message: `Agent response validation failed in step '${name}'`,
+              original: zodError,
+              workflowId: this.workflowId,
+              stack: zodError.stack,
+              state: getObservedState(this.workflow),
+              logs: [...this.workflow.node.logs] as LogEntry[],
+            };
+
+            // Throw immediately - validation errors are not retried via reflection
+            throw validationError;
+          }
+        }
+
         // Update step node status
         stepNode.status = 'completed';
 
@@ -166,6 +226,19 @@ export class WorkflowContextImpl implements WorkflowContext {
 
         // Rebuild event tree
         this.eventTreeImpl.rebuild(this.workflow.node);
+
+        // Check if this is a validation error - skip reflection for validation failures
+        const isValidationError =
+          error instanceof Object &&
+          'original' in error &&
+          error.original instanceof Object &&
+          'name' in error.original &&
+          error.original.name === 'ZodError';
+
+        if (isValidationError) {
+          // Validation errors should not trigger reflection - throw immediately
+          throw error;
+        }
 
         // Check if we should try reflection
         if (!this.reflectionManager.isEnabled() || attempt === maxAttempts) {
@@ -352,11 +425,13 @@ export class WorkflowContextImpl implements WorkflowContext {
  * @param workflow The workflow object
  * @param parentWorkflowId Optional parent workflow ID
  * @param reflectionConfig Optional reflection configuration
+ * @param autoValidateResponses Optional flag to enable automatic AgentResponse validation
  */
 export function createWorkflowContext(
   workflow: WorkflowLike,
   parentWorkflowId?: string,
-  reflectionConfig?: Partial<ReflectionConfig>
+  reflectionConfig?: Partial<ReflectionConfig>,
+  autoValidateResponses?: boolean
 ): WorkflowContext {
-  return new WorkflowContextImpl(workflow, parentWorkflowId, reflectionConfig);
+  return new WorkflowContextImpl(workflow, parentWorkflowId, reflectionConfig, autoValidateResponses);
 }

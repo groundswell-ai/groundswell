@@ -259,7 +259,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "Add automatic validation hook to workflow context",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S3"

@@ -147,6 +147,9 @@ export interface WorkflowConfig {
 
   /** Enable reflection for this workflow */
   enableReflection?: boolean;
+
+  /** Automatically validate AgentResponse results after agent.prompt() calls */
+  autoValidateResponses?: boolean;
 }
 
 /**
