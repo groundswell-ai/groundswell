@@ -45,7 +45,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S3",
                   "title": "Create stepRetry event type in events schema",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - WorkflowEvent types are defined in src/types/events.ts. Current event types include workflow lifecycle, agent, tool, reflection, and cache events. No stepRetry event exists.\n2. INPUT: Event structure requirements from P1.M1.T1.S2.\n3. LOGIC: Add new discriminated union member to WorkflowEvent type: { type: 'stepRetry', stepName: string, retryCount: number, analysis: RestartAnalysis, error: WorkflowError, timestamp: number }. Ensure it follows existing event pattern with type field for discrimination.\n4. OUTPUT: Updated WorkflowEvent type in src/types/events.ts with stepRetry event. Must be compatible with observer pattern (observers receive this via onEvent callback)."
