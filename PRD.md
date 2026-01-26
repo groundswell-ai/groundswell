@@ -280,11 +280,26 @@ export interface Provider {
     request: ProviderRequest,
     toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
     hooks?: ProviderHookEvents
-  ): Promise<ProviderResult<T>>;
+  ): Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
 
   registerMCPs(servers: MCPServer[]): Promise<Tool[]>;
   loadSkills(skills: Skill[]): Promise<void>;
   normalizeModel(model: string): ModelSpec;
+}
+```
+
+**Migration Note (v1.5.0):** The `execute()` method return type was changed from `ProviderResult<T>` to `AgentResponse<T>`. The structure is identical, but use `AgentResponse<T>` in new code. See Section 6 for the `AgentResponse<T>` interface definition.
+
+**Example:**
+
+```ts
+const response = await provider.execute<{ answer: string }>(
+  { prompt: 'What is 2+2?', options: {} },
+  toolExecutor
+);
+
+if (response.status === 'success') {
+  console.log(response.data.answer);  // Type-safe access
 }
 ```
 
