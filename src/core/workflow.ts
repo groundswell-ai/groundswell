@@ -292,6 +292,7 @@ export class Workflow<T = unknown> {
    * - Sets child.parent = this (workflow tree)
    * - Sets child.node.parent = this.node (node tree)
    * - Emits childAttached event to notify observers
+   * - Emits treeUpdated event to trigger tree debugger rebuild
    *
    * **Invariants Maintained:**
    * - Single-parent rule: A workflow can only have one parent
@@ -370,6 +371,9 @@ export class Workflow<T = unknown> {
       parentId: this.id,
       child: child.node,
     });
+
+    // Emit treeUpdated event to trigger tree debugger rebuild
+    this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node });
   }
 
   /**
@@ -378,6 +382,8 @@ export class Workflow<T = unknown> {
    * Removes the child from both the workflow tree (this.children) and
    * the node tree (this.node.children), clears the child's parent reference,
    * and emits a childDetached event to notify observers.
+   *
+   * Also emits treeUpdated event to trigger tree debugger rebuild.
    *
    * This enables reparenting workflows: oldParent.detachChild(child); newParent.attachChild(child);
    *
@@ -423,6 +429,9 @@ export class Workflow<T = unknown> {
       parentId: this.id,
       childId: child.id,
     });
+
+    // Emit treeUpdated event to trigger tree debugger rebuild
+    this.emitEvent({ type: 'treeUpdated', root: this.getRoot().node });
   }
 
   /**

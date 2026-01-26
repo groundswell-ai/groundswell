@@ -491,14 +491,14 @@
           "type": "Milestone",
           "id": "P2.M3",
           "title": "Milestone 2.3: Tree Update Event Consistency",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Ensure treeUpdated event is emitted consistently for all state changes to maintain the PRD's '1:1 tree mirror' guarantee.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M3.T1",
               "title": "Audit and Fix treeUpdated Event Emission",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Identify all state-changing methods in Workflow class and ensure treeUpdated event is emitted after structural changes.",
               "subtasks": [
                 {
@@ -514,7 +514,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T1.S2",
                   "title": "Add treeUpdated emission to missing methods",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M3.T1.S1"
@@ -525,7 +525,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T1.S3",
                   "title": "Write integration tests for tree update consistency",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M3.T1.S2"
