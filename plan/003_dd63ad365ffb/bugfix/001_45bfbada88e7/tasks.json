@@ -75,7 +75,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "Define RestartAnalysis and ErrorCriterion interfaces",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/restart_logic_analysis.md - No restart analysis interfaces currently exist. WorkflowError interface is in src/types/error.ts with fields: message, original, workflowId, stack, state, logs.\n2. INPUT: WorkflowError interface from src/types/error.ts. PRD Section 11 requirements for error analysis.\n3. LOGIC: Define RestartAnalysis interface with fields: shouldRestart: boolean, reason: string, suggestedAction: 'retry' | 'abort' | 'rebuild', estimatedSuccessProbability: number (0-1). Define ErrorCriterion as discriminated union used in P1.M1.T1.S1. Export from src/types/restart.ts (NEW FILE).\n4. OUTPUT: New file src/types/restart.ts with RestartAnalysis and ErrorCriterion type definitions. Must be importable by decorator and workflow modules."
