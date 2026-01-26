@@ -605,14 +605,14 @@
               "type": "Task",
               "id": "P3.M1.T1",
               "title": "Add Provider Capability Query Helpers",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Add convenience methods to Provider class for checking capabilities at runtime, improving developer experience.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T1.S1",
                   "title": "Implement supports() and requiresFeatures() methods",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/external_deps.md - Provider.capabilities object exists but no helper methods. Users must manually check provider.capabilities.mcp.\n2. INPUT: Provider interface, ProviderCapabilities type.\n3. LOGIC: Add methods to Provider interface: supports(capability: keyof ProviderCapabilities): boolean - returns this.capabilities[capability], requiresFeatures(features: (keyof ProviderCapabilities)[]): boolean - returns features.every(f => this.capabilities[f]). Implement in both AnthropicProvider and OpenCodeProvider.\n4. OUTPUT: Enhanced Provider interface with capability checking helpers. Must be implemented by all providers."
@@ -621,7 +621,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T1.S2",
                   "title": "Write tests for capability helpers",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M1.T1.S1"

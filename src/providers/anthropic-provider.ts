@@ -97,6 +97,26 @@ export class AnthropicProvider implements Provider {
   } satisfies ProviderCapabilities;
 
   /**
+   * Check if a specific capability is supported
+   *
+   * @param capability - The capability to check
+   * @returns true if the capability is supported
+   */
+  supports(capability: keyof ProviderCapabilities): boolean {
+    return this.capabilities[capability];
+  }
+
+  /**
+   * Check if all specified features are supported
+   *
+   * @param features - Array of capability keys to check
+   * @returns true if all features are supported
+   */
+  requiresFeatures(features: (keyof ProviderCapabilities)[]): boolean {
+    return features.every(f => this.capabilities[f]);
+  }
+
+  /**
    * Anthropic SDK module (lazy loaded)
    *
    * Dynamically imported in initialize() to support optional dependencies.

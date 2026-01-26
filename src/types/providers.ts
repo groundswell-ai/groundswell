@@ -815,4 +815,51 @@ export interface Provider {
    * ```
    */
   normalizeModel(model: string): ModelSpec;
+
+  /**
+   * Check if a specific capability is supported
+   *
+   * Convenience method for querying provider capabilities.
+   * Equivalent to accessing `this.capabilities[capability]`.
+   *
+   * @param capability - The capability to check (must be keyof ProviderCapabilities)
+   * @returns true if the capability is supported, false otherwise
+   *
+   * @example
+   * ```ts
+   * const provider = new AnthropicProvider();
+   * if (provider.supports('mcp')) {
+   *   // Register MCP servers
+   * }
+   *
+   * // Type-safe: TypeScript will error on invalid capability names
+   * provider.supports('invalid'); // Type error
+   * ```
+   */
+  supports(capability: keyof ProviderCapabilities): boolean;
+
+  /**
+   * Check if all specified features are supported
+   *
+   * Convenience method for validating multiple capabilities at once.
+   * Returns true only if ALL specified features are supported.
+   *
+   * @param features - Array of capability keys to check
+   * @returns true if all features are supported, false if any are unsupported
+   *
+   * @example
+   * ```ts
+   * const provider = new AnthropicProvider();
+   * if (provider.requiresFeatures(['mcp', 'streaming'])) {
+   *   // Enable advanced features requiring both MCP and streaming
+   * }
+   *
+   * // Empty array returns true (no requirements)
+   * provider.requiresFeatures([]); // true
+   *
+   * // Any unsupported feature returns false
+   * provider.requiresFeatures(['mcp', 'lsp']); // false if lsp is not supported
+   * ```
+   */
+  requiresFeatures(features: (keyof ProviderCapabilities)[]): boolean;
 }
