@@ -170,7 +170,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T4.S1",
                   "title": "Create parent-child restart integration test",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T3.S4"
