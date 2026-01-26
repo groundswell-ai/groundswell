@@ -44,13 +44,12 @@ import type {
   ToolExecutor,
   ProviderHookEvents,
   ModelSpec,
+  SessionState,
 } from "../types/providers.js";
 import type { AgentResponse } from "../types/agent.js";
-import {
-  createSuccessResponse,
-  createErrorResponse,
-} from "../types/agent.js";
+import { createSuccessResponse, createErrorResponse } from "../types/agent.js";
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
+import { MemorySessionStore, type SessionStore } from "./session-store.js";
 import { MCPHandler } from "../core/mcp-handler.js";
 import { parseModelSpec } from "../utils/model-spec.js";
 import { readFile } from "fs/promises";
@@ -121,7 +120,9 @@ export class AnthropicProvider implements Provider {
    *
    * @internal
    */
-  private mcpServerConfig: import("@anthropic-ai/claude-agent-sdk").McpServerConfig | null = null;
+  private mcpServerConfig:
+    | import("@anthropic-ai/claude-agent-sdk").McpServerConfig
+    | null = null;
 
   /**
    * Combined skills prompt for injection into system prompts
@@ -132,17 +133,18 @@ export class AnthropicProvider implements Provider {
    *
    * @internal
    */
-  private skillsPrompt: string = '';
+  private skillsPrompt: string = "";
 
   /**
-   * Session storage for multi-turn conversations
+   * Session storage backend
    *
-   * Maps session IDs to their conversation state. Enables session-based
-   * execution despite Anthropic SDK's stateless design.
+   * Manages session state using pluggable storage backends. Defaults to
+   * in-memory storage but can be configured with file-based, Redis, or
+   * custom implementations via ProviderOptions or setSessionStore().
    *
    * @internal
    */
-  private sessions: Map<string, SessionState> = new Map();
+  private sessionStore: SessionStore<SessionState> = new MemorySessionStore();
 
   /**
    * Initialize the Anthropic provider
@@ -177,6 +179,19 @@ export class AnthropicProvider implements Provider {
       );
     }
 
+    // Configure session store if provided in options
+    if (options?.sessionStore) {
+      this.sessionStore = options.sessionStore;
+    }
+
+    // Restore sessions from persistent store (non-memory stores)
+    // For persistent stores (File, Redis, custom), verify the store is accessible
+    if (!(this.sessionStore instanceof MemorySessionStore)) {
+      const sessionIds = await this.sessionStore.list();
+      // Sessions are already in store - no need to load into memory
+      // Just verify store is accessible by listing sessions
+    }
+
     // Note: Options are stored for later use in execute() method
     // The actual SDK client creation happens when execute() is called
     // This is because SDK may need different clients per-request (e.g., custom endpoint)
@@ -186,9 +201,7 @@ export class AnthropicProvider implements Provider {
     // - options.endpoint: Will be used in execute() for custom endpoint
     // - options.timeout: Will be used in execute() for request timeout
     // - options.headers: Will be used in execute() for custom headers
-    //
-    // Ignored option:
-    // - options.sessionId: Anthropic has sessions: false capability
+    // - options.sessionStore: Configured above for persistent storage
     //
     // Note: No internal initialization flag needed - ProviderRegistry manages state externally
   }
@@ -219,10 +232,14 @@ export class AnthropicProvider implements Provider {
     this.mcpServerConfig = null;
 
     // Clear skills prompt (from P2.M1.T1.S8)
-    this.skillsPrompt = '';
+    this.skillsPrompt = "";
 
-    // Clear session storage (from P2.M2.T1.S1)
-    this.sessions.clear();
+    // Clear session storage only for MemorySessionStore
+    // Persistent stores (File, Redis, custom) keep sessions after termination
+    if (this.sessionStore instanceof MemorySessionStore) {
+      await this.sessionStore.clear();
+    }
+    // For persistent stores, sessions remain in storage
 
     // GOTCHA: No return value needed - Promise<void> is implicit
     // GOTCHA: No throws possible from null check and assignment
@@ -249,16 +266,17 @@ export class AnthropicProvider implements Provider {
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
     hooks?: ProviderHookEvents,
-  ): Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
-    // PATTERN: SDK initialization check (follow initialize() pattern at lines 107-110)
-    // CRITICAL: Validate SDK is loaded before attempting to use it
-    if (!this.sdk) {
-      throw new Error("SDK not initialized. Call initialize() first.");
-    }
-
+  ):
+    | Promise<AgentResponse<T>>
+    | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
     // STREAMING MODE: Check if streaming is enabled
     // When options.streaming is true, return an AsyncGenerator that yields StreamEvent objects
     if (request.options.streaming) {
+      // PATTERN: SDK initialization check (follow initialize() pattern at lines 107-110)
+      // CRITICAL: Validate SDK is loaded before attempting to use it
+      if (!this.sdk) {
+        throw new Error("SDK not initialized. Call initialize() first.");
+      }
       return this.executeStreaming<T>(request, toolExecutor, hooks);
     }
 
@@ -266,6 +284,12 @@ export class AnthropicProvider implements Provider {
     // Note: This function is not 'async' because it needs to return either Promise or AsyncGenerator
     // The non-streaming path is wrapped in an async IIFE to return a Promise
     return (async (): Promise<AgentResponse<T>> => {
+      // PATTERN: SDK initialization check (follow initialize() pattern at lines 107-110)
+      // CRITICAL: Validate SDK is loaded before attempting to use it
+      if (!this.sdk) {
+        throw new Error("SDK not initialized. Call initialize() first.");
+      }
+
       // P2.M2.T1.S2: Session detection and retrieval
       // Extract sessionId from request options and retrieve session state
       const sessionId = request.options.sessionId;
@@ -273,7 +297,7 @@ export class AnthropicProvider implements Provider {
       let isContinuation = false;
 
       if (sessionId) {
-        session = this.getSession(sessionId);
+        session = await this.getSession(sessionId);
 
         // Check if this is a continuation (existing history)
         // Only continue if session exists and has history
@@ -284,8 +308,8 @@ export class AnthropicProvider implements Provider {
         // P2.M2.T1.S2: Create session if it doesn't exist (lazy session creation)
         // Session will be populated with user messages during message iteration
         if (!session) {
-          this.createSession(sessionId);
-          session = this.getSession(sessionId);
+          await this.createSession(sessionId);
+          session = await this.getSession(sessionId);
         }
       }
 
@@ -308,7 +332,9 @@ export class AnthropicProvider implements Provider {
 
         // System prompt mapping (from src/core/agent.ts:317-318)
         // CRITICAL: Inject loaded skills via buildSystemPromptWithSkills() helper
-        systemPrompt: this.buildSystemPromptWithSkills(request.options.systemPrompt),
+        systemPrompt: this.buildSystemPromptWithSkills(
+          request.options.systemPrompt,
+        ),
 
         // P2.M2.T1.S2: Continue flag for session continuation
         // CRITICAL: When continuing, SDK expects continue: true AND streamInput() with history
@@ -345,7 +371,7 @@ export class AnthropicProvider implements Provider {
       // Do NOT await the query() call - it returns the generator synchronously
       // P2.M2.T1.S2: For continuation, use empty prompt (history comes via streamInput)
       const queryResult = this.sdk!.query({
-        prompt: isContinuation ? '' : request.prompt,
+        prompt: isContinuation ? "" : request.prompt,
         options: sdkOptions,
       });
 
@@ -353,30 +379,32 @@ export class AnthropicProvider implements Provider {
       // CRITICAL: continue: true alone is insufficient - must also call streamInput() with history
       if (isContinuation && session) {
         await queryResult.streamInput(
-          async function* historyStream() {
+          (async function* historyStream() {
             for (const msg of session!.history) {
               yield msg;
             }
-          }()
+          })(),
         );
 
         // Stream new user message for continuation
         // CRITICAL: New message also goes via streamInput(), not prompt parameter
         await queryResult.streamInput(
-          async function* newMessageStream() {
+          (async function* newMessageStream() {
             yield {
-              type: 'user',
+              type: "user",
               message: { content: request.prompt },
               parent_tool_use_id: null,
-              session_id: session!.history[0]?.session_id ?? '',
+              session_id: session!.history[0]?.session_id ?? "",
             } as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage;
-          }()
+          })(),
         );
       }
 
       // PATTERN: Message iteration and AgentResponse construction
       // FROM: src/core/agent.ts lines 437-492
-      let resultMessage: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null = null;
+      let resultMessage:
+        | import("@anthropic-ai/claude-agent-sdk").SDKResultMessage
+        | null = null;
       let toolCallCount = 0;
 
       // Iterate over the AsyncGenerator of SDK messages
@@ -396,17 +424,31 @@ export class AnthropicProvider implements Provider {
 
         // P2.M2.T1.S2: Capture user messages and append to session history
         // CRITICAL: User messages must be accumulated for next turn's streamInput()
-        if (message.type === "user" && session) {
-          session.history.push(message as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage);
+        if (message.type === "user" && session && sessionId) {
+          session.history.push(
+            message as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage,
+          );
+
+          // CRITICAL: Save back to store for persistent stores
+          // FileSessionStore returns copies - must save after mutation
+          if (!(this.sessionStore instanceof MemorySessionStore)) {
+            await this.sessionStore.save(sessionId, session);
+          }
         }
 
         // Capture the final result message
         if (message.type === "result") {
-          resultMessage = message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
+          resultMessage =
+            message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
 
           // P2.M2.T1.S2: Update session lastResult with latest execution result
-          if (session) {
+          if (session && sessionId) {
             session.lastResult = resultMessage;
+
+            // CRITICAL: Save back to store for persistent stores
+            if (!(this.sessionStore instanceof MemorySessionStore)) {
+              await this.sessionStore.save(sessionId, session);
+            }
           }
         }
       }
@@ -420,16 +462,17 @@ export class AnthropicProvider implements Provider {
           "INVALID_RESPONSE_FORMAT",
           "No result message received from Agent SDK",
           { duration },
-          false
+          false,
         ) as AgentResponse<T>;
       }
 
       // Handle error subtypes (error_during_execution, error_max_turns)
       if (resultMessage.subtype !== "success") {
-        const errorResult = resultMessage as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage & {
-          subtype: string;
-          errors?: string[];
-        };
+        const errorResult =
+          resultMessage as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage & {
+            subtype: string;
+            errors?: string[];
+          };
         return createErrorResponse(
           "EXECUTION_FAILED",
           `Agent SDK execution failed: ${errorResult.subtype}`,
@@ -437,7 +480,7 @@ export class AnthropicProvider implements Provider {
             errors: errorResult.errors ?? [],
             subtype: errorResult.subtype,
           },
-          errorResult.subtype === "error_max_turns" // Recoverable if just hit turn limit
+          errorResult.subtype === "error_max_turns", // Recoverable if just hit turn limit
         ) as AgentResponse<T>;
       }
 
@@ -448,7 +491,8 @@ export class AnthropicProvider implements Provider {
       };
 
       // Extract data from result (prefer structured_output, fallback to result)
-      const data = (resultMessage.structured_output ?? resultMessage.result) as T;
+      const data = (resultMessage.structured_output ??
+        resultMessage.result) as T;
 
       // Return success response with metadata
       return createSuccessResponse(data, {
@@ -493,13 +537,13 @@ export class AnthropicProvider implements Provider {
     let isContinuation = false;
 
     if (sessionId) {
-      session = this.getSession(sessionId);
+      session = await this.getSession(sessionId);
       if (session && session.history.length > 0) {
         isContinuation = true;
       }
       if (!session) {
-        this.createSession(sessionId);
-        session = this.getSession(sessionId);
+        await this.createSession(sessionId);
+        session = await this.getSession(sessionId);
       }
     }
 
@@ -514,7 +558,9 @@ export class AnthropicProvider implements Provider {
     // Build SDK options
     const sdkOptions = {
       model: modelSpec.model,
-      systemPrompt: this.buildSystemPromptWithSkills(request.options.systemPrompt),
+      systemPrompt: this.buildSystemPromptWithSkills(
+        request.options.systemPrompt,
+      ),
       ...(isContinuation && { continue: true }),
       ...(request.options.tools &&
         request.options.tools.length > 0 && {
@@ -534,7 +580,7 @@ export class AnthropicProvider implements Provider {
 
     // Yield metadata event first
     yield {
-      type: 'metadata',
+      type: "metadata",
       metadata: {
         requestId: `${this.id}-${Date.now()}`,
         model: modelSpec.model,
@@ -544,35 +590,37 @@ export class AnthropicProvider implements Provider {
 
     // Create SDK query
     const queryResult = this.sdk.query({
-      prompt: isContinuation ? '' : request.prompt,
+      prompt: isContinuation ? "" : request.prompt,
       options: sdkOptions,
     });
 
     // Stream session history for continuation
     if (isContinuation && session) {
       await queryResult.streamInput(
-        async function* historyStream() {
+        (async function* historyStream() {
           for (const msg of session!.history) {
             yield msg;
           }
-        }()
+        })(),
       );
 
       await queryResult.streamInput(
-        async function* newMessageStream() {
+        (async function* newMessageStream() {
           yield {
-            type: 'user',
+            type: "user",
             message: { content: request.prompt },
             parent_tool_use_id: null,
-            session_id: session!.history[0]?.session_id ?? '',
+            session_id: session!.history[0]?.session_id ?? "",
           } as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage;
-        }()
+        })(),
       );
     }
 
-    let resultMessage: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null = null;
+    let resultMessage:
+      | import("@anthropic-ai/claude-agent-sdk").SDKResultMessage
+      | null = null;
     let toolCallCount = 0;
-    let fullText = '';
+    let fullText = "";
     let textIndex = 0;
 
     // Iterate over the AsyncGenerator of SDK messages
@@ -589,7 +637,7 @@ export class AnthropicProvider implements Provider {
                 const delta = text.slice(fullText.length);
                 fullText = text;
                 yield {
-                  type: 'text_delta',
+                  type: "text_delta",
                   delta,
                   index: textIndex++,
                 };
@@ -598,7 +646,7 @@ export class AnthropicProvider implements Provider {
               toolCallCount++;
               // Yield tool call start event
               yield {
-                type: 'tool_call_start',
+                type: "tool_call_start",
                 id: block.id,
                 name: block.name,
                 index: 0,
@@ -606,7 +654,7 @@ export class AnthropicProvider implements Provider {
               // Tool execution happens via SDK, toolExecutor is called through hooks
               // Yield tool call done event
               yield {
-                type: 'tool_call_done',
+                type: "tool_call_done",
                 id: block.id,
                 result: null, // Results come back in subsequent messages
               };
@@ -616,15 +664,28 @@ export class AnthropicProvider implements Provider {
       }
 
       // Capture user messages for session history
-      if (message.type === "user" && session) {
-        session.history.push(message as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage);
+      if (message.type === "user" && session && sessionId) {
+        session.history.push(
+          message as import("@anthropic-ai/claude-agent-sdk").SDKUserMessage,
+        );
+
+        // CRITICAL: Save back to store for persistent stores
+        if (!(this.sessionStore instanceof MemorySessionStore)) {
+          await this.sessionStore.save(sessionId, session);
+        }
       }
 
       // Capture the final result message
       if (message.type === "result") {
-        resultMessage = message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
-        if (session) {
+        resultMessage =
+          message as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage;
+        if (session && sessionId) {
           session.lastResult = resultMessage;
+
+          // CRITICAL: Save back to store for persistent stores
+          if (!(this.sessionStore instanceof MemorySessionStore)) {
+            await this.sessionStore.save(sessionId, session);
+          }
         }
       }
     }
@@ -634,9 +695,9 @@ export class AnthropicProvider implements Provider {
     // Handle missing result message
     if (!resultMessage) {
       yield {
-        type: 'error',
+        type: "error",
         error: new Error("No result message received from Agent SDK"),
-        code: 'INVALID_RESPONSE_FORMAT',
+        code: "INVALID_RESPONSE_FORMAT",
         retryable: false,
       };
       throw new Error("No result message received from Agent SDK");
@@ -644,14 +705,15 @@ export class AnthropicProvider implements Provider {
 
     // Handle error subtypes
     if (resultMessage.subtype !== "success") {
-      const errorResult = resultMessage as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage & {
-        subtype: string;
-        errors?: string[];
-      };
+      const errorResult =
+        resultMessage as import("@anthropic-ai/claude-agent-sdk").SDKResultMessage & {
+          subtype: string;
+          errors?: string[];
+        };
       yield {
-        type: 'error',
+        type: "error",
         error: new Error(`Agent SDK execution failed: ${errorResult.subtype}`),
-        code: 'EXECUTION_FAILED',
+        code: "EXECUTION_FAILED",
         retryable: errorResult.subtype === "error_max_turns",
       };
       throw new Error(`Agent SDK execution failed: ${errorResult.subtype}`);
@@ -660,17 +722,19 @@ export class AnthropicProvider implements Provider {
     // Yield usage event
     if (resultMessage.usage) {
       yield {
-        type: 'usage',
+        type: "usage",
         inputTokens: resultMessage.usage.input_tokens ?? 0,
         outputTokens: resultMessage.usage.output_tokens ?? 0,
-        cacheTokens: resultMessage.usage.cache_read_tokens ?? resultMessage.usage.cache_write_tokens,
+        cacheTokens:
+          resultMessage.usage.cache_read_tokens ??
+          resultMessage.usage.cache_write_tokens,
       };
     }
 
     // Yield done event
     yield {
-      type: 'done',
-      finishReason: 'stop',
+      type: "done",
+      finishReason: "stop",
     };
 
     // Extract data and return final AgentResponse
@@ -786,7 +850,7 @@ export class AnthropicProvider implements Provider {
 
     // Handle empty skills array - nothing to load
     if (skills.length === 0) {
-      this.skillsPrompt = '';
+      this.skillsPrompt = "";
       return;
     }
 
@@ -796,8 +860,8 @@ export class AnthropicProvider implements Provider {
     for (const skill of skills) {
       try {
         // GOTCHA: Skill.path is directory, must join with 'SKILL.md'
-        const skillMdPath = join(skill.path, 'SKILL.md');
-        const content = await readFile(skillMdPath, 'utf-8');
+        const skillMdPath = join(skill.path, "SKILL.md");
+        const content = await readFile(skillMdPath, "utf-8");
 
         // Format skill with markdown header
         skillContents.push(`### ${skill.name}\n\n${content.trim()}`);
@@ -805,14 +869,14 @@ export class AnthropicProvider implements Provider {
         // PATTERN: Wrap errors with context (follow registerMCPs pattern)
         throw new Error(
           `Failed to load skill '${skill.name}' from ${skill.path}: ` +
-          `${error instanceof Error ? error.message : 'Unknown error'}`
+            `${error instanceof Error ? error.message : "Unknown error"}`,
         );
       }
     }
 
     // Combine all skills with markdown separator
     // PATTERN: Use "\n\n---\n\n" for visual clarity (horizontal rule)
-    this.skillsPrompt = skillContents.join('\n\n---\n\n');
+    this.skillsPrompt = skillContents.join("\n\n---\n\n");
   }
 
   /**
@@ -833,7 +897,7 @@ export class AnthropicProvider implements Provider {
   private buildSystemPromptWithSkills(baseSystemPrompt?: string): string {
     // Case 1: No skills loaded - return base prompt unchanged
     if (!this.skillsPrompt) {
-      return baseSystemPrompt ?? '';
+      return baseSystemPrompt ?? "";
     }
 
     // Case 2: No base prompt - return skills with default header
@@ -886,7 +950,9 @@ Each skill provides specific capabilities and guidelines.
     hooks?: ProviderHookEvents,
   ): Partial<
     Record<
-      typeof this.sdk extends null ? never : import("@anthropic-ai/claude-agent-sdk").HookEvent,
+      typeof this.sdk extends null
+        ? never
+        : import("@anthropic-ai/claude-agent-sdk").HookEvent,
       import("@anthropic-ai/claude-agent-sdk").HookCallbackMatcher[]
     >
   > {
@@ -897,65 +963,93 @@ Each skill provides specific capabilities and guidelines.
 
     const sdkHooks: Partial<
       Record<
-        typeof this.sdk extends null ? never : import("@anthropic-ai/claude-agent-sdk").HookEvent,
+        typeof this.sdk extends null
+          ? never
+          : import("@anthropic-ai/claude-agent-sdk").HookEvent,
         import("@anthropic-ai/claude-agent-sdk").HookCallbackMatcher[]
       >
     > = {};
 
     // Map onToolStart → PreToolUse
     if (hooks.onToolStart) {
-      sdkHooks['PreToolUse' as import("@anthropic-ai/claude-agent-sdk").HookEvent] = [{
-        hooks: [async (input, _toolUseID, _options) => {
-          const preInput = input as import("@anthropic-ai/claude-agent-sdk").PreToolUseHookInput;
-          const toolRequest = {
-            name: preInput.tool_name,
-            input: preInput.tool_input,
-          };
-          await hooks.onToolStart!(toolRequest);
-          return { continue: true };
-        }],
-      }];
+      sdkHooks[
+        "PreToolUse" as import("@anthropic-ai/claude-agent-sdk").HookEvent
+      ] = [
+        {
+          hooks: [
+            async (input, _toolUseID, _options) => {
+              const preInput =
+                input as import("@anthropic-ai/claude-agent-sdk").PreToolUseHookInput;
+              const toolRequest = {
+                name: preInput.tool_name,
+                input: preInput.tool_input,
+              };
+              await hooks.onToolStart!(toolRequest);
+              return { continue: true };
+            },
+          ],
+        },
+      ];
     }
 
     // Map onToolEnd → PostToolUse
     if (hooks.onToolEnd) {
-      sdkHooks['PostToolUse' as import("@anthropic-ai/claude-agent-sdk").HookEvent] = [{
-        hooks: [async (input, _toolUseID, _options) => {
-          const postInput = input as import("@anthropic-ai/claude-agent-sdk").PostToolUseHookInput;
-          const toolRequest = {
-            name: postInput.tool_name,
-            input: postInput.tool_input,
-          };
-          const toolResult = {
-            content: postInput.tool_response,
-            isError: false, // SDK limitation - always false
-          };
-          const duration = 0; // SDK limitation - duration not available
-          await hooks.onToolEnd!(toolRequest, toolResult, duration);
-          return { continue: true };
-        }],
-      }];
+      sdkHooks[
+        "PostToolUse" as import("@anthropic-ai/claude-agent-sdk").HookEvent
+      ] = [
+        {
+          hooks: [
+            async (input, _toolUseID, _options) => {
+              const postInput =
+                input as import("@anthropic-ai/claude-agent-sdk").PostToolUseHookInput;
+              const toolRequest = {
+                name: postInput.tool_name,
+                input: postInput.tool_input,
+              };
+              const toolResult = {
+                content: postInput.tool_response,
+                isError: false, // SDK limitation - always false
+              };
+              const duration = 0; // SDK limitation - duration not available
+              await hooks.onToolEnd!(toolRequest, toolResult, duration);
+              return { continue: true };
+            },
+          ],
+        },
+      ];
     }
 
     // Map onSessionStart → SessionStart
     if (hooks.onSessionStart) {
-      sdkHooks['SessionStart' as import("@anthropic-ai/claude-agent-sdk").HookEvent] = [{
-        hooks: [async (_input, _toolUseID, _options) => {
-          await hooks.onSessionStart!();
-          return { continue: true };
-        }],
-      }];
+      sdkHooks[
+        "SessionStart" as import("@anthropic-ai/claude-agent-sdk").HookEvent
+      ] = [
+        {
+          hooks: [
+            async (_input, _toolUseID, _options) => {
+              await hooks.onSessionStart!();
+              return { continue: true };
+            },
+          ],
+        },
+      ];
     }
 
     // Map onSessionEnd → SessionEnd
     if (hooks.onSessionEnd) {
-      sdkHooks['SessionEnd' as import("@anthropic-ai/claude-agent-sdk").HookEvent] = [{
-        hooks: [async (_input, _toolUseID, _options) => {
-          const totalDuration = 0; // SDK limitation - duration not available
-          await hooks.onSessionEnd!(totalDuration);
-          return { continue: true };
-        }],
-      }];
+      sdkHooks[
+        "SessionEnd" as import("@anthropic-ai/claude-agent-sdk").HookEvent
+      ] = [
+        {
+          hooks: [
+            async (_input, _toolUseID, _options) => {
+              const totalDuration = 0; // SDK limitation - duration not available
+              await hooks.onSessionEnd!(totalDuration);
+              return { continue: true };
+            },
+          ],
+        },
+      ];
     }
 
     return sdkHooks;
@@ -1019,7 +1113,7 @@ Each skill provides specific capabilities and guidelines.
    * @remarks
    * Session will be used when execute() receives matching sessionId in options.
    */
-  createSession(sessionId: string): void {
+  async createSession(sessionId: string): Promise<void> {
     // PATTERN: SDK initialization check (follow execute() pattern at lines 219-223)
     if (!this.sdk) {
       throw new Error("SDK not initialized. Call initialize() first.");
@@ -1027,12 +1121,15 @@ Each skill provides specific capabilities and guidelines.
 
     // PATTERN: Idempotent operation (follow initialize() pattern)
     // Only create if doesn't exist
-    if (!this.sessions.has(sessionId)) {
-      this.sessions.set(sessionId, {
+    const exists = await this.sessionStore.has(sessionId);
+    if (!exists) {
+      const emptyState: SessionState = {
         history: [],
         lastResult: null,
-      });
+      };
+      await this.sessionStore.save(sessionId, emptyState);
     }
+    // If exists, do nothing (idempotent)
   }
 
   /**
@@ -1046,23 +1143,31 @@ Each skill provides specific capabilities and guidelines.
    * @remarks
    * This is a read-only operation - does not modify session state.
    */
-  getSession(sessionId: string): SessionState | undefined {
-    return this.sessions.get(sessionId);
+  async getSession(sessionId: string): Promise<SessionState | undefined> {
+    const state = await this.sessionStore.load(sessionId);
+    // Convert null to undefined for consistency
+    return state ?? undefined;
   }
-}
 
-/**
- * Session state for maintaining conversation history
- *
- * Stores the conversation context for session-based execution.
- * Used when request.options.sessionId is provided.
- *
- * @internal
- */
-interface SessionState {
-  /** Conversation history - all user messages in this session */
-  history: import("@anthropic-ai/claude-agent-sdk").SDKUserMessage[];
+  /**
+   * Delete a session
+   *
+   * Removes the session from storage. If the session doesn't exist,
+   * returns false.
+   *
+   * @param sessionId - Session identifier to delete
+   * @returns true if deleted, false if not found
+   * @throws {Error} If SDK is not initialized
+   * @remarks
+   * This is a destructive operation - deleted sessions cannot be recovered
+   * unless the store has backup/retention policies.
+   */
+  async deleteSession(sessionId: string): Promise<boolean> {
+    // PATTERN: SDK initialization check
+    if (!this.sdk) {
+      throw new Error("SDK not initialized. Call initialize() first.");
+    }
 
-  /** Last result message from the most recent execution */
-  lastResult: import("@anthropic-ai/claude-agent-sdk").SDKResultMessage | null;
+    return await this.sessionStore.delete(sessionId);
+  }
 }

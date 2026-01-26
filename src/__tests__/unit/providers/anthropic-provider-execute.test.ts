@@ -649,7 +649,7 @@ describe('AnthropicProvider - execute()', () => {
       await provider.execute(request, toolExecutor);
 
       // @ts-expect-error - Testing private property
-      const session = provider.getSession('test-session');
+      const session = await provider.getSession('test-session');
 
       expect(session).toBeDefined();
       expect(session?.history).toBeDefined();
@@ -674,7 +674,7 @@ describe('AnthropicProvider - execute()', () => {
       await provider.execute(request2, toolExecutor);
 
       // @ts-expect-error - Testing private property
-      const session = provider.getSession('existing-session');
+      const session = await provider.getSession('existing-session');
 
       expect(session).toBeDefined();
     });
@@ -729,7 +729,7 @@ describe('AnthropicProvider - execute()', () => {
 
       // Verify session has history
       // @ts-expect-error - Testing private property
-      let session = provider.getSession(sessionId);
+      let session = await provider.getSession(sessionId);
       expect(session?.history.length).toBeGreaterThan(0);
 
       // Reset mock for second call
@@ -787,7 +787,7 @@ describe('AnthropicProvider - execute()', () => {
       await provider.execute(request, toolExecutor);
 
       // @ts-expect-error - Testing private property
-      const session = provider.getSession('result-session');
+      const session = await provider.getSession('result-session');
 
       expect(session?.lastResult).toBeDefined();
       // @ts-expect-error - Testing private property
@@ -802,11 +802,11 @@ describe('AnthropicProvider - execute()', () => {
 
       await provider.execute(request, toolExecutor);
 
-      // Sessions map should be empty or not have unexpected sessions
+      // Sessions store should be empty or not have unexpected sessions
       // @ts-expect-error - Testing private property
-      const hasSessions = provider.sessions.size > 0;
+      const sessionList = await provider.sessionStore.list();
 
-      expect(hasSessions).toBe(false);
+      expect(sessionList).toHaveLength(0);
     });
 
     it('should set continue: true for continuation', async () => {

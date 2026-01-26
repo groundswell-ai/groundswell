@@ -1,14 +1,12 @@
-import type { Tool, MCPServer, Skill, TokenUsage } from './sdk-primitives.js';
-import type { AgentResponse } from './agent.js';
-import type { StreamEvent } from './streaming.js';
+import type { Tool, MCPServer, Skill, TokenUsage } from "./sdk-primitives.js";
+import type { AgentResponse } from "./agent.js";
+import type { StreamEvent } from "./streaming.js";
 
 /**
  * Provider identifier union type
  * Defines supported Agent SDK providers
  */
-export type ProviderId =
-  | 'anthropic'
-  | 'opencode';
+export type ProviderId = "anthropic" | "opencode";
 
 /**
  * Provider capability flags
@@ -48,6 +46,15 @@ export interface ProviderOptions {
 
   /** Custom headers */
   headers?: Record<string, string>;
+
+  /**
+   * Session store for persistent session storage
+   *
+   * @remarks
+   * Using type import to avoid circular dependency. The actual SessionStore
+   * type is imported from '../providers/session-store.js'.
+   */
+  sessionStore?: import("../providers/session-store.js").SessionStore<SessionState>;
 }
 
 /**
@@ -103,7 +110,7 @@ export interface ProviderHookEvents {
   onToolEnd?: (
     tool: ToolExecutionRequest,
     result: ToolExecutionResult,
-    duration: number
+    duration: number,
   ) => Promise<void> | void;
 
   /** Called when provider session starts */
@@ -188,7 +195,7 @@ export interface ModelSpec {
  * The provider does not create or manage its own MCPHandler instance.
  */
 export type ToolExecutor = (
-  request: ToolExecutionRequest
+  request: ToolExecutionRequest,
 ) => Promise<ToolExecutionResult>;
 
 // ========================
@@ -224,10 +231,7 @@ export type ToolExecutor = (
  *
  * @see {@link AgentResponseStatus | New response status type}
  */
-export type ProviderResponseStatus =
-  | 'success'
-  | 'error'
-  | 'partial';
+export type ProviderResponseStatus = "success" | "error" | "partial";
 
 /**
  * Detailed error information for provider operations
@@ -681,8 +685,10 @@ export interface Provider {
   execute<T>(
     request: ProviderRequest,
     toolExecutor: ToolExecutor,
-    hooks?: ProviderHookEvents
-  ): Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
+    hooks?: ProviderHookEvents,
+  ):
+    | Promise<AgentResponse<T>>
+    | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
 
   /**
    * Register MCP servers and return available tools
