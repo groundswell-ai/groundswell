@@ -55,6 +55,53 @@ export interface ProviderOptions {
    * type is imported from '../providers/session-store.js'.
    */
   sessionStore?: import("../providers/session-store.js").SessionStore<SessionState>;
+
+  /**
+   * Session persistence type
+   *
+   * @remarks
+   * Use 'file' for persistent storage across restarts. Mutually exclusive with
+   * sessionStore property.
+   *
+   * When specified, a SessionStore instance will be created automatically.
+   * Provide sessionStore directly for custom store implementations.
+   *
+   * @example
+   * ```ts
+   * // Easy configuration - file persistence
+   * { sessionPersistence: 'file' }
+   *
+   * // Full configuration - custom path and TTL
+   * {
+   *   sessionPersistence: 'file',
+   *   sessionPath: '/tmp/sessions',
+   *   sessionTtl: 3600000
+   * }
+   *
+   * // Direct injection - custom store
+   * { sessionStore: new CustomStore() }
+   * ```
+   */
+  sessionPersistence?: 'memory' | 'file' | 'redis';
+
+  /**
+   * Session time-to-live in milliseconds
+   *
+   * @remarks
+   * Sessions expire after this duration. Default: 86400000 (24 hours).
+   *
+   * Note: TTL enforcement is planned for a future PRP (P2.M2.T2.S2).
+   * This option is accepted now for forward compatibility.
+   */
+  sessionTtl?: number;
+
+  /**
+   * Directory path for file-based session storage
+   *
+   * @remarks
+   * Only used when sessionPersistence is 'file'. Default: './sessions'.
+   */
+  sessionPath?: string;
 }
 
 /**

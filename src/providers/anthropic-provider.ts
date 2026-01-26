@@ -49,7 +49,11 @@ import type {
 import type { AgentResponse } from "../types/agent.js";
 import { createSuccessResponse, createErrorResponse } from "../types/agent.js";
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
-import { MemorySessionStore, type SessionStore } from "./session-store.js";
+import {
+  MemorySessionStore,
+  FileSessionStore,
+  type SessionStore,
+} from "./session-store.js";
 import { MCPHandler } from "../core/mcp-handler.js";
 import { parseModelSpec } from "../utils/model-spec.js";
 import { readFile } from "fs/promises";
@@ -179,10 +183,34 @@ export class AnthropicProvider implements Provider {
       );
     }
 
-    // Configure session store if provided in options
+    // Handle session store configuration
+    // Priority: sessionStore (direct injection) > sessionPersistence (declarative)
     if (options?.sessionStore) {
+      // Direct injection (backward compatibility)
       this.sessionStore = options.sessionStore;
+    } else if (options?.sessionPersistence) {
+      // Create SessionStore from sessionPersistence option
+      switch (options.sessionPersistence) {
+        case "memory":
+          this.sessionStore = new MemorySessionStore<SessionState>();
+          break;
+        case "file": {
+          const path = options.sessionPath ?? "./sessions";
+          this.sessionStore = new FileSessionStore<SessionState>(path);
+          break;
+        }
+        case "redis":
+          throw new Error(
+            'Redis session storage not yet implemented. Use sessionPersistence: "memory" or "file", or provide a custom sessionStore instance.',
+          );
+        default: {
+          // Exhaustive check - TypeScript will error if missing case
+          const _exhaustiveCheck: never = options.sessionPersistence;
+          throw new Error(`Unknown session persistence type: ${_exhaustiveCheck}`);
+        }
+      }
     }
+    // If neither sessionStore nor sessionPersistence provided, keep existing default (MemorySessionStore)
 
     // Restore sessions from persistent store (non-memory stores)
     // For persistent stores (File, Redis, custom), verify the store is accessible
@@ -202,6 +230,9 @@ export class AnthropicProvider implements Provider {
     // - options.timeout: Will be used in execute() for request timeout
     // - options.headers: Will be used in execute() for custom headers
     // - options.sessionStore: Configured above for persistent storage
+    // - options.sessionPersistence: Creates appropriate SessionStore instance
+    // - options.sessionPath: Custom path for FileSessionStore
+    // - options.sessionTtl: Reserved for future TTL enforcement (P2.M2.T2.S2)
     //
     // Note: No internal initialization flag needed - ProviderRegistry manages state externally
   }

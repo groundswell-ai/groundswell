@@ -336,7 +336,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Phase 2: Major Issues - Next Release",
-      "status": "Complete",
+      "status": "Planned",
       "description": "Address major issues that impact system quality and type safety but do not completely block release. These should be resolved in the next release cycle.",
       "milestones": [
         {
@@ -392,7 +392,7 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "Milestone 2.2: Session Persistence Implementation",
-          "status": "Complete",
+          "status": "Planned",
           "description": "Implement session persistence to maintain conversation state across provider lifecycle (initialize → terminate → initialize). Currently sessions are in-memory only and lost on terminate.",
           "tasks": [
             {
@@ -449,14 +449,14 @@
               "type": "Task",
               "id": "P2.M2.T2",
               "title": "Add Session Configuration and Lifecycle Management",
-              "status": "Failed",
+              "status": "Planned",
               "description": "Add configuration options for session persistence and implement session TTL, cleanup, and lifecycle management.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T2.S1",
                   "title": "Add session configuration to ProviderOptions",
-                  "status": "Failed",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: ProviderOptions interface exists in src/types/providers.ts. No session configuration options exist.\n2. INPUT: SessionStore implementations from P2.M2.T1.S1.\n3. LOGIC: Extend ProviderOptions interface with: sessionStore?: SessionStore, sessionPersistence?: 'memory' | 'file' | 'redis', sessionTtl?: number (milliseconds, default: 24 hours), sessionPath?: string (for file store). Update AnthropicProvider.initialize() to read these options and configure session store accordingly.\n4. OUTPUT: Extended ProviderOptions interface with session configuration. Must support easy configuration (e.g., sessionPersistence: 'file')."
@@ -465,7 +465,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T2.S2",
                   "title": "Implement session TTL and cleanup",
-                  "status": "Failed",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T2.S1"
@@ -476,7 +476,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T2.S3",
                   "title": "Write documentation for session persistence",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M2.T2.S2"
@@ -491,21 +491,21 @@
           "type": "Milestone",
           "id": "P2.M3",
           "title": "Milestone 2.3: Tree Update Event Consistency",
-          "status": "Failed",
+          "status": "Planned",
           "description": "Ensure treeUpdated event is emitted consistently for all state changes to maintain the PRD's '1:1 tree mirror' guarantee.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M3.T1",
               "title": "Audit and Fix treeUpdated Event Emission",
-              "status": "Failed",
+              "status": "Planned",
               "description": "Identify all state-changing methods in Workflow class and ensure treeUpdated event is emitted after structural changes.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M3.T1.S1",
                   "title": "Audit state-changing methods in Workflow class",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - Workflow class in src/core/workflow.ts has methods that change state: setStatus(), snapshotState(), attachChild(), detachChild(). Inconsistent treeUpdated emission reported.\n2. INPUT: Workflow class source code.\n3. LOGIC: Read through src/core/workflow.ts and identify all methods that modify: status, stateSnapshot, children array, parent reference, logs array. Create list of methods with current treeUpdated emission status (yes/no). Document in plan/003_dd63ad365ffb/bugfix/001_45bfbada88e7/architecture/tree-update-audit.md.\n4. OUTPUT: Audit document listing all state-changing methods and their treeUpdated emission status."
@@ -514,7 +514,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T1.S2",
                   "title": "Add treeUpdated emission to missing methods",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M3.T1.S1"
@@ -525,7 +525,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T1.S3",
                   "title": "Write integration tests for tree update consistency",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M3.T1.S2"
@@ -540,21 +540,21 @@
           "type": "Milestone",
           "id": "P2.M4",
           "title": "Milestone 2.4: Workflow-Level Error Merge Strategy",
-          "status": "Failed",
+          "status": "Planned",
           "description": "Extend error merge strategy from @Task concurrent execution to workflow-level configuration, enabling consistent error handling across the entire workflow.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M4.T1",
               "title": "Add Error Merge Strategy to WorkflowConfig",
-              "status": "Failed",
+              "status": "Planned",
               "description": "Enable error merge strategy configuration at workflow level, not just for @Task concurrent execution.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M4.T1.S1",
                   "title": "Extend WorkflowConfig with errorMergeStrategy",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/system_context.md - ErrorMergeStrategy exists in src/types/error-strategy.ts. @Task decorator supports error merge for concurrent tasks. WorkflowConfig in src/types/workflow-context.ts has no error merge option.\n2. INPUT: Existing ErrorMergeStrategy interface.\n3. LOGIC: Extend WorkflowConfig interface in src/types/workflow-context.ts with optional errorMergeStrategy?: ErrorMergeStrategy field. Pass through to workflow initialization. Default: disabled (matches PRD - 'first error wins').\n4. OUTPUT: Extended WorkflowConfig interface with error merge support."
@@ -563,7 +563,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S2",
                   "title": "Implement error collection in workflow execution",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M4.T1.S1"
@@ -574,7 +574,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S3",
                   "title": "Write tests for workflow-level error merge",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M4.T1.S2"
@@ -591,28 +591,28 @@
       "type": "Phase",
       "id": "P3",
       "title": "Phase 3: Minor Issues - Polish",
-      "status": "Failed",
+      "status": "Planned",
       "description": "Address minor issues that improve developer experience, documentation clarity, and system polish. These are low-priority but should be completed for production readiness.",
       "milestones": [
         {
           "type": "Milestone",
           "id": "P3.M1",
           "title": "Milestone 3.1: Documentation and DX Improvements",
-          "status": "Failed",
+          "status": "Planned",
           "description": "Improve documentation clarity, add helper methods for common operations, and enhance developer experience.",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M1.T1",
               "title": "Add Provider Capability Query Helpers",
-              "status": "Failed",
+              "status": "Planned",
               "description": "Add convenience methods to Provider class for checking capabilities at runtime, improving developer experience.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T1.S1",
                   "title": "Implement supports() and requiresFeatures() methods",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: From architecture/external_deps.md - Provider.capabilities object exists but no helper methods. Users must manually check provider.capabilities.mcp.\n2. INPUT: Provider interface, ProviderCapabilities type.\n3. LOGIC: Add methods to Provider interface: supports(capability: keyof ProviderCapabilities): boolean - returns this.capabilities[capability], requiresFeatures(features: (keyof ProviderCapabilities)[]): boolean - returns features.every(f => this.capabilities[f]). Implement in both AnthropicProvider and OpenCodeProvider.\n4. OUTPUT: Enhanced Provider interface with capability checking helpers. Must be implemented by all providers."
@@ -621,7 +621,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T1.S2",
                   "title": "Write tests for capability helpers",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M1.T1.S1"
@@ -634,14 +634,14 @@
               "type": "Task",
               "id": "P3.M1.T2",
               "title": "Improve JSDoc Clarity",
-              "status": "Failed",
+              "status": "Planned",
               "description": "Update JSDoc comments to be clearer about default values and behavior, addressing Issue 9 from the bug report.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T2.S1",
                   "title": "Update Step decorator JSDoc for trackTiming default",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 0.5,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Issue 9 notes that trackTiming defaults to true but JSDoc doesn't clearly state this. Step decorator in src/decorators/step.ts line 94 has unclear comment.\n2. INPUT: Step decorator JSDoc comments.\n3. LOGIC: Update trackTiming JSDoc from 'Track and emit step duration' to 'Track and emit step duration (default: true, tracked unless explicitly set to false)'. Make the default crystal clear.\n4. OUTPUT: Improved JSDoc clarity in src/decorators/step.ts."
@@ -650,7 +650,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T2.S2",
                   "title": "Audit and improve other unclear JSDoc comments",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: JSDoc clarity varies across codebase. Some defaults are unclear.\n2. INPUT: Codebase JSDoc comments.\n3. LOGIC: Audit JSDoc in critical files: Workflow class, Agent class, Provider interface, decorators. Identify comments with unclear defaults or behavior. Update to be explicit: '(default: X)', 'required vs optional', side effects. Focus on public APIs.\n4. OUTPUT: Improved JSDoc clarity across key interfaces and classes."
@@ -661,14 +661,14 @@
               "type": "Task",
               "id": "P3.M1.T3",
               "title": "Add Workflow Name Security Validation",
-              "status": "Failed",
+              "status": "Planned",
               "description": "Enhance workflow name validation to prevent injection attacks and improve security (Issue 10).",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T3.S1",
                   "title": "Implement workflow name security validation",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Issue 10 - Workflow constructor validates empty/whitespace/length but not special characters. Names like '<script>alert('xss')</script>' are allowed.\n2. INPUT: Workflow constructor in src/core/workflow.ts lines 99-107.\n3. LOGIC: Add validation for: control characters (/[\\x00-\\x1F\\x7F]/), HTML/JS injection patterns (/<[^>]*>/, /javascript:/), path traversal (\\.\\.), file system operations. Throw WorkflowError with descriptive message if validation fails. Add JSDoc documenting allowed characters (alphanumeric, spaces, hyphens, underscores).\n4. OUTPUT: Enhanced workflow name validation in constructor. Must catch injection patterns."
@@ -677,7 +677,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T3.S2",
                   "title": "Write tests for name validation",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M1.T3.S1"
@@ -692,21 +692,21 @@
           "type": "Milestone",
           "id": "P3.M2",
           "title": "Milestone 3.2: AgentResponse Schema Strengthening",
-          "status": "Failed",
+          "status": "Planned",
           "description": "Strengthen AgentResponse JSON schema validation to enforce stricter consistency rules (Issue 7).",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M2.T1",
               "title": "Create Discriminated Union for AgentResponse",
-              "status": "Failed",
+              "status": "Planned",
               "description": "Use discriminated union pattern to enforce status/error/data consistency in AgentResponse schema.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T1.S1",
                   "title": "Refactor AgentResponse as discriminated union",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Issue 7 - AgentResponse allows invalid combinations like status='success' with error!=null. Schema in src/types/agent.ts doesn't enforce consistency.\n2. INPUT: Current AgentResponse interface.\n3. LOGIC: Refactor AgentResponse to discriminated union: type SuccessResponse<T> = { status: 'success', data: T, error: null, metadata: AgentResponseMetadata }, type ErrorResponse = { status: 'error', data: null, error: AgentErrorDetails, metadata: AgentResponseMetadata }, type AgentResponse<T> = SuccessResponse<T> | ErrorResponse. This enforces type-level consistency.\n4. OUTPUT: Refactored AgentResponse type in src/types/agent.ts. Must be backward compatible with existing usage."
@@ -715,7 +715,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S2",
                   "title": "Add Zod refinement for validation",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M2.T1.S1"
@@ -726,7 +726,7 @@
                   "type": "Subtask",
                   "id": "P3.M2.T1.S3",
                   "title": "Write tests for schema validation",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M2.T1.S2"
@@ -741,21 +741,21 @@
           "type": "Milestone",
           "id": "P3.M3",
           "title": "Milestone 3.3: Event Replay System",
-          "status": "Failed",
+          "status": "Planned",
           "description": "Implement workflow event replay functionality to enable late-joining observers to catch up on past events (Issue 12).",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M3.T1",
               "title": "Add Event History Storage to Workflow",
-              "status": "Failed",
+              "status": "Planned",
               "description": "Store event history in workflow and implement replay mechanism for observers.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M3.T1.S1",
                   "title": "Implement event history storage",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: Issue 12 - WorkflowEventReplayer exists in tests but not integrated into Workflow class. No API to request event replay.\n2. INPUT: Workflow class in src/core/workflow.ts, WorkflowEvent type.\n3. LOGIC: Add private eventHistory: WorkflowEvent[] array to Workflow class. In emit() method, push events to history before notifying observers. Add replayEvents(observer: WorkflowObserver, options?: { since?: number, limit?: number }) method that iterates through history and calls observer.onEvent() for each event. Add clearEventHistory() method.\n4. OUTPUT: Modified Workflow class with event history storage and replay capability."
@@ -764,7 +764,7 @@
                   "type": "Subtask",
                   "id": "P3.M3.T1.S2",
                   "title": "Add event history configuration",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M3.T1.S1"
@@ -775,7 +775,7 @@
                   "type": "Subtask",
                   "id": "P3.M3.T1.S3",
                   "title": "Write tests for event replay",
-                  "status": "Failed",
+                  "status": "Planned",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M3.T1.S2"
