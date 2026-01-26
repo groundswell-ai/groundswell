@@ -876,7 +876,7 @@
                   "type": "Subtask",
                   "id": "P5.M3.T1.S1",
                   "title": "Document provider system overview",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P4.M3.T1.S2"
