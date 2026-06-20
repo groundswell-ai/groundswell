@@ -1,7 +1,7 @@
 /**
  * Test file: anthropic-provider-initialize.test.ts
  *
- * Purpose: Comprehensive tests for AnthropicProvider initialize() method per P2.M1.T1.S2
+ * Purpose: Comprehensive tests for ClaudeCodeHarness initialize() method per P2.M1.T1.S2
  *
  * Tests:
  * - SDK imports successfully and is stored in this.sdk
@@ -14,15 +14,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 import type { ProviderOptions } from '../../../types/providers.js';
 
-describe('AnthropicProvider - initialize()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness - initialize()', () => {
+  let provider: ClaudeCodeHarness;
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
     // Reset registry state for isolation
     ProviderRegistry._resetForTesting();
   });
@@ -228,7 +228,7 @@ describe('AnthropicProvider - initialize()', () => {
       registry.register(provider);
 
       // Initialize via registry
-      await expect(registry.initializeProvider('anthropic')).resolves.not.toThrow();
+      await expect(registry.initializeProvider('claude-code')).resolves.not.toThrow();
 
       // Verify SDK is loaded
       expect(
@@ -237,8 +237,8 @@ describe('AnthropicProvider - initialize()', () => {
       ).not.toBeNull();
 
       // Verify registry status
-      expect(registry.isReady('anthropic')).toBe(true);
-      expect(registry.getStatus('anthropic')).toBe('initialized');
+      expect(registry.isReady('claude-code')).toBe(true);
+      expect(registry.getStatus('claude-code')).toBe('initialized');
     });
 
     it('should work with ProviderRegistry.initializeProvider() with options', async () => {
@@ -248,7 +248,7 @@ describe('AnthropicProvider - initialize()', () => {
       const options: ProviderOptions = { apiKey: 'sk-test' };
 
       // Initialize via registry with options
-      await expect(registry.initializeProvider('anthropic', options)).resolves.not.toThrow();
+      await expect(registry.initializeProvider('claude-code', options)).resolves.not.toThrow();
 
       // Verify SDK is loaded
       expect(
@@ -257,7 +257,7 @@ describe('AnthropicProvider - initialize()', () => {
       ).not.toBeNull();
 
       // Verify registry status
-      expect(registry.isReady('anthropic')).toBe(true);
+      expect(registry.isReady('claude-code')).toBe(true);
     });
 
     it('should handle concurrent initialization via ProviderRegistry', async () => {
@@ -265,9 +265,9 @@ describe('AnthropicProvider - initialize()', () => {
       registry.register(provider);
 
       // Start multiple concurrent initializations
-      const init1 = registry.initializeProvider('anthropic');
-      const init2 = registry.initializeProvider('anthropic');
-      const init3 = registry.initializeProvider('anthropic');
+      const init1 = registry.initializeProvider('claude-code');
+      const init2 = registry.initializeProvider('claude-code');
+      const init3 = registry.initializeProvider('claude-code');
 
       // All should resolve successfully
       await expect(Promise.all([init1, init2, init3])).resolves.not.toThrow();
@@ -279,7 +279,7 @@ describe('AnthropicProvider - initialize()', () => {
       ).not.toBeNull();
 
       // Status should be initialized
-      expect(registry.getStatus('anthropic')).toBe('initialized');
+      expect(registry.getStatus('claude-code')).toBe('initialized');
     });
   });
 
@@ -299,10 +299,10 @@ describe('AnthropicProvider - initialize()', () => {
   describe('State Management', () => {
     it('should not add internal initialization flags', async () => {
       // Provider manages state externally via ProviderRegistry
-      // AnthropicProvider should not have internal flags like 'isInitialized'
+      // ClaudeCodeHarness should not have internal flags like 'isInitialized'
 
       // Verify no unexpected properties
-      const instance = new AnthropicProvider();
+      const instance = new ClaudeCodeHarness();
       const keys = Object.keys(instance);
 
       // Should only have id and capabilities (readonly public properties)
@@ -310,7 +310,7 @@ describe('AnthropicProvider - initialize()', () => {
     });
 
     it('should start with SDK field as null', () => {
-      const newProvider = new AnthropicProvider();
+      const newProvider = new ClaudeCodeHarness();
 
       // @ts-expect-error - Testing private property
       expect(newProvider.sdk).toBeNull();

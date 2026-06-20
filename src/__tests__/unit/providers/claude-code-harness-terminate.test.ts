@@ -1,7 +1,7 @@
 /**
  * Test file: anthropic-provider-terminate.test.ts
  *
- * Purpose: Comprehensive tests for AnthropicProvider terminate() method per P2.M1.T1.S3
+ * Purpose: Comprehensive tests for ClaudeCodeHarness terminate() method per P2.M1.T1.S3
  *
  * Tests:
  * - SDK reference is cleared after termination
@@ -15,15 +15,15 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 import type { ProviderOptions } from '../../../types/providers.js';
 
-describe('AnthropicProvider - terminate()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness - terminate()', () => {
+  let provider: ClaudeCodeHarness;
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
     // Reset registry state for isolation
     ProviderRegistry._resetForTesting();
   });
@@ -202,7 +202,7 @@ describe('AnthropicProvider - terminate()', () => {
       registry.register(provider);
 
       // Initialize provider
-      await registry.initializeProvider('anthropic');
+      await registry.initializeProvider('claude-code');
 
       // Verify SDK is loaded
       // @ts-expect-error - Testing private property
@@ -216,7 +216,7 @@ describe('AnthropicProvider - terminate()', () => {
       expect(provider.sdk).toBeNull();
 
       // Verify provider is removed from registry
-      expect(registry.has('anthropic')).toBe(false);
+      expect(registry.has('claude-code')).toBe(false);
     });
 
     it('should not throw when called via ProviderRegistry.terminateAll()', async () => {
@@ -224,7 +224,7 @@ describe('AnthropicProvider - terminate()', () => {
       registry.register(provider);
 
       // Initialize provider
-      await registry.initializeProvider('anthropic');
+      await registry.initializeProvider('claude-code');
 
       // Should not throw when terminating via registry
       await expect(registry.terminateAll()).resolves.not.toThrow();
@@ -235,7 +235,7 @@ describe('AnthropicProvider - terminate()', () => {
 
       // First cycle
       registry.register(provider);
-      await registry.initializeProvider('anthropic');
+      await registry.initializeProvider('claude-code');
       // @ts-expect-error - Testing private property
       expect(provider.sdk).not.toBeNull();
       await registry.terminateAll();
@@ -248,7 +248,7 @@ describe('AnthropicProvider - terminate()', () => {
 
       // Second cycle
       registry2.register(provider);
-      await registry2.initializeProvider('anthropic');
+      await registry2.initializeProvider('claude-code');
       // @ts-expect-error - Testing private property
       expect(provider.sdk).not.toBeNull();
       await registry2.terminateAll();
@@ -310,10 +310,10 @@ describe('AnthropicProvider - terminate()', () => {
   describe('State Management', () => {
     it('should not add internal termination flags', async () => {
       // Provider manages state externally via ProviderRegistry
-      // AnthropicProvider should not have internal flags like 'isTerminated'
+      // ClaudeCodeHarness should not have internal flags like 'isTerminated'
 
       // Verify no unexpected properties
-      const instance = new AnthropicProvider();
+      const instance = new ClaudeCodeHarness();
       const keys = Object.keys(instance);
 
       // Should only have id and capabilities (readonly public properties)
@@ -321,7 +321,7 @@ describe('AnthropicProvider - terminate()', () => {
     });
 
     it('should start with SDK field as null', () => {
-      const newProvider = new AnthropicProvider();
+      const newProvider = new ClaudeCodeHarness();
 
       // @ts-expect-error - Testing private property
       expect(newProvider.sdk).toBeNull();

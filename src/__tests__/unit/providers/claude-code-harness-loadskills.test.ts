@@ -1,7 +1,7 @@
 /**
  * Test file: anthropic-provider-loadskills.test.ts
  *
- * Purpose: Comprehensive tests for AnthropicProvider loadSkills() method per P2.M1.T1.S8
+ * Purpose: Comprehensive tests for ClaudeCodeHarness loadSkills() method per P2.M1.T1.S8
  *
  * Tests:
  * - SDK initialization check (throws if not initialized)
@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 import type { Skill } from '../../../types/sdk-primitives.js';
 
@@ -29,11 +29,11 @@ vi.mock('fs/promises', () => ({
 
 const { readFile } = await import('fs/promises');
 
-describe('AnthropicProvider - loadSkills()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness - loadSkills()', () => {
+  let provider: ClaudeCodeHarness;
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
     // Reset registry state for isolation
     ProviderRegistry._resetForTesting();
     // Clear mocks
@@ -493,7 +493,7 @@ You review code for bugs, style issues, and best practices.
       registry.register(provider);
 
       // Initialize via registry
-      await registry.initializeProvider('anthropic');
+      await registry.initializeProvider('claude-code');
 
       vi.mocked(readFile).mockResolvedValue(mockSkillContent['math-expert']);
 

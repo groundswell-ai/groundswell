@@ -17,10 +17,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { z } from 'zod';
 import { Agent, Prompt } from '../../index.js';
-import { AnthropicProvider } from '../../harnesses/anthropic-provider.js';
+import { AnthropicProvider } from '../../harnesses/claude-code-harness.js';
 import { ProviderRegistry } from '../../harnesses/harness-registry.js';
 import { isSuccess, isError } from '../../types/agent.js';
-import { resetGlobalConfig } from '../../utils/provider-config.js';
+import { resetGlobalConfig, configureProviders } from '../../utils/provider-config.js';
 
 // Mock SDK types (from @anthropic-ai/claude-agent-sdk)
 type SDKMessage =
@@ -154,7 +154,7 @@ describe('Agent → Provider → SDK Integration', () => {
   describe('Agent Creation with Provider Configuration', () => {
     it('should throw when provider is not registered', () => {
       expect(() => {
-        new Agent({ provider: 'anthropic' });
+        new Agent({ provider: 'claude-code' });
       }).toThrow('Provider');
     });
 
@@ -168,7 +168,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       expect(agent).toBeDefined();
       expect(agent.id).toBeDefined();
@@ -178,8 +178,11 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      // Agent without explicit provider config uses global default ('anthropic')
-      // which is registered, so it should work
+      // Configure the global default to 'claude-code' (the new harness id)
+      configureProviders({ defaultProvider: 'claude-code' });
+
+      // Agent without explicit provider config uses the configured global default
+      // which is now 'claude-code', so it should work
       const agent = new Agent({});
 
       expect(agent).toBeDefined();
@@ -196,7 +199,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
       const prompt = new Prompt({
         user: 'What is 2 + 2?',
         responseFormat: z.object({ result: z.any() })
@@ -221,7 +224,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
       const prompt = new Prompt({
         user: 'Test prompt',
         responseFormat: z.object({ result: z.string() })
@@ -245,7 +248,7 @@ describe('Agent → Provider → SDK Integration', () => {
         new Error('Provider execution failed')
       );
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
       const prompt = new Prompt({
         user: 'Test',
         responseFormat: z.object({ result: z.string() })
@@ -263,7 +266,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
       const prompt = new Prompt({
         user: 'Test',
         responseFormat: z.object({ result: z.string() })
@@ -285,7 +288,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const executeSpy = vi.spyOn(provider, 'execute');
 
       const agent = new Agent({
-        provider: 'anthropic',
+        provider: 'claude-code',
         model: 'claude-sonnet-4-20250514'
       });
 
@@ -307,7 +310,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const executeSpy = vi.spyOn(provider, 'execute');
 
       const agent = new Agent({
-        provider: 'anthropic',
+        provider: 'claude-code',
         system: 'You are a helpful assistant'
       });
 
@@ -359,7 +362,7 @@ describe('Agent → Provider → SDK Integration', () => {
       provider.sdk.query = toolMockQuery;
 
       ProviderRegistry.getInstance().register(provider);
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Calculate 2 + 2',
@@ -404,7 +407,7 @@ describe('Agent → Provider → SDK Integration', () => {
       provider.sdk.query = toolMockQuery;
 
       ProviderRegistry.getInstance().register(provider);
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Use multiple tools',
@@ -420,7 +423,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
       const prompt = new Prompt({
         user: 'Just answer normally',
         responseFormat: z.object({ result: z.string() })
@@ -438,7 +441,7 @@ describe('Agent → Provider → SDK Integration', () => {
       // The provider should handle tool execution internally
       // This test verifies the flow completes successfully
       ProviderRegistry.getInstance().register(provider);
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',
@@ -460,7 +463,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'First message',
@@ -486,7 +489,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const sessionId = 'existing-session';
 
@@ -523,7 +526,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       // Create prompts with different sessionIds
       const prompt1 = new Prompt({
@@ -559,7 +562,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test without session',
@@ -585,7 +588,7 @@ describe('Agent → Provider → SDK Integration', () => {
       ProviderRegistry.getInstance().register(provider1);
 
       // Create agent with provider1
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',
@@ -594,7 +597,7 @@ describe('Agent → Provider → SDK Integration', () => {
 
       // Prompt with provider override should use specified provider
       const response = await agent.prompt(prompt, {
-        provider: 'anthropic'
+        provider: 'claude-code'
       });
 
       expect(isSuccess(response)).toBe(true);
@@ -604,7 +607,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',
@@ -621,7 +624,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',
@@ -647,7 +650,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: '',
@@ -664,7 +667,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const longText = 'a'.repeat(10000);
 
@@ -682,7 +685,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       // Terminate provider to make it unavailable
       await provider.terminate();
@@ -702,7 +705,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt1 = new Prompt({
         user: 'Prompt 1',
@@ -747,7 +750,7 @@ describe('Agent → Provider → SDK Integration', () => {
 
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',
@@ -773,7 +776,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const executeSpy = vi.spyOn(provider, 'execute');
 
       const agent = new Agent({
-        provider: 'anthropic',
+        provider: 'claude-code',
         model: 'claude-sonnet-4-20250514',
         system: 'Agent system prompt'
       });
@@ -800,7 +803,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const executeSpy = vi.spyOn(provider, 'execute');
 
       const agent = new Agent({
-        provider: 'anthropic',
+        provider: 'claude-code',
         model: 'claude-sonnet-4-20250514',
         system: 'Agent system prompt'
       });
@@ -825,7 +828,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const executeSpy = vi.spyOn(provider, 'execute');
 
       const agent = new Agent({
-        provider: 'anthropic',
+        provider: 'claude-code',
         model: 'claude-sonnet-4-20250514'
       });
 
@@ -854,7 +857,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',
@@ -892,7 +895,7 @@ describe('Agent → Provider → SDK Integration', () => {
         }
       });
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',
@@ -913,7 +916,7 @@ describe('Agent → Provider → SDK Integration', () => {
       const provider = await createMockProvider();
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',
@@ -950,7 +953,7 @@ describe('Agent → Provider → SDK Integration', () => {
         }
       });
 
-      const agent = new Agent({ provider: 'anthropic' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'Test',

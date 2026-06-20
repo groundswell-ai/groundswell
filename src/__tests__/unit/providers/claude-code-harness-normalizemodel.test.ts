@@ -1,5 +1,5 @@
 /**
- * Unit tests for AnthropicProvider.normalizeModel()
+ * Unit tests for ClaudeCodeHarness.normalizeModel()
  *
  * Purpose: Comprehensive tests for normalizeModel() method per P2.M1.T1.S4
  *
@@ -15,15 +15,15 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import type { ModelSpec } from '../../../types/providers.js';
 
-describe('AnthropicProvider.normalizeModel()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness.normalizeModel()', () => {
+  let provider: ClaudeCodeHarness;
 
   // Setup: Create provider instance before each test
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
   });
 
   describe('plain format (model without provider prefix)', () => {
@@ -98,7 +98,7 @@ describe('AnthropicProvider.normalizeModel()', () => {
   describe('provider validation', () => {
     it('should throw on opencode provider', () => {
       expect(() => provider.normalizeModel('opencode/gpt-4')).toThrow(
-        /Cannot normalize opencode\/gpt-4 with AnthropicProvider/
+        /Cannot normalize opencode\/gpt-4 with ClaudeCodeHarness/
       );
     });
 
@@ -110,14 +110,14 @@ describe('AnthropicProvider.normalizeModel()', () => {
         expect(error).toBeInstanceOf(Error);
         expect((error as Error).message).toContain('Cannot normalize');
         expect((error as Error).message).toContain('opencode/gpt-4');
-        expect((error as Error).message).toContain('AnthropicProvider');
-        expect((error as Error).message).toContain('ProviderRegistry');
+        expect((error as Error).message).toContain('ClaudeCodeHarness');
+        expect((error as Error).message).toContain('HarnessRegistry');
       }
     });
 
     it('should suggest using correct provider registry', () => {
       expect(() => provider.normalizeModel('opencode/gpt-4')).toThrow(
-        /ProviderRegistry\.get\('opencode'\)/
+        /HarnessRegistry/
       );
     });
   });
@@ -133,7 +133,7 @@ describe('AnthropicProvider.normalizeModel()', () => {
 
     it('should accept arbitrary provider via parseModelSpec (open set) but throw on provider mismatch', () => {
       // parseModelSpec now accepts any non-empty provider (open set per PRD §7.8).
-      // AnthropicProvider rejects non-anthropic providers in its own normalizeModel wrapper.
+      // ClaudeCodeHarness rejects non-anthropic providers in its own normalizeModel wrapper.
       expect(() => provider.normalizeModel('invalid/model')).toThrow();
     });
 

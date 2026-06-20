@@ -1,8 +1,8 @@
 /**
- * Anthropic provider implementation
+ * Claude Code harness implementation (PRD §7.1)
  *
  * Wraps the @anthropic-ai/claude-agent-sdk to provide Anthropic Claude
- * model access through the unified Provider interface.
+ * model access through the unified Harness interface.
  *
  * ## Capabilities
  *
@@ -20,12 +20,12 @@
  *
  * @example
  * ```ts
- * import { AnthropicProvider } from 'groundswell';
+ * import { ClaudeCodeHarness } from 'groundswell';
  *
- * const provider = new AnthropicProvider();
- * await provider.initialize({ apiKey: 'sk-...' });
+ * const harness = new ClaudeCodeHarness();
+ * await harness.initialize({ apiKey: 'sk-...' });
  *
- * const result = await provider.execute(
+ * const result = await harness.execute(
  *   { prompt: 'Hello, Claude!', options: {} },
  *   toolExecutor
  * );
@@ -36,16 +36,17 @@
  */
 
 import type {
-  Provider,
-  ProviderId,
-  ProviderCapabilities,
-  ProviderOptions,
-  ProviderRequest,
-  ToolExecutor,
-  ProviderHookEvents,
+  Harness,
+  HarnessId,
+  HarnessCapabilities,
+  HarnessOptions,
+  HarnessRequest,
+  HarnessHookEvents,
+  ToolExecutionRequest,
+  ToolExecutionResult,
   ModelSpec,
-  SessionState,
-} from "../types/providers.js";
+} from "../types/harnesses.js";
+import type { SessionState } from "../types/providers.js";
 import type { AgentResponse } from "../types/agent.js";
 import { createSuccessResponse, createErrorResponse } from "../types/agent.js";
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
@@ -60,13 +61,29 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import type { StreamEvent } from "../types/streaming.js";
 
-export class AnthropicProvider implements Provider {
+/**
+ * Claude Code harness options (PRD §7.5).
+ * Extends {@link HarnessOptions} with adapter-internal session-store configuration that the
+ * slimmed base contract intentionally omits.
+ */
+export interface ClaudeCodeHarnessOptions extends HarnessOptions {
+  /** Direct session-store injection (mutually exclusive with sessionPersistence). */
+  sessionStore?: SessionStore<SessionState>;
+  /** Declarative store selection; constructs the appropriate SessionStore. */
+  sessionPersistence?: "memory" | "file" | "redis";
+  /** Session TTL in ms (default 86400000 = 24h). */
+  sessionTtl?: number;
+  /** Directory for FileSessionStore (default './sessions'). Only when sessionPersistence='file'. */
+  sessionPath?: string;
+}
+
+export class ClaudeCodeHarness implements Harness {
   /**
-   * Unique provider identifier
+   * Unique harness identifier (PRD §7.2)
    *
    * @readonly
    */
-  readonly id: ProviderId = "anthropic";
+  readonly id: HarnessId = "claude-code";
 
   /**
    * Provider capability flags
@@ -81,7 +98,7 @@ export class AnthropicProvider implements Provider {
    *
    * @readonly
    */
-  readonly capabilities: ProviderCapabilities = {
+  readonly capabilities: HarnessCapabilities = {
     /** MCP server connections via createSdkMcpServer */
     mcp: true,
     /** Skill loading via system prompt */
@@ -94,7 +111,7 @@ export class AnthropicProvider implements Provider {
     sessions: true,
     /** Extended thinking via maxThinkingTokens */
     extendedThinking: true,
-  } satisfies ProviderCapabilities;
+  } satisfies HarnessCapabilities;
 
   /**
    * Check if a specific capability is supported
@@ -102,7 +119,7 @@ export class AnthropicProvider implements Provider {
    * @param capability - The capability to check
    * @returns true if the capability is supported
    */
-  supports(capability: keyof ProviderCapabilities): boolean {
+  supports(capability: keyof HarnessCapabilities): boolean {
     return this.capabilities[capability];
   }
 
@@ -112,7 +129,7 @@ export class AnthropicProvider implements Provider {
    * @param features - Array of capability keys to check
    * @returns true if all features are supported
    */
-  requiresFeatures(features: (keyof ProviderCapabilities)[]): boolean {
+  requiresFeatures(features: (keyof HarnessCapabilities)[]): boolean {
     return features.every(f => this.capabilities[f]);
   }
 
@@ -186,7 +203,7 @@ export class AnthropicProvider implements Provider {
    * @remarks Session storage defaults to MemorySessionStore if not specified.
    * Implemented in P2.M1.T1.S2
    */
-  async initialize(options?: ProviderOptions): Promise<void> {
+  async initialize(options?: ClaudeCodeHarnessOptions): Promise<void> {
     // Idempotent check: if SDK is already loaded, return immediately
     if (this.sdk) {
       return;
@@ -336,9 +353,9 @@ export class AnthropicProvider implements Provider {
    * Streaming: Returns AsyncGenerator<StreamEvent> when options.streaming = true
    */
   execute<T>(
-    request: ProviderRequest,
-    toolExecutor: ToolExecutor,
-    hooks?: ProviderHookEvents,
+    request: HarnessRequest,
+    toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
+    hooks?: HarnessHookEvents,
   ):
     | Promise<AgentResponse<T>>
     | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
@@ -593,9 +610,9 @@ export class AnthropicProvider implements Provider {
    * Streaming mode implementation following PRP P4.M2.T1.S4 specification.
    */
   private async *executeStreaming<T>(
-    request: ProviderRequest,
-    toolExecutor: ToolExecutor,
-    hooks?: ProviderHookEvents,
+    request: HarnessRequest,
+    toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
+    hooks?: HarnessHookEvents,
   ): AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
     // SDK initialization check (required by TypeScript strict mode)
     // The caller (execute) already checks this, but we need to assert here
@@ -1019,7 +1036,7 @@ Each skill provides specific capabilities and guidelines.
    * Duration values are set to 0 as SDK doesn't provide them in hook input.
    */
   private buildAgentSDKHooks(
-    hooks?: ProviderHookEvents,
+    hooks?: HarnessHookEvents,
   ): Partial<
     Record<
       typeof this.sdk extends null
@@ -1156,18 +1173,21 @@ Each skill provides specific capabilities and guidelines.
    *
    * // Error: wrong provider
    * provider.normalizeModel('opencode/gpt-4');
-   * // Throws: "Cannot normalize opencode/gpt-4 with AnthropicProvider..."
+   * // Throws: "Cannot normalize opencode/gpt-4 with ClaudeCodeHarness..."
    * ```
    */
   normalizeModel(model: string): ModelSpec {
     // Delegate to existing utility function
     const spec = parseModelSpec(model, "anthropic");
 
-    // Provider-specific validation
-    if (spec.provider !== this.id) {
+    // PRD §7.8 — claude-code can ONLY run anthropic/* models.
+    // Compare against the literal LLM-host 'anthropic', NOT this.id (which is the harness id
+    // 'claude-code' — a different axis). A naive `!== this.id` would throw on every call.
+    if (spec.provider !== "anthropic") {
       throw new Error(
-        `Cannot normalize ${spec.provider}/${spec.model} with AnthropicProvider. ` +
-          `Use ProviderRegistry.get('${spec.provider}') instead.`,
+        `Cannot normalize ${spec.provider}/${spec.model} with ClaudeCodeHarness. ` +
+          `The claude-code harness only supports anthropic/* models (PRD §7.8). ` +
+          `Use HarnessRegistry to select a harness that supports the '${spec.provider}' provider.`,
       );
     }
 
@@ -1252,3 +1272,9 @@ Each skill provides specific capabilities and guidelines.
     return await this.sessionStore.delete(sessionId);
   }
 }
+
+/**
+ * @deprecated Since v1.2. Use {@link ClaudeCodeHarness}. Renamed as part of the
+ * Harness/Provider split (PRD §7). Identity preserved for backward compatibility.
+ */
+export const AnthropicProvider = ClaudeCodeHarness;

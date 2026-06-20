@@ -1,41 +1,41 @@
 /**
  * Test file: anthropic-provider.test.ts
  *
- * Purpose: Validate AnthropicProvider class structure and capabilities per P2.M1.T1.S1
+ * Purpose: Validate ClaudeCodeHarness class structure and capabilities per P2.M1.T1.S1
  *
  * Tests:
- * - AnthropicProvider has correct id property
- * - AnthropicProvider has correct capabilities matching Anthropic SDK v0.1.77
- * - AnthropicProvider implements Provider interface
- * - AnthropicProvider has all required methods
- * - AnthropicProvider can be registered with ProviderRegistry
+ * - ClaudeCodeHarness has correct id property
+ * - ClaudeCodeHarness has correct capabilities matching Anthropic SDK v0.1.77
+ * - ClaudeCodeHarness implements Provider interface
+ * - ClaudeCodeHarness has all required methods
+ * - ClaudeCodeHarness can be registered with ProviderRegistry
  * - normalizeModel() returns correct ModelSpec structure
  *
- * PRP: P2.M1.T1.S1 - Implement AnthropicProvider class structure and capabilities
+ * PRP: P2.M1.T1.S1 - Implement ClaudeCodeHarness class structure and capabilities
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import type { Provider } from '../../../types/providers.js';
 import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 
-describe('AnthropicProvider', () => {
+describe('ClaudeCodeHarness', () => {
   describe('Class Structure', () => {
     it('should have correct id property', () => {
-      const provider = new AnthropicProvider();
-      expect(provider.id).toBe('anthropic');
+      const provider = new ClaudeCodeHarness();
+      expect(provider.id).toBe('claude-code');
       expect(typeof provider.id).toBe('string');
     });
 
     it('should have readonly id property', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
       // Readonly is a compile-time check, verified by TypeScript
       // At runtime, we just verify the property exists and has correct value
-      expect(provider.id).toBe('anthropic');
+      expect(provider.id).toBe('claude-code');
     });
 
     it('should have correct capabilities matching Anthropic SDK v0.1.77', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
 
       expect(provider.capabilities).toBeDefined();
       expect(provider.capabilities.mcp).toBe(true);
@@ -47,7 +47,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should have readonly capabilities property', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
       // Readonly is a compile-time check, verified by TypeScript
       // At runtime, we just verify the capabilities exist and have correct values
       expect(provider.capabilities.mcp).toBe(true);
@@ -59,7 +59,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should have private sdk field for lazy loading', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
       // @ts-expect-error - Testing private property
       expect(provider.sdk).toBeNull();
     });
@@ -67,18 +67,18 @@ describe('AnthropicProvider', () => {
 
   describe('Interface Implementation', () => {
     it('should implement Provider interface', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
 
-      // Type check: AnthropicProvider should be assignable to Provider
+      // Type check: ClaudeCodeHarness should be assignable to Provider
       const providerInterface: Provider = provider;
 
       expect(providerInterface).toBeDefined();
-      expect(providerInterface.id).toBe('anthropic');
+      expect(providerInterface.id).toBe('claude-code');
       expect(providerInterface.capabilities).toBeDefined();
     });
 
     it('should have all required methods', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
 
       expect(typeof provider.initialize).toBe('function');
       expect(typeof provider.terminate).toBe('function');
@@ -91,7 +91,7 @@ describe('AnthropicProvider', () => {
 
   describe('Method Signatures', () => {
     it('should have initialize() method with correct signature', async () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
 
       // Should accept optional options parameter
       await expect(provider.initialize()).resolves.not.toThrow();
@@ -103,7 +103,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should have terminate() method with correct signature', async () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
 
       // Should return Promise<void>
       const result = provider.terminate();
@@ -112,7 +112,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should have execute() method with correct signature', async () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
       // Initialize provider first (required for execute)
       await provider.initialize();
       const mockToolExecutor = async () => ({ content: '', isError: false });
@@ -127,7 +127,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should have registerMCPs() method with correct signature', async () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
       // Initialize provider first (required for registerMCPs)
       await provider.initialize();
 
@@ -140,7 +140,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should have loadSkills() method with correct signature', async () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
 
       // Initialize provider first (loadSkills requires SDK initialization)
       await provider.initialize();
@@ -153,7 +153,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should have normalizeModel() method with correct signature', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
 
       // Should return ModelSpec (synchronous)
       const result = provider.normalizeModel('claude-sonnet-4');
@@ -167,7 +167,7 @@ describe('AnthropicProvider', () => {
 
   describe('normalizeModel() Behavior', () => {
     it('should return correct ModelSpec for plain model string', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
       const modelSpec = provider.normalizeModel('claude-sonnet-4');
 
       expect(modelSpec).toEqual({
@@ -178,7 +178,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should return correct ModelSpec for qualified model string', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
       const modelSpec = provider.normalizeModel('anthropic/claude-opus-4');
 
       expect(modelSpec).toEqual({
@@ -189,7 +189,7 @@ describe('AnthropicProvider', () => {
     });
 
     it('should preserve raw model string', () => {
-      const provider = new AnthropicProvider();
+      const provider = new ClaudeCodeHarness();
       const raw = 'claude-sonnet-4-20250514';
       const modelSpec = provider.normalizeModel(raw);
 
@@ -205,40 +205,40 @@ describe('AnthropicProvider', () => {
 
     it('should be registerable with ProviderRegistry', () => {
       const registry = ProviderRegistry.getInstance();
-      const anthropic = new AnthropicProvider();
+      const anthropic = new ClaudeCodeHarness();
 
       expect(() => registry.register(anthropic)).not.toThrow();
     });
 
     it('should be retrievable from ProviderRegistry after registration', () => {
       const registry = ProviderRegistry.getInstance();
-      const anthropic = new AnthropicProvider();
+      const anthropic = new ClaudeCodeHarness();
 
       registry.register(anthropic);
 
-      const retrieved = registry.get('anthropic');
+      const retrieved = registry.get('claude-code');
       expect(retrieved).toBeDefined();
-      expect(retrieved?.id).toBe('anthropic');
+      expect(retrieved?.id).toBe('claude-code');
     });
 
     it('should pass has() check after registration', () => {
       const registry = ProviderRegistry.getInstance();
-      const anthropic = new AnthropicProvider();
+      const anthropic = new ClaudeCodeHarness();
 
       registry.register(anthropic);
 
-      expect(registry.has('anthropic')).toBe(true);
+      expect(registry.has('claude-code')).toBe(true);
     });
   });
 
   describe('Instantiation', () => {
     it('should be instantiable without arguments', () => {
-      expect(() => new AnthropicProvider()).not.toThrow();
+      expect(() => new ClaudeCodeHarness()).not.toThrow();
     });
 
     it('should create independent instances', () => {
-      const provider1 = new AnthropicProvider();
-      const provider2 = new AnthropicProvider();
+      const provider1 = new ClaudeCodeHarness();
+      const provider2 = new ClaudeCodeHarness();
 
       expect(provider1).not.toBe(provider2);
       expect(provider1.id).toBe(provider2.id);

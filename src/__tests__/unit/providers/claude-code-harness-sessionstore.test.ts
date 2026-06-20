@@ -1,7 +1,7 @@
 /**
  * Test file: anthropic-provider-sessionstore.test.ts
  *
- * Purpose: Integration tests for AnthropicProvider SessionStore integration per P2.M2.T1.S3
+ * Purpose: Integration tests for ClaudeCodeHarness SessionStore integration per P2.M2.T1.S3
  *
  * Tests:
  * - Backward compatibility (no params = MemorySessionStore)
@@ -12,11 +12,11 @@
  * - Async session methods work correctly
  * - Session mutations save for persistent stores
  *
- * PRP: P2.M2.T1.S3 - Integrate SessionStore into AnthropicProvider
+ * PRP: P2.M2.T1.S3 - Integrate SessionStore into ClaudeCodeHarness
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { AnthropicProvider } from "../../../harnesses/anthropic-provider.js";
+import { ClaudeCodeHarness } from "../../../harnesses/claude-code-harness.js";
 import {
   FileSessionStore,
   MemorySessionStore,
@@ -26,12 +26,12 @@ import type { SessionState } from "../../../types/providers.js";
 import { ProviderRegistry } from "../../../harnesses/harness-registry.js";
 import { rm } from "fs/promises";
 
-describe("AnthropicProvider - SessionStore Integration (P2.M2.T1.S3)", () => {
-  let provider: AnthropicProvider;
+describe("ClaudeCodeHarness - SessionStore Integration (P2.M2.T1.S3)", () => {
+  let provider: ClaudeCodeHarness;
   const testSessionDir = "./test-sessions-sessionstore";
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
     // Reset registry state for isolation
     ProviderRegistry._resetForTesting();
   });

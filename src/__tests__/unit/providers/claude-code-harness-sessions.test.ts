@@ -1,7 +1,7 @@
 /**
  * Test file: anthropic-provider-sessions.test.ts
  *
- * Purpose: Comprehensive tests for AnthropicProvider session storage per P2.M2.T1.S1
+ * Purpose: Comprehensive tests for ClaudeCodeHarness session storage per P2.M2.T1.S1
  *
  * Tests:
  * - createSession() creates new session with empty state
@@ -12,20 +12,20 @@
  * - createSession() throws when SDK not initialized
  * - capabilities.sessions is true
  *
- * PRP: P2.M2.T1.S1 - Implement session storage in AnthropicProvider
+ * PRP: P2.M2.T1.S1 - Implement session storage in ClaudeCodeHarness
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 import { FileSessionStore } from '../../../harnesses/session-store.js';
 import { rm } from 'node:fs/promises';
 
-describe('AnthropicProvider - Session Storage (P2.M2.T1.S1)', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness - Session Storage (P2.M2.T1.S1)', () => {
+  let provider: ClaudeCodeHarness;
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
     // Reset registry state for isolation
     ProviderRegistry._resetForTesting();
   });
@@ -306,7 +306,7 @@ describe('AnthropicProvider - Session Storage (P2.M2.T1.S1)', () => {
       registry.register(provider);
 
       // Initialize via registry
-      await registry.initializeProvider('anthropic');
+      await registry.initializeProvider('claude-code');
 
       // Create session
       await provider.createSession('test-session');
@@ -435,7 +435,7 @@ describe('AnthropicProvider - Session Storage (P2.M2.T1.S1)', () => {
 
   describe('State Management', () => {
     it('should initialize sessionStore in field declaration', () => {
-      const newProvider = new AnthropicProvider();
+      const newProvider = new ClaudeCodeHarness();
 
       // @ts-expect-error - Testing private property
       expect(provider.sessionStore).toBeDefined();
@@ -444,7 +444,7 @@ describe('AnthropicProvider - Session Storage (P2.M2.T1.S1)', () => {
     });
 
     it('should start with empty sessionStore', async () => {
-      const newProvider = new AnthropicProvider();
+      const newProvider = new ClaudeCodeHarness();
 
       // @ts-expect-error - Testing private property
       const sessionList = await newProvider.sessionStore.list();
@@ -457,7 +457,7 @@ describe('AnthropicProvider - Session Storage (P2.M2.T1.S1)', () => {
       // TypeScript will error if we try to access private fields without @ts-expect-error
 
       // Verify the provider instance has the expected public properties
-      expect(provider.id).toBe('anthropic');
+      expect(provider.id).toBe('claude-code');
       expect(provider.capabilities).toBeDefined();
 
       // Private sessionStore field is only accessible with @ts-expect-error

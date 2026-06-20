@@ -114,7 +114,7 @@ export { Prompt } from './core/prompt.js';
 export { MCPHandler } from './core/mcp-handler.js';
 
 // Providers
-export { AnthropicProvider } from './harnesses/anthropic-provider.js';
+export { ClaudeCodeHarness, AnthropicProvider } from './harnesses/claude-code-harness.js';
 export { HarnessRegistry, ProviderRegistry } from './harnesses/harness-registry.js';
 
 // Context and event tree

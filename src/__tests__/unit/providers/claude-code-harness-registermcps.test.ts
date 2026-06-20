@@ -1,7 +1,7 @@
 /**
  * Test file: anthropic-provider-registermcps.test.ts
  *
- * Purpose: Comprehensive tests for AnthropicProvider registerMCPs() method per P2.M1.T1.S7
+ * Purpose: Comprehensive tests for ClaudeCodeHarness registerMCPs() method per P2.M1.T1.S7
  *
  * Tests:
  * - SDK initialization check (throws if not initialized)
@@ -18,15 +18,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 import type { MCPServer, Tool } from '../../../types/sdk-primitives.js';
 
-describe('AnthropicProvider - registerMCPs()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness - registerMCPs()', () => {
+  let provider: ClaudeCodeHarness;
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
     // Reset registry state for isolation
     ProviderRegistry._resetForTesting();
   });
@@ -320,7 +320,7 @@ describe('AnthropicProvider - registerMCPs()', () => {
 
       // Second registration with different server (should throw due to duplicate check)
       // So we'll create a new provider instance
-      const provider2 = new AnthropicProvider();
+      const provider2 = new ClaudeCodeHarness();
       await provider2.initialize();
       await provider2.registerMCPs([
         createTestServer('server2', [createTestTool('tool2', 'Tool 2')]),
@@ -366,7 +366,7 @@ describe('AnthropicProvider - registerMCPs()', () => {
       registry.register(provider);
 
       // Initialize via registry
-      await registry.initializeProvider('anthropic');
+      await registry.initializeProvider('claude-code');
 
       // Register MCPs
       const servers: MCPServer[] = [

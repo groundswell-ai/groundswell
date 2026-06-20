@@ -1,19 +1,19 @@
 /**
- * Unit tests for AnthropicProvider.buildAgentSDKHooks()
+ * Unit tests for ClaudeCodeHarness.buildAgentSDKHooks()
  *
  * Tests the adapter method that converts ProviderHookEvents to
  * Anthropic Agent SDK-compatible hook format.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import type { ProviderHookEvents, ToolExecutionRequest, ToolExecutionResult } from '../../../types/providers.js';
 
-describe('AnthropicProvider.buildAgentSDKHooks()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness.buildAgentSDKHooks()', () => {
+  let provider: ClaudeCodeHarness;
 
   beforeEach(async () => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
     await provider.initialize();
   });
 

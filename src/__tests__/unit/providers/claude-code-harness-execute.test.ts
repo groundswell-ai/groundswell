@@ -1,7 +1,7 @@
 /**
  * Test file: anthropic-provider-execute.test.ts
  *
- * Purpose: Comprehensive tests for AnthropicProvider execute() method per P5.M1.T3.S2
+ * Purpose: Comprehensive tests for ClaudeCodeHarness execute() method per P5.M1.T3.S2
  *
  * Tests:
  * - SDK initialization check (throws if not initialized)
@@ -14,11 +14,11 @@
  * - Error handling (missing result, error subtypes)
  * - Streaming mode (AsyncGenerator<StreamEvent> return)
  *
- * PRP: P5.M1.T3.S2 - Test AnthropicProvider execute() method
+ * PRP: P5.M1.T3.S2 - Test ClaudeCodeHarness execute() method
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 import type { ProviderRequest, ToolExecutor } from '../../../types/providers.js';
 import type { StreamEvent } from '../../../types/streaming.js';
@@ -34,12 +34,12 @@ type SDKQueryResult = AsyncGenerator<SDKMessage> & {
   streamInput(generator: AsyncGenerator<SDKMessage>): Promise<void>;
 };
 
-describe('AnthropicProvider - execute()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness - execute()', () => {
+  let provider: ClaudeCodeHarness;
   let toolExecutor: ToolExecutor;
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
     // Reset registry state for isolation
     ProviderRegistry._resetForTesting();
     // Clear all mocks
@@ -113,7 +113,7 @@ describe('AnthropicProvider - execute()', () => {
 
       expect(response.status).toBe('success');
       expect(response.data).toBeDefined();
-      expect(response.metadata.agentId).toBe('anthropic');
+      expect(response.metadata.agentId).toBe('claude-code');
       expect(response.metadata.timestamp).toBeGreaterThan(0);
       expect(response.metadata.duration).toBeGreaterThanOrEqual(0);
     });
@@ -967,7 +967,7 @@ describe('AnthropicProvider - execute()', () => {
 
       const response = await provider.execute(request, toolExecutor);
 
-      expect(response.metadata.agentId).toBe('anthropic');
+      expect(response.metadata.agentId).toBe('claude-code');
     });
 
     it('should construct valid AgentResponse structure', async () => {
@@ -1215,7 +1215,7 @@ describe('AnthropicProvider - execute()', () => {
 
       expect(events[0].type).toBe('metadata');
       if (events[0].type === 'metadata') {
-        expect(events[0].metadata.provider).toBe('anthropic');
+        expect(events[0].metadata.provider).toBe('claude-code');
       }
     });
 

@@ -1,5 +1,5 @@
 /**
- * Unit tests for AnthropicProvider.supports() and requiresFeatures()
+ * Unit tests for ClaudeCodeHarness.supports() and requiresFeatures()
  *
  * Purpose: Comprehensive tests for capability checking methods per P3.M1.T1.S2
  *
@@ -15,13 +15,13 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
 
-describe('AnthropicProvider.supports()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness.supports()', () => {
+  let provider: ClaudeCodeHarness;
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
   });
 
   describe('positive cases - all capabilities supported', () => {
@@ -68,11 +68,11 @@ describe('AnthropicProvider.supports()', () => {
   });
 });
 
-describe('AnthropicProvider.requiresFeatures()', () => {
-  let provider: AnthropicProvider;
+describe('ClaudeCodeHarness.requiresFeatures()', () => {
+  let provider: ClaudeCodeHarness;
 
   beforeEach(() => {
-    provider = new AnthropicProvider();
+    provider = new ClaudeCodeHarness();
   });
 
   describe('all features supported', () => {
