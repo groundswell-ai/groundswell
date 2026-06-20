@@ -1,0 +1,58 @@
+h1.0 📘 PRODUCT REQUIREMENTS DOCUMENT (PRD)
+  h3.0 Hierarchical Workflow Engine with Full Observability & Tree Debugging
+h1.1 1. Overview
+h1.2 2. Architecture
+h1.3 3. Core Data Model (Interfaces)
+ h2.0 3.1 WorkflowNode
+ h2.1 3.2 WorkflowStatus
+h1.4 4. Logging & Events Model
+ h2.2 4.1 LogEntry
+ h2.3 4.2 WorkflowEvent
+h1.5 5. Error Model
+ h2.4 5.1 WorkflowError
+h1.6 6. Agent Response Model
+ h2.5 6.1 AgentResponse Interface
+ h2.6 6.2 AgentErrorDetails
+ h2.7 6.3 AgentResponseMetadata
+ h2.8 6.4 Response Requirements
+ h2.9 6.5 Example Responses
+ h2.10 6.6 Validation
+h1.7 7. Agent Harness System
+ h2.11 7.1 Supported Harnesses
+ h2.12 7.2 HarnessId
+ h2.13 7.3 Harness Interface
+ h2.14 7.4 Harness Capabilities
+ h2.15 7.5 HarnessOptions
+ h2.16 7.6 Global Harness Configuration
+ h2.17 7.7 Configuration Cascade
+ h2.18 7.8 Model & Provider Specification
+ h2.19 7.9 AgentConfig Extensions
+ h2.20 7.10 Tool Execution
+ h2.21 7.11 Hook Adaptation
+ h2.22 7.12 MCP, Skills & LSP Integration
+ h2.23 7.13 Harness Usage Examples
+ h2.24 7.14 Feature Parity Requirements
+h1.8 8. Snapshot System
+ h2.25 8.1 State Snapshot
+ h2.26 8.2 ObservedState Metadata
+h1.9 9. Observers
+ h2.27 9.1 WorkflowObserver
+h1.10 10. Decorators (Complete Technical Specification)
+ h2.28 10.1 @Step() Decorator
+ h2.29 10.2 @Task() Decorator
+ h2.30 10.3 @ObservedState Decorator
+h1.11 11. Restart Semantics
+h1.12 12. Optional Multi-Error Merging
+h1.13 13. Tree Debugger API
+ h2.31 13.1 Tree Debugger Interface
+h1.14 14. Base Classes (Class Skeletons)
+h1.15 14.1 WorkflowLogger Skeleton
+h1.16 14.2 Workflow Base Class Skeleton
+h1.17 14.3 Decorator Skeletons
+  h3.1 @ObservedState
+  h3.2 @Step
+  h3.3 @Task
+h1.18 15. Example Workflow Using the System
+h1.19 16. Acceptance Criteria (Updated)
+---
+code:44 para:43 list:10 table:4 quote:3
