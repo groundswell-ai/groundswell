@@ -23,7 +23,7 @@ import {
   type SessionStore,
 } from "../../../harnesses/session-store.js";
 import type { SessionState } from "../../../types/providers.js";
-import { ProviderRegistry } from "../../../harnesses/provider-registry.js";
+import { ProviderRegistry } from "../../../harnesses/harness-registry.js";
 import { rm } from "fs/promises";
 
 describe("AnthropicProvider - Session Configuration (P2.M2.T2.S1)", () => {

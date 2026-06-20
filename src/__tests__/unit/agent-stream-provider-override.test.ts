@@ -9,7 +9,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '../../core/agent.js';
 import { Prompt } from '../../core/prompt.js';
-import { ProviderRegistry } from '../../harnesses/provider-registry.js';
+import { ProviderRegistry } from '../../harnesses/harness-registry.js';
 import { configureProviders, resetGlobalConfig } from '../../utils/provider-config.js';
 import type { Provider, ProviderId, ProviderCapabilities, ProviderRequest } from '../../types/providers.js';
 import type { ModelSpec } from '../../types/providers.js';

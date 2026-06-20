@@ -245,7 +245,7 @@ describe('OpenCodeProvider - Deprecation', () => {
 
   describe('Integration with ProviderRegistry', () => {
     it('should show warning when initialized via ProviderRegistry', async () => {
-      const { ProviderRegistry } = await import('../../../harnesses/provider-registry.js');
+      const { ProviderRegistry } = await import('../../../harnesses/harness-registry.js');
 
       // Reset registry state
       ProviderRegistry._resetForTesting();
@@ -262,7 +262,7 @@ describe('OpenCodeProvider - Deprecation', () => {
     });
 
     it('should only show warning once even via ProviderRegistry', async () => {
-      const { ProviderRegistry } = await import('../../../harnesses/provider-registry.js');
+      const { ProviderRegistry } = await import('../../../harnesses/harness-registry.js');
 
       // Reset registry state
       ProviderRegistry._resetForTesting();

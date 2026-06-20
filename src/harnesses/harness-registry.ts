@@ -1,10 +1,10 @@
 /**
- * Provider Registry - Singleton provider lifecycle management
+ * Harness Registry - Singleton harness lifecycle management
  *
- * Implements singleton pattern for managing provider instances across
- * the application. Ensures single shared instance of each provider.
+ * Implements singleton pattern for managing harness instances across
+ * the application. Ensures single shared instance of each harness.
  *
- * @module providers
+ * @module harnesses
  */
 
 import type {
@@ -63,9 +63,9 @@ interface BatchInitResult {
 }
 
 /**
- * Singleton registry for managing provider instances.
+ * Singleton registry for managing harness instances.
  *
- * This class maintains a single instance of itself and stores provider
+ * This class maintains a single instance of itself and stores harness
  * instances in a Map for efficient lookup by ProviderId.
  *
  * ## Singleton Pattern
@@ -78,43 +78,43 @@ interface BatchInitResult {
  *
  * ```ts
  * // Get registry instance
- * const registry = ProviderRegistry.getInstance();
+ * const registry = HarnessRegistry.getInstance();
  *
- * // Register a provider
+ * // Register a harness
  * registry.register(anthropicProvider);
  *
- * // Retrieve a provider
+ * // Retrieve a harness
  * const provider = registry.get('anthropic');
  *
  * // Check existence
  * if (registry.has('anthropic')) {
- *   // Provider is registered
+ *   // Harness is registered
  * }
  * ```
  *
  * @example
  * ```ts
- * import { ProviderRegistry } from 'groundswell';
+ * import { HarnessRegistry } from 'groundswell';
  *
- * // Register providers at startup
- * const registry = ProviderRegistry.getInstance();
+ * // Register harnesses at startup
+ * const registry = HarnessRegistry.getInstance();
  * registry.register(new AnthropicProvider());
  * registry.register(new OpenCodeProvider());
  *
- * // Retrieve providers throughout application
+ * // Retrieve harnesses throughout application
  * const anthropic = registry.get('anthropic');
  * if (anthropic) {
  *   await anthropic.initialize();
  * }
  * ```
  */
-export class ProviderRegistry {
+export class HarnessRegistry {
   /**
    * Private static instance - the singleton instance
    *
    * @internal
    */
-  private static instance: ProviderRegistry;
+  private static instance: HarnessRegistry;
 
   /**
    * Private provider storage - maps ProviderId to Provider instance
@@ -147,27 +147,27 @@ export class ProviderRegistry {
   // ============================================================================
 
   /**
-   * Get the singleton ProviderRegistry instance
+   * Get the singleton HarnessRegistry instance
    *
    * Creates the instance on first call (lazy initialization).
    * Returns the same instance on subsequent calls.
    *
-   * @returns The singleton ProviderRegistry instance
+   * @returns The singleton HarnessRegistry instance
    * @remarks Creates instance on first call (lazy initialization).
    * Returns same instance on subsequent calls.
    *
    * @example
    * ```ts
-   * const registry1 = ProviderRegistry.getInstance();
-   * const registry2 = ProviderRegistry.getInstance();
+   * const registry1 = HarnessRegistry.getInstance();
+   * const registry2 = HarnessRegistry.getInstance();
    * console.log(registry1 === registry2); // true
    * ```
    */
-  public static getInstance(): ProviderRegistry {
-    if (!ProviderRegistry.instance) {
-      ProviderRegistry.instance = new ProviderRegistry();
+  public static getInstance(): HarnessRegistry {
+    if (!HarnessRegistry.instance) {
+      HarnessRegistry.instance = new HarnessRegistry();
     }
-    return ProviderRegistry.instance;
+    return HarnessRegistry.instance;
   }
 
   // ============================================================================
@@ -568,7 +568,7 @@ export class ProviderRegistry {
    * ```
    */
   public static _resetForTesting(): void {
-    ProviderRegistry.instance = null as any;
+    HarnessRegistry.instance = null as any;
   }
 
   /**
@@ -585,7 +585,7 @@ export class ProviderRegistry {
    * @example
    * ```ts
    * import { describe, it, afterEach } from 'vitest';
-   * import { ProviderRegistry } from './provider-registry.js';
+   * import { ProviderRegistry } from './harness-registry.js';
    *
    * describe('ProviderRegistry', () => {
    *   afterEach(() => {
@@ -605,3 +605,19 @@ export class ProviderRegistry {
     this.states.clear();
   }
 }
+
+/**
+ * @deprecated Since v1.2. Use {@link HarnessRegistry}. Retained so existing
+ * `import { ProviderRegistry }` callsites (agent.ts, tests, public barrel) keep
+ * resolving during the harness-vocabulary migration. Removed when P2.M1/P3.M1/P4.M1
+ * collapse the Provider/ProviderId aliases.
+ */
+export type ProviderRegistry = HarnessRegistry;
+
+/**
+ * @deprecated Since v1.2. Use {@link HarnessRegistry}. Retained so existing
+ * `import { ProviderRegistry }` callsites (agent.ts, tests, public barrel) keep
+ * resolving during the harness-vocabulary migration. Removed when P2.M1/P3.M1/P4.M1
+ * collapse the Provider/ProviderId aliases.
+ */
+export const ProviderRegistry = HarnessRegistry;

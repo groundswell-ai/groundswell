@@ -19,7 +19,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
-import { ProviderRegistry } from '../../../harnesses/provider-registry.js';
+import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 import type { MCPServer, Tool } from '../../../types/sdk-primitives.js';
 
 describe('AnthropicProvider - registerMCPs()', () => {

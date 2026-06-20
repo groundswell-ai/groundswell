@@ -17,7 +17,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
-import { ProviderRegistry } from '../../../harnesses/provider-registry.js';
+import { ProviderRegistry } from '../../../harnesses/harness-registry.js';
 import { FileSessionStore } from '../../../harnesses/session-store.js';
 import { rm } from 'node:fs/promises';
 

@@ -112,14 +112,14 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Harness Registry & Configuration Cascade",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Relocate the provider modules to src/harnesses/, rename ProviderRegistry→HarnessRegistry (keyed by HarnessId), and implement configureHarnesses/getGlobalHarnessConfig/resolveHarnessConfig with the dual independent cascade (harness axis + defaultModelProvider) per PRD §7.6-7.7.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Relocate provider modules and rename registry",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Move src/providers/ → src/harnesses/ and rename ProviderRegistry to HarnessRegistry keyed by HarnessId, preserving the singleton, InitializationStatus enum, and lifecycle methods.",
               "subtasks": [
                 {
@@ -140,7 +140,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S2",
                   "title": "Rename ProviderRegistry → HarnessRegistry (keyed by HarnessId)",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1"
@@ -157,14 +157,14 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Harness configuration cascade utilities",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Implement configureHarnesses/getGlobalHarnessConfig/resolveHarnessConfig with the dual independent cascade (harness selection + model provider) per PRD §7.6-7.7.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "configureHarnesses + getGlobalHarnessConfig + resolveHarnessConfig (dual cascade)",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S2"

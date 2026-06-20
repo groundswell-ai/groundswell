@@ -18,7 +18,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { z } from 'zod';
 import { Agent, Prompt } from '../../index.js';
 import { AnthropicProvider } from '../../harnesses/anthropic-provider.js';
-import { ProviderRegistry } from '../../harnesses/provider-registry.js';
+import { ProviderRegistry } from '../../harnesses/harness-registry.js';
 import { isSuccess, isError } from '../../types/agent.js';
 import { resetGlobalConfig } from '../../utils/provider-config.js';
 

@@ -1,11 +1,12 @@
 /**
- * Provider module exports
+ * Harness module exports
  *
- * Exports the ProviderRegistry class for managing provider instances
- * and InitializationStatus enum for type-safe status checking.
+ * Exports the HarnessRegistry class (+ deprecated ProviderRegistry alias)
+ * for managing harness instances and InitializationStatus enum for type-safe
+ * status checking.
  */
 
-export { ProviderRegistry, InitializationStatus } from './provider-registry.js';
+export { HarnessRegistry, ProviderRegistry, InitializationStatus } from './harness-registry.js';
 
 export {
   MemorySessionStore,
