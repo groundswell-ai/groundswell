@@ -1,3 +1,12 @@
+import { Type } from "@sinclair/typebox";
+import {
+  defineTool,
+} from "@earendil-works/pi-coding-agent";
+import type {
+  ToolDefinition,
+  AgentToolResult,
+  ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import type {
   Harness,
   HarnessId,
@@ -10,6 +19,7 @@ import type {
   ModelSpec,
 } from "../types/harnesses.js";
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
+import { MCPHandler } from "../core/mcp-handler.js";
 import type { AgentResponse } from "../types/agent.js";
 import type { StreamEvent } from "../types/streaming.js";
 import { parseModelSpec } from "../utils/model-spec.js";
@@ -82,6 +92,8 @@ export class PiHarness implements Harness {
   private modelRegistry: ModelRegistry | null = null;
   /** Caller-supplied options (apiKey forwarded per-provider at resolveModel time). */
   private options: HarnessOptions | null = null;
+  /** MCP tool registry — mirrors ClaudeCodeHarness L177. */
+  private mcpHandler: MCPHandler = new MCPHandler();
 
   // ── S2: lifecycle ──────────────────────────────────────────────────────────────────────────
   /**
@@ -214,7 +226,7 @@ export class PiHarness implements Harness {
         model,
         modelRegistry: this.modelRegistry,
         authStorage: this.authStorage,
-        customTools: [],
+        customTools: this.buildCustomTools(toolExecutor),
       });
 
       // Aggregation closure — terminal assistant text + usage + tool-call count from events.
@@ -290,9 +302,67 @@ export class PiHarness implements Harness {
     })();
   }
 
-  async registerMCPs(_servers: MCPServer[]): Promise<Tool[]> {
-    throw new Error(
-      "PiHarness.registerMCPs() not implemented — P2.M4.T1.S2 (MCPHandler.toPiCustomTools)",
+  async registerMCPs(servers: MCPServer[]): Promise<Tool[]> {
+    if (!this.sdk) {
+      throw new Error("PiHarness not initialized. Call initialize() first.");
+    }
+    for (const server of servers) {
+      this.mcpHandler.registerServer(server);
+    }
+    return this.mcpHandler.getTools();
+  }
+
+  /**
+   * Build Pi `ToolDefinition[]` from the registered MCPHandler tools, wiring each tool's `execute()`
+   * to delegate to the caller-supplied `toolExecutor` (PRD §7.10).
+   *
+   * NOTE: `MCPHandler.toPiCustomTools()` (the schema-faithful bridge) is owned by P2.M4.T1.S2 and is
+   * NOT yet built. This inline bridge consumes `getTools()` directly. The `parameters` schema is a
+   * PERMISSIVE placeholder (`Type.Object({}, { additionalProperties: true })`) pending P2.M4.T1.S1's
+   * real JSON-Schema→TypeBox converter. Tool names are already namespaced `serverName__toolName`
+   * by MCPHandler.registerServer (Decision 5).
+   */
+  private buildCustomTools(
+    toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
+  ): ToolDefinition[] {
+    // Permissive placeholder schema — accepts any object (LLM tool args are always objects).
+    // Real schema fidelity is P2.M4.T1.S1. Fallback if Pi rejects: Type.Any().
+    const PERMISSIVE_PARAMS = Type.Object({}, { additionalProperties: true });
+
+    return this.mcpHandler.getTools().map((tool) =>
+      defineTool({
+        name: tool.name,                 // already 'serverName__toolName' (Decision 5)
+        label: tool.name,                // UI label — reuse the namespaced name
+        description: tool.description,
+        parameters: PERMISSIVE_PARAMS,   // placeholder — P2.M4.T1.S1 owns real conversion
+        // PRD §7.10: when Pi emits a tool_call, invoke toolExecutor and return the ToolExecutionResult.
+        execute: async (
+          _toolCallId: string,
+          params: unknown,
+          _signal: AbortSignal | undefined,
+          _onUpdate: undefined,
+          _ctx: ExtensionContext,
+        ): Promise<AgentToolResult<unknown>> => {
+          try {
+            const result = await toolExecutor({ name: tool.name, input: params });
+            const text =
+              typeof result.content === "string"
+                ? result.content
+                : JSON.stringify(result.content);
+            return {
+              content: [{ type: "text" as const, text }],
+              details: { isError: result.isError, toolName: tool.name },
+            };
+          } catch (error) {
+            // toolExecutor rejection — return error content, do NOT propagate (GOTCHA #9).
+            const message = error instanceof Error ? error.message : String(error);
+            return {
+              content: [{ type: "text" as const, text: `Error: ${message}` }],
+              details: { isError: true, toolName: tool.name },
+            };
+          }
+        },
+      }),
     );
   }
 
