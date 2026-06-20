@@ -23,7 +23,6 @@ import {
   Agent,
   Prompt,
   AnthropicProvider,
-  OpenCodeProvider,
   ProviderRegistry,
 } from 'groundswell';
 import { z } from 'zod';
@@ -54,7 +53,6 @@ export async function runProviderSessionsExample(): Promise<void> {
 
   console.log('Setting up providers...');
   registry.register(new AnthropicProvider());
-  registry.register(new OpenCodeProvider());
   await registry.initializeProvider('anthropic', {
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
@@ -299,22 +297,15 @@ export async function runProviderSessionsExample(): Promise<void> {
     console.log('  - Session ID: Any string (user-generated or UUID)');
     console.log('  - SDK Integration: Custom implementation on top of stateless SDK');
 
-    console.log('\nOpenCodeProvider Session Model:');
-    console.log('  - Implementation: Native SDK session management');
-    console.log('  - Storage: Managed by OpenCode SDK');
-    console.log('  - Lifecycle: Managed by SDK (may have TTL)');
-    console.log('  - Persistence: Depends on SDK configuration');
-    console.log('  - Session ID: Required by SDK format');
-    console.log('  - SDK Integration: Built-in session support');
-
-    console.log('\nKey Differences:');
-    console.log('  | Aspect          | Anthropic              | OpenCode              |');
-    console.log('  |-----------------|------------------------|-----------------------|');
-    console.log('  | Storage         | In-memory (Map)        | SDK-managed           |');
-    console.log('  | Persistence     | No                     | Depends on config     |');
-    console.log('  | Implementation  | Custom abstraction     | Native SDK feature    |');
-    console.log('  | Session sharing | Provider-specific only  | Provider-specific only |');
-    console.log('  | State access    | getSession() method    | SDK-managed           |');
+    // TODO(P4.M3.T2): compare pi vs claude-code session models.
+    console.log('\nSession Model Characteristics:');
+    console.log('  | Aspect          | Anthropic              |');
+    console.log('  |-----------------|------------------------|');
+    console.log('  | Storage         | In-memory (Map)        |');
+    console.log('  | Persistence     | No                     |');
+    console.log('  | Implementation  | Custom abstraction     |');
+    console.log('  | Session sharing | Provider-specific only  |');
+    console.log('  | State access    | getSession() method    |');
 
     console.log('\nImportant Notes:');
     console.log('  - Session IDs are provider-specific (cannot share between providers)');
@@ -322,7 +313,6 @@ export async function runProviderSessionsExample(): Promise<void> {
     console.log('  - For production persistence, implement custom session storage');
     console.log('  - Consider session expiration and cleanup for long-running apps');
     console.log('  - Anthropic uses custom abstraction (SDK is stateless)');
-    console.log('  - OpenCode uses native SDK session support');
   }
 
   // ========================================================================

@@ -1,12 +1,13 @@
 # Migration Guide: OpenCode Provider Removal
 
+**Status:** ✅ COMPLETED — Removed in v2.0.0
 **Deprecated:** Version 1.5.0
 **Removed In:** Version 2.0.0
-**Last Updated:** January 26, 2026
+**Last Updated:** June 2026
 
 ## Overview
 
-OpenCodeProvider has been deprecated in favor of AnthropicProvider, which provides:
+OpenCodeProvider **has been removed** in v2.0.0 (deprecated in v1.5.0). Migrate to AnthropicProvider, which provides:
 - Full MCP server integration via `createSdkMcpServer`
 - LSP integration via MCP plugins
 - Client-side tool execution and delegation
@@ -173,8 +174,8 @@ const agent = new Agent({
 ## Timeline
 
 - **January 2026**: v1.5.0 released with deprecation warnings
-- **January-June 2026**: Migration period (6 months)
-- **July 2026**: v2.0.0 released with OpenCodeProvider removal
+- **January–June 2026**: Migration period (6 months)
+- **Completed (v2.0.0):** `OpenCodeProvider` and `@opencode-ai/sdk` removed; `ProviderId` no longer includes `'opencode'`.
 
 ## Getting Help
 
@@ -188,10 +189,10 @@ const agent = new Agent({
 A: Not directly through Groundswell. OpenCodeProvider was the only provider offering multi-provider access. For OpenAI models, consider using the OpenAI API directly or through another library.
 
 **Q: Will OpenCodeProvider continue to work in v1.x?**
-A: Yes, OpenCodeProvider will remain functional in all v1.x releases, but you will see deprecation warnings. We recommend migrating before v2.0.0.
+A: OpenCodeProvider has been **removed** in v2.0.0. It remained functional with deprecation warnings through all v1.x releases.
 
 **Q: How long do I have to migrate?**
-A: You have until v2.0.0 is released (estimated July 2026). That's approximately 6 months from the deprecation announcement.
+A: The migration window **closed with v2.0.0**. If you have not yet migrated, apply the steps above before upgrading from v1.x.
 
 **Q: What if I need features only OpenCode provided?**
 A: Please open a GitHub issue to discuss your use case. We may consider adding support for additional providers in the future if there's sufficient demand.

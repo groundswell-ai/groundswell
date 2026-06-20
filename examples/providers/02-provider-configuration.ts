@@ -25,7 +25,6 @@ import {
   configureProviders,
   getGlobalProviderConfig,
   AnthropicProvider,
-  OpenCodeProvider,
   ProviderRegistry,
 } from 'groundswell';
 import { z } from 'zod';
@@ -70,10 +69,7 @@ export async function runProviderConfigurationExample(): Promise<void> {
           apiKey: process.env.ANTHROPIC_API_KEY,
           timeout: 30000,
         },
-        opencode: {
-          endpoint: 'http://localhost:4096',
-          timeout: 60000,
-        },
+
       },
     });
 
@@ -88,7 +84,6 @@ export async function runProviderConfigurationExample(): Promise<void> {
 
   // Register and initialize providers
   registry.register(new AnthropicProvider());
-  registry.register(new OpenCodeProvider());
   await registry.initializeProvider('anthropic');
 
   // ========================================================================
@@ -104,12 +99,12 @@ export async function runProviderConfigurationExample(): Promise<void> {
       // No provider specified - uses global default
     });
 
-    // Agent 2: Explicitly specifies OpenCode provider
+    // Agent 2: Explicitly specifies Anthropic provider with custom options
     const agent2 = new Agent({
-      name: 'OpenCodeAgent',
-      provider: 'opencode',
+      name: 'ExplicitAnthropicAgent',
+      provider: 'anthropic',
       providerOptions: {
-        endpoint: 'http://localhost:4096',
+        timeout: 15000,
       },
     });
 
@@ -125,9 +120,9 @@ export async function runProviderConfigurationExample(): Promise<void> {
     console.log('✓ Agents created with different configurations');
     console.log('\nAgent 1 (DefaultAgent):');
     console.log('  - Provider: anthropic (from global default)');
-    console.log('\nAgent 2 (OpenCodeAgent):');
-    console.log('  - Provider: opencode (explicitly set)');
-    console.log('  - Endpoint: http://localhost:4096');
+    console.log('\nAgent 2 (ExplicitAnthropicAgent):');
+    console.log('  - Provider: anthropic (explicitly set)');
+    console.log('  - Timeout: 15000ms (custom value)');
     console.log('\nAgent 3 (CustomAnthropicAgent):');
     console.log('  - Provider: anthropic (explicitly set)');
     console.log('  - Timeout: 10000ms (overrides global 30000ms)');
@@ -169,12 +164,12 @@ export async function runProviderConfigurationExample(): Promise<void> {
     console.log('Response:', response1);
     console.log('Provider used: anthropic (agent default)');
 
-    console.log('\n--- Prompt 2: Prompt-level override to OpenCode ---');
-    console.log('Overriding provider at prompt level...');
+    console.log('\n--- Prompt 2: Prompt-level override to different config ---');
+    console.log('Overriding provider options at prompt level...');
 
     // Create a similar prompt
     const prompt2 = new Prompt({
-      user: 'Say "Hello from OpenCode"',
+      user: 'Say "Hello from Anthropic"',
       responseFormat: z.object({
         message: z.string(),
       }),
@@ -183,14 +178,13 @@ export async function runProviderConfigurationExample(): Promise<void> {
     // Execute with prompt-level provider override
     // This OVERRIDES both agent and global configuration
     const response2 = await agent.prompt(prompt2, {
-      provider: 'opencode',
       providerOptions: {
-        endpoint: 'http://localhost:4096',
+        timeout: 5000,
       },
     });
 
     console.log('Response:', response2);
-    console.log('Provider used: opencode (prompt override)');
+    console.log('Provider used: anthropic (prompt-level options override)');
 
     console.log('\n--- Prompt 3: Back to agent default ---');
     console.log('Executing without override (back to anthropic)...');
@@ -231,8 +225,8 @@ export async function runProviderConfigurationExample(): Promise<void> {
     console.log('');
     console.log('Example cascade:');
     console.log('  configureProviders({ defaultProvider: "anthropic" })');
-    console.log('  const agent = new Agent({ provider: "opencode" })');
-    console.log('  await agent.prompt(prompt, { provider: "anthropic" })');
+    console.log('  const agent = new Agent({ provider: "anthropic" })');
+    console.log('  await agent.prompt(prompt, { providerOptions: { timeout: 5000 } })');
     console.log('');
     console.log('  Result: Uses "anthropic" (prompt override wins)');
     console.log('');

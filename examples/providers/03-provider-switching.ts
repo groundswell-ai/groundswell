@@ -12,7 +12,6 @@
  * **Prerequisites**:
  * - Node.js 18+
  * - ANTHROPIC_API_KEY environment variable set
- * - OpenCode server running (optional - for demonstration)
  *
  * **Run**: `npx tsx examples/providers/03-provider-switching.ts`
  */
@@ -24,7 +23,6 @@ import {
   Agent,
   Prompt,
   AnthropicProvider,
-  OpenCodeProvider,
   ProviderRegistry,
 } from 'groundswell';
 import { z } from 'zod';
@@ -55,16 +53,9 @@ export async function runProviderSwitchingExample(): Promise<void> {
 
   console.log('Setting up providers...');
   registry.register(new AnthropicProvider());
-  registry.register(new OpenCodeProvider());
   await registry.initializeProvider('anthropic', {
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
-
-  // Note: OpenCode initialization is optional for this example
-  // If you have an OpenCode server running, uncomment the following:
-  // await registry.initializeProvider('opencode', {
-  //   endpoint: 'http://localhost:4096'
-  // });
 
   console.log('✓ Providers registered and initialized\n');
 
@@ -87,21 +78,19 @@ export async function runProviderSwitchingExample(): Promise<void> {
     console.log('  Provider: anthropic');
     console.log('  Model: claude-sonnet-4-20250514');
 
-    // Agent 2: OpenCode provider
-    const opencodeAgent = new Agent({
-      name: 'OpenCodeAgent',
-      provider: 'opencode',
-      model: 'openai/gpt-4',
-      providerOptions: {
-        endpoint: 'http://localhost:4096',
-      },
+    // Agent 2: Second Anthropic agent with different model
+    // TODO(P4.M3.T2): rewrite as pi vs claude-code harness switching.
+    //   The legacy provider vocabulary has no second valid provider after removal.
+    const secondAgent = new Agent({
+      name: 'SecondaryAgent',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
     });
 
     console.log('\nAgent 2 created:');
-    console.log('  Name: OpenCodeAgent');
-    console.log('  Provider: opencode');
-    console.log('  Model: openai/gpt-4');
-    console.log('  Endpoint: http://localhost:4096');
+    console.log('  Name: SecondaryAgent');
+    console.log('  Provider: anthropic');
+    console.log('  Model: claude-sonnet-4-20250514');
 
     console.log('\n--- Testing AnthropicAgent ---');
 
@@ -122,9 +111,8 @@ export async function runProviderSwitchingExample(): Promise<void> {
       console.log('  Error:', (error as Error).message);
     }
 
-    console.log('\n--- Testing OpenCodeAgent ---');
-    console.log('Note: OpenCode requires a running server at http://localhost:4096');
-    console.log('  If you have OpenCode running, uncomment the initialization above');
+    console.log('\n--- Testing SecondaryAgent ---');
+    console.log('Note: Both agents use the Anthropic provider in this example');
 
     console.log('\nKey points:');
     console.log('  - Each agent can have a different provider');
@@ -170,28 +158,26 @@ export async function runProviderSwitchingExample(): Promise<void> {
       console.log('Note: Would execute with ANTHROPIC_API_KEY');
     }
 
-    console.log('\n--- Prompt 2: Switching to OpenCode ---');
+    console.log('\n--- Prompt 2: Prompt-level provider options override ---');
 
     const prompt2 = new Prompt({
-      user: 'Say "Using OpenCode" in exactly those words.',
+      user: 'Say "Using Anthropic with override" in exactly those words.',
       responseFormat: z.object({
         message: z.string(),
       }),
     });
 
     try {
-      // Switch to OpenCode for this prompt only
+      // Override provider options for this prompt only
       const response2 = await agent.prompt(prompt2, {
-        provider: 'opencode',
         providerOptions: {
-          endpoint: 'http://localhost:4096',
+          timeout: 5000,
         },
       });
       console.log('Response:', response2);
-      console.log('Provider used: opencode (prompt override)');
+      console.log('Provider used: anthropic (with prompt-level options override)');
     } catch (error) {
-      console.log('Note: Would execute with OpenCode at http://localhost:4096');
-      console.log('  (requires running OpenCode server)');
+      console.log('Note: Would execute with ANTHROPIC_API_KEY');
     }
 
     console.log('\n--- Prompt 3: Back to default provider ---');
@@ -248,20 +234,16 @@ export async function runProviderSwitchingExample(): Promise<void> {
       console.log('  Anthropic capabilities:', anthropicProvider.capabilities);
     }
 
-    const opencodeProvider = registry.get('opencode');
-    if (opencodeProvider) {
-      console.log('  OpenCode capabilities:', opencodeProvider.capabilities);
-    }
-
-    console.log('\nCapability comparison:');
-    console.log('  Feature           | Anthropic | OpenCode');
-    console.log('  ------------------|-----------|----------');
-    console.log('  MCP support       | ✓         | ✗');
-    console.log('  Skills            | ✓         | ✓');
-    console.log('  LSP               | ✓         | ✗');
-    console.log('  Streaming         | ✓         | ✓');
-    console.log('  Sessions          | ✓         | ✓');
-    console.log('  Extended Thinking | ✓         | ✓');
+    console.log('\nAnthropic capabilities:');
+    // TODO(P4.M3.T2): rewrite as pi vs claude-code capability comparison.
+    console.log('  Feature           | Anthropic');
+    console.log('  ------------------|-----------');
+    console.log('  MCP support       | ✓');
+    console.log('  Skills            | ✓');
+    console.log('  LSP               | ✓');
+    console.log('  Streaming         | ✓');
+    console.log('  Sessions          | ✓');
+    console.log('  Extended Thinking | ✓');
   }
 
   // ========================================================================
@@ -278,7 +260,7 @@ export async function runProviderSwitchingExample(): Promise<void> {
     console.log('    • You want to isolate workloads by provider');
     console.log('  Example:');
     console.log('    const researchAgent = new Agent({ provider: "anthropic" })');
-    console.log('    const codeAgent = new Agent({ provider: "opencode" })');
+    console.log('    const codeAgent = new Agent({ provider: "anthropic" })');
 
     console.log('\nPrompt-Level Switching (agent.prompt(prompt, { provider }))');
     console.log('  Use when:');
@@ -291,7 +273,7 @@ export async function runProviderSwitchingExample(): Promise<void> {
     console.log('    try {');
     console.log('      return await agent.prompt(prompt, { provider: "anthropic" })');
     console.log('    } catch {');
-    console.log('      return await agent.prompt(prompt, { provider: "opencode" })');
+    console.log('      return await agent.prompt(prompt, { providerOptions: { timeout: 5000 } })');
     console.log('    }');
 
     console.log('\nGlobal Configuration (configureProviders())');

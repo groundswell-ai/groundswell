@@ -703,14 +703,14 @@
           "type": "Milestone",
           "id": "P4.M1",
           "title": "OpenCode Provider Removal",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Delete OpenCodeProvider, its test suite, the 'opencode' literal, and the @opencode-ai/sdk dependency (completing the v1.5.0→v2.0.0 deprecation track now that the type system has been rewritten).",
           "tasks": [
             {
               "type": "Task",
               "id": "P4.M1.T1",
               "title": "Delete OpenCodeProvider and opencode surface",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Remove the OpenCodeProvider source, tests, the 'opencode' enum value, examples, and the @opencode-ai/sdk dependency.",
               "subtasks": [
                 {
@@ -732,7 +732,7 @@
                   "type": "Subtask",
                   "id": "P4.M1.T1.S2",
                   "title": "Update examples and finalize migration-opencode doc",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P4.M1.T1.S1"

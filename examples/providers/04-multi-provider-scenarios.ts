@@ -12,7 +12,6 @@
  * **Prerequisites**:
  * - Node.js 18+
  * - ANTHROPIC_API_KEY environment variable set
- * - OpenCode server running (optional - for demonstration)
  *
  * **Run**: `npx tsx examples/providers/04-multi-provider-scenarios.ts`
  */
@@ -24,7 +23,6 @@ import {
   Agent,
   Prompt,
   AnthropicProvider,
-  OpenCodeProvider,
   ProviderRegistry,
 } from 'groundswell';
 import { z } from 'zod';
@@ -55,12 +53,10 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
 
   console.log('Setting up providers...');
   registry.register(new AnthropicProvider());
-  registry.register(new OpenCodeProvider());
   await registry.initializeProvider('anthropic', {
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
-  // Note: OpenCode initialization is optional for this example
   console.log('✓ Providers registered and initialized\n');
 
   // ========================================================================
@@ -74,7 +70,7 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
      * CostOptimizer - Routes tasks based on complexity
      *
      * Strategy:
-     * - Simple tasks (FAQ, basic queries) → OpenCode (cheaper)
+     * - Simple tasks (FAQ, basic queries) → Anthropic with faster model (cheaper)
      * - Complex tasks (analysis, reasoning) → Anthropic (higher quality)
      */
     class CostOptimizer {
@@ -85,7 +81,7 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
         // Simple agent for basic tasks (could use cheaper provider)
         this.simpleAgent = new Agent({
           name: 'SimpleAgent',
-          provider: 'anthropic', // Would be 'opencode' in production
+          provider: 'anthropic', // Would use a faster/cheaper model in production
           model: 'claude-sonnet-4-20250514',
         });
 
@@ -188,8 +184,9 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
      */
     class ResilientAgent {
       private agent: Agent;
-      private primaryProvider: 'anthropic' | 'opencode' = 'anthropic';
-      private fallbackProvider: 'anthropic' | 'opencode' = 'opencode';
+      // TODO(P4.M3.T2): multi-model routing moves to the model axis under a constant harness.
+      private primaryProvider: 'anthropic' = 'anthropic';
+      private fallbackProvider: 'anthropic' = 'anthropic';
 
       constructor() {
         this.agent = new Agent({
@@ -225,9 +222,6 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
             // Try fallback provider
             const response = await this.agent.prompt(prompt, {
               provider: this.fallbackProvider,
-              providerOptions: {
-                endpoint: 'http://localhost:4096',
-              },
             });
             console.log('✓ Fallback provider succeeded');
             return { ...response, fallbackUsed: true };
@@ -297,7 +291,8 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
           }),
         });
 
-        const providers: Array<'anthropic' | 'opencode'> = ['anthropic', 'opencode'];
+        // TODO(P4.M3.T2): expand to multi-model routing (anthropic/... vs openai/...) under harness vocabulary.
+        const providers: Array<'anthropic'> = ['anthropic'];
         const results: Array<{ provider: string; response: unknown; latency: number }> = [];
 
         console.log(`Testing prompt: "${promptText}"\n`);
@@ -310,7 +305,6 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
           try {
             const response = await this.agent.prompt(prompt, {
               provider,
-              providerOptions: provider === 'opencode' ? { endpoint: 'http://localhost:4096' } : undefined,
             });
 
             const latency = Date.now() - startTime;
@@ -374,7 +368,7 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
     console.log('  Different agents for different capabilities');
     console.log('  ```typescript');
     console.log('  const researchAgent = new Agent({ provider: "anthropic" })');
-    console.log('  const codeAgent = new Agent({ provider: "opencode" })');
+    console.log('  const codeAgent = new Agent({ provider: "anthropic" })');
     console.log('  ```');
     console.log('  Benefits:');
     console.log('    - Optimized for specific tasks');
@@ -384,7 +378,7 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
     console.log('\nPattern 2: Provider Pool');
     console.log('  Round-robin or load-balanced provider selection');
     console.log('  ```typescript');
-    console.log('  const providers = ["anthropic", "opencode"];');
+    console.log('  const providers = ["anthropic"];');
     console.log('  const provider = providers[Math.floor(Math.random() * providers.length)];');
     console.log('  await agent.prompt(prompt, { provider })');
     console.log('  ```');
@@ -396,7 +390,7 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
     console.log('\nPattern 3: Tiered Routing');
     console.log('  Route based on user tier or service level');
     console.log('  ```typescript');
-    console.log('  const provider = user.tier === "premium" ? "anthropic" : "opencode";');
+    console.log('  const provider = user.tier === "premium" ? "anthropic" : "anthropic";');
     console.log('  await agent.prompt(prompt, { provider })');
     console.log('  ```');
     console.log('  Benefits:');
@@ -418,7 +412,7 @@ export async function runMultiProviderScenariosExample(): Promise<void> {
     console.log('\nPattern 5: Feature-Based Routing');
     console.log('  Route based on required capabilities');
     console.log('  ```typescript');
-    console.log('  const provider = needsMCP ? "anthropic" : "opencode";');
+    console.log('  const provider = needsMCP ? "anthropic" : "anthropic";');
     console.log('  await agent.prompt(prompt, { provider })');
     console.log('  ```');
     console.log('  Benefits:');

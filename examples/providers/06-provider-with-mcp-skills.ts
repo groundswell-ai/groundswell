@@ -23,7 +23,6 @@ import {
   Agent,
   Prompt,
   AnthropicProvider,
-  OpenCodeProvider,
   ProviderRegistry,
   type MCPServer,
 } from 'groundswell';
@@ -55,7 +54,6 @@ export async function runProviderWithMcpSkillsExample(): Promise<void> {
 
   console.log('Setting up providers...');
   registry.register(new AnthropicProvider());
-  registry.register(new OpenCodeProvider());
   await registry.initializeProvider('anthropic', {
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
@@ -456,40 +454,31 @@ Clear and concise technical documentation skills.
     console.log('Comparing capabilities across providers:\n');
 
     const anthropicProvider = registry.get('anthropic');
-    const opencodeProvider = registry.get('opencode');
 
-    if (anthropicProvider && opencodeProvider) {
+    // TODO(P4.M3.T2): rewrite matrix as pi vs claude-code (PRD §7.4 capability table).
+    if (anthropicProvider) {
       console.log('Capability Matrix:');
-      console.log('┌─────────────────────┬────────────┬───────────┐');
-      console.log('│ Feature             │ Anthropic  │ OpenCode  │');
-      console.log('├─────────────────────┼────────────┼───────────┤');
-      console.log('│ MCP Support         │ ✓          │ ✗         │');
-      console.log('│ Skills              │ ✓          │ ✓         │');
-      console.log('│ LSP Support         │ ✓          │ ✗         │');
-      console.log('│ Streaming           │ ✓          │ ✓         │');
-      console.log('│ Sessions            │ ✓          │ ✓         │');
-      console.log('│ Extended Thinking   │ ✓          │ ✓         │');
-      console.log('└─────────────────────┴────────────┴───────────┘');
+      console.log('┌─────────────────────┬────────────┐');
+      console.log('│ Feature             │ Anthropic  │');
+      console.log('├─────────────────────┼────────────┤');
+      console.log('│ MCP Support         │ ✓          │');
+      console.log('│ Skills              │ ✓          │');
+      console.log('│ LSP Support         │ ✓          │');
+      console.log('│ Streaming           │ ✓          │');
+      console.log('│ Sessions            │ ✓          │');
+      console.log('│ Extended Thinking   │ ✓          │');
+      console.log('└─────────────────────┴────────────┘');
 
       console.log('\nDetailed capabilities:');
       console.log('\nAnthropicProvider:');
       console.log('  ', prettyJson(anthropicProvider.capabilities));
-
-      console.log('\nOpenCodeProvider:');
-      console.log('  ', prettyJson(opencodeProvider.capabilities));
     }
 
-    console.log('\nKey differences:');
-    console.log('  - MCP: Only Anthropic supports MCP integration');
-    console.log('  - LSP: Only Anthropic supports LSP via MCP plugins');
-    console.log('  - Tools: OpenCode operates in LLM-only mode (server-side tools)');
-    console.log('  - Skills: Both support skills via system prompt injection');
-    console.log('  - Sessions: Both support sessions (different implementations)');
-
-    console.log('\nImportant note:');
-    console.log('  OpenCodeProvider.registerMCPs() returns empty array');
-    console.log('  OpenCode executes tools server-side with no client-side delegation');
-    console.log('  Use AnthropicProvider when you need MCP integration');
+    console.log('\nKey capabilities:');
+    console.log('  - MCP: Full MCP server integration with tool delegation');
+    console.log('  - LSP: LSP support via MCP plugins');
+    console.log('  - Skills: Skills via system prompt injection');
+    console.log('  - Sessions: In-memory session management');
   }
 
   // ========================================================================
@@ -504,7 +493,6 @@ Clear and concise technical documentation skills.
   console.log('  5. Feature comparison across providers');
   console.log('\nKey takeaways:');
   console.log('  - AnthropicProvider: Full MCP support, LSP, skills, sessions');
-  console.log('  - OpenCodeProvider: LLM-only mode, skills, sessions, no MCP/LSP');
   console.log('  - Skills enhance agents via system prompt injection');
   console.log('  - Hooks provide observability into provider operations');
   console.log('  - Check provider capabilities before using features');
