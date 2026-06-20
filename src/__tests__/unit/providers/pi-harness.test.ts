@@ -61,14 +61,6 @@ describe('PiHarness', () => {
   });
 
   describe('stub methods throw with downstream subtask references', () => {
-    it('execute() should throw citing P2.M2.T2.S1', () => {
-      const harness = new PiHarness();
-      const dummyExecutor = async () => ({ content: '', isError: false });
-      expect(() =>
-        harness.execute({ prompt: 'test', options: {} }, dummyExecutor),
-      ).toThrow(/P2\.M2\.T2\.S1/);
-    });
-
     it('registerMCPs() should throw citing P2.M4.T1.S2', async () => {
       const harness = new PiHarness();
       await expect(harness.registerMCPs([])).rejects.toThrow(/P2\.M4\.T1\.S2/);

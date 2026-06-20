@@ -15,7 +15,13 @@ import type { StreamEvent } from "../types/streaming.js";
 import { parseModelSpec } from "../utils/model-spec.js";
 import { getGlobalHarnessConfig } from "../utils/harness-config.js";
 import { AGENT_ERROR_CODES } from "../types/agent.js";
+import { createSuccessResponse, createErrorResponse } from "../types/agent.js";
 import { ConfigError } from "./claude-code-harness.js";
+import type {
+  AgentSession,
+  AgentSessionEvent,
+  AgentSessionEventListener,
+} from "@earendil-works/pi-coding-agent";
 import { ModelRegistry, AuthStorage } from "@earendil-works/pi-coding-agent";
 
 /**
@@ -164,12 +170,124 @@ export class PiHarness implements Harness {
     return model;
   }
 
+  /**
+   * Execute a prompt and return a structured AgentResponse (PRD §7.3, §7.11, §7.14.4).
+   *
+   * Creates a Pi AgentSession via createAgentSession, drives one prompt through session.prompt(),
+   * aggregates the terminal assistant text + token usage + tool-call count from the event stream
+   * (session.subscribe), fires session lifecycle hooks, and returns an AgentResponse<T>.
+   *
+   * Non-streaming path (this task — P2.M2.T2.S1): returns Promise<AgentResponse<T>>.
+   * Streaming path: owned by P2.M3.T2.S1 (StreamEvent mapping) — throws synchronously.
+   * Tool delegation: owned by P2.M3.T1 — customTools:[] in T2 (toolExecutor accepted, unused).
+   * Remaining hooks (onToolStart/onToolEnd/onStream): owned by P2.M3.T2.S2.
+   */
   execute<T>(
-    _request: HarnessRequest,
-    _toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
-    _hooks?: HarnessHookEvents,
+    request: HarnessRequest,
+    toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
+    hooks?: HarnessHookEvents,
   ): Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
-    throw new Error("PiHarness.execute() not implemented — P2.M2.T2.S1 (prompt/subscribe → AgentResponse)");
+    // STREAMING branch — owned by P2.M3.T2.S1. Throw synchronously (not a rejected promise).
+    if (request.options.streaming) {
+      throw new Error(
+        "PiHarness streaming execute() not implemented — P2.M3.T2.S1 (StreamEvent mapping)",
+      );
+    }
+
+    // NON-STREAMING branch — IIFE returning Promise<AgentResponse<T>> (mirrors ClaudeCodeHarness).
+    return (async (): Promise<AgentResponse<T>> => {
+      // Uninitialized guard (mirror ClaudeCodeHarness's `if (!this.sdk) throw …`).
+      if (!this.sdk || !this.modelRegistry || !this.authStorage) {
+        throw new Error("PiHarness not initialized. Call initialize() first.");
+      }
+
+      const startTime = Date.now(); // capture BEFORE createAgentSession (duration includes setup)
+
+      // Model resolution (S2's resolveModel; S1/S2's normalizeModel).
+      const modelSpec = this.normalizeModel(
+        request.options.model ?? "claude-sonnet-4-20250514",
+      );
+      const model = this.resolveModel(modelSpec); // throws ConfigError if absent — let it propagate
+
+      // Create the Pi session. customTools: [] — Groundswell tools wired in P2.M3.T1.
+      const { session } = await this.sdk!.createAgentSession({
+        model,
+        modelRegistry: this.modelRegistry,
+        authStorage: this.authStorage,
+        customTools: [],
+      });
+
+      // Aggregation closure — terminal assistant text + usage + tool-call count from events.
+      // Pi's prompt() resolves void; the answer is ONLY available via the event stream.
+      let lastAssistantText = "";
+      let totalInput = 0;
+      let totalOutput = 0;
+      let toolCallCount = 0;
+
+      const listener: AgentSessionEventListener = (event: AgentSessionEvent) => {
+        // Structural cast — AgentMessage/AssistantMessage are NON-importable transitive types.
+        const e = event as { type: string; message?: any; messages?: any[] };
+        switch (e.type) {
+          case "session_start": // PRD §7.11 → onSessionStart
+            void hooks?.onSessionStart?.();
+            break;
+          case "session_shutdown": // PRD §7.11 → onSessionEnd(duration)
+            void hooks?.onSessionEnd?.(Date.now() - startTime);
+            break;
+          case "turn_end": {
+            const msg = e.message;
+            if (msg && msg.role === "assistant" && Array.isArray(msg.content)) {
+              // Text: last turn wins (final assistant message after all tool calls).
+              const text = msg.content
+                .filter((b: any) => b?.type === "text")
+                .map((b: any) => b.text ?? "")
+                .join("");
+              if (text) lastAssistantText = text;
+              // Usage: accumulate across turns (input→input_tokens, output→output_tokens).
+              if (msg.usage) {
+                totalInput += msg.usage.input ?? 0;
+                totalOutput += msg.usage.output ?? 0;
+              }
+              // Tool calls: count toolCall blocks in this turn's message.
+              for (const b of msg.content) {
+                if (b?.type === "toolCall") toolCallCount++;
+              }
+            }
+            break;
+          }
+          // agent_end is the terminal signal but turn_end already captured everything we need.
+        }
+      };
+
+      const unsubscribe = session.subscribe(listener);
+
+      try {
+        await session.prompt(request.prompt); // resolves when the turn/loop is processed; events already fired
+      } catch (error) {
+        // EXECUTION_FAILED path (parity with ClaudeCodeHarness's createErrorResponse usage).
+        return createErrorResponse(
+          AGENT_ERROR_CODES.EXECUTION_FAILED,
+          `Pi agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
+          {
+            prompt: request.prompt,
+            model: modelSpec.raw,
+            ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+          },
+          true, // recoverable: assume transient (provider/network) — caller can retry
+        ) as AgentResponse<T>;
+      } finally {
+        unsubscribe(); // detach even on success to avoid leaks if the session is reused
+      }
+
+      const duration = Date.now() - startTime;
+      return createSuccessResponse(lastAssistantText as unknown as T, {
+        agentId: this.id,
+        timestamp: Date.now(),
+        duration,
+        usage: { input_tokens: totalInput, output_tokens: totalOutput },
+        toolCalls: toolCallCount,
+      });
+    })();
   }
 
   async registerMCPs(_servers: MCPServer[]): Promise<Tool[]> {
