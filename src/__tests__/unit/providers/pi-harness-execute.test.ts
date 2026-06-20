@@ -151,19 +151,6 @@ describe('PiHarness - execute() non-streaming', () => {
     });
   });
 
-  // ── Streaming branch throws ──────────────────────────────────────────────
-
-  describe('streaming branch', () => {
-    it('should throw synchronously citing P2.M3.T2.S1 when streaming is true', () => {
-      expect(() =>
-        harness.execute(
-          { prompt: 'test', options: { streaming: true } },
-          dummyToolExecutor,
-        ),
-      ).toThrow(/P2\.M3\.T2\.S1/);
-    });
-  });
-
   // ── Success aggregation ──────────────────────────────────────────────────
 
   describe('success aggregation', () => {

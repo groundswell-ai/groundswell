@@ -398,7 +398,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T2.S1",
                   "title": "StreamEvent mapping from Pi session events",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T2.S1"
@@ -414,7 +414,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T2.S2",
                   "title": "HarnessHookEvents adaptation (onToolStart/End, onSessionStart/End, onStream)",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M3.T2.S1"

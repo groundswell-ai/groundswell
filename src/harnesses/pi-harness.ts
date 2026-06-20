@@ -189,9 +189,9 @@ export class PiHarness implements Harness {
    * aggregates the terminal assistant text + token usage + tool-call count from the event stream
    * (session.subscribe), fires session lifecycle hooks, and returns an AgentResponse<T>.
    *
-   * Non-streaming path (this task — P2.M2.T2.S1): returns Promise<AgentResponse<T>>.
-   * Streaming path: owned by P2.M3.T2.S1 (StreamEvent mapping) — throws synchronously.
-   * Tool delegation: owned by P2.M3.T1 — customTools:[] in T2 (toolExecutor accepted, unused).
+   * Non-streaming path (P2.M2.T2.S1): returns Promise<AgentResponse<T>>.
+   * Streaming path: delegates to executeStreaming() (P2.M3.T2.S1) — returns AsyncGenerator<StreamEvent, AgentResponse<T>>.
+   * Tool delegation: customTools wired via buildCustomTools (P2.M3.T1).
    * Remaining hooks (onToolStart/onToolEnd/onStream): owned by P2.M3.T2.S2.
    */
   execute<T>(
@@ -199,11 +199,13 @@ export class PiHarness implements Harness {
     toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
     hooks?: HarnessHookEvents,
   ): Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
-    // STREAMING branch — owned by P2.M3.T2.S1. Throw synchronously (not a rejected promise).
+    // STREAMING branch — P2.M3.T2.S1. Init guard BEFORE returning the generator (synchronous return).
+    // Mirror ClaudeCodeHarness L386-395: if (streaming) { guard; return this.executeStreaming(...); }
     if (request.options.streaming) {
-      throw new Error(
-        "PiHarness streaming execute() not implemented — P2.M3.T2.S1 (StreamEvent mapping)",
-      );
+      if (!this.sdk || !this.modelRegistry || !this.authStorage) {
+        throw new Error("PiHarness not initialized. Call initialize() first.");
+      }
+      return this.executeStreaming<T>(request, toolExecutor, hooks);
     }
 
     // NON-STREAMING branch — IIFE returning Promise<AgentResponse<T>> (mirrors ClaudeCodeHarness).
@@ -300,6 +302,215 @@ export class PiHarness implements Harness {
         toolCalls: toolCallCount,
       });
     })();
+  }
+
+  /**
+   * Stream a Pi turn as `StreamEvent`s (PRD §7.3, §7.4, §7.14.4).
+   *
+   * Pi's `session.subscribe(listener)` is SYNCHRONOUS — a listener cannot `yield`. This method
+   * bridges sync callbacks → async generator via an internal queue: the listener `enqueue`s events
+   * (and resolves a parked drain), the generator `dequeue`s/maps/`yield`s. `session.prompt()` runs
+   * detached; its resolution flips the terminal condition.
+   *
+   * Mapping (PRD §7.11): message_update→text_delta (snapshot-diff), tool_execution_start→tool_call_start,
+   * tool_execution_end→tool_call_done, turn_end→usage, terminal→done, errors→error.
+   *
+   * Hooks (Decision 5): session lifecycle hooks (onSessionStart/onSessionEnd) fire for parity with
+   * the non-streaming path. onToolStart/onToolEnd/onStream are P2.M3.T2.S2 (NOT wired here).
+   */
+  private async *executeStreaming<T>(
+    request: HarnessRequest,
+    toolExecutor: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
+    hooks?: HarnessHookEvents,
+  ): AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
+    if (!this.sdk || !this.modelRegistry || !this.authStorage) {
+      throw new Error("PiHarness not initialized. Call initialize() first.");
+    }
+    const startTime = Date.now();
+
+    const modelSpec = this.normalizeModel(request.options.model ?? "claude-sonnet-4-20250514");
+    const model = this.resolveModel(modelSpec); // throws ConfigError if absent — let it propagate
+
+    // REUSE P2.M3.T1.S1's customTools seam (Decision 1) — do NOT pass customTools: [].
+    const { session } = await this.sdk!.createAgentSession({
+      model,
+      modelRegistry: this.modelRegistry,
+      authStorage: this.authStorage,
+      customTools: this.buildCustomTools(toolExecutor),
+    });
+
+    // Yield metadata FIRST (mirror ClaudeCodeHarness L696-701).
+    yield {
+      type: "metadata",
+      metadata: {
+        requestId: `${this.id}-${Date.now()}`,
+        model: modelSpec.model,
+        provider: this.id,
+      },
+    } satisfies Extract<StreamEvent, { type: "metadata" }>;
+
+    // ── Async-queue bridge (Decision 3) ─────────────────────────────────────────────
+    const queue: AgentSessionEvent[] = [];
+    let resolveNext: (() => void) | null = null;
+    let turnDone = false;
+
+    const enqueue = (e: AgentSessionEvent) => {
+      queue.push(e);
+      resolveNext?.();
+      resolveNext = null;
+    };
+
+    // Aggregation state (mirrors the non-streaming listener).
+    let fullText = "";
+    let textIndex = 0;
+    let toolIndex = 0;
+    let lastInput = 0;
+    let lastOutput = 0;
+    let lastCache: number | undefined;
+
+    const listener: AgentSessionEventListener = (event: AgentSessionEvent) => {
+      const e = event as { type: string; message?: any };
+      // Session lifecycle hooks — parity with non-streaming (Decision 5).
+      // onToolStart/onToolEnd/onStream are P2.M3.T2.S2 (deliberately NOT wired here).
+      switch (e.type) {
+        case "session_start":
+          void hooks?.onSessionStart?.();
+          break;
+        case "session_shutdown":
+          void hooks?.onSessionEnd?.(Date.now() - startTime);
+          break;
+      }
+      enqueue(event); // every event flows through the bridge for mapping
+    };
+
+    const unsubscribe = session.subscribe(listener);
+
+    // Kick off prompt() WITHOUT awaiting in the generator body (Decision 3). Capture rejection.
+    let promptError: unknown = null;
+    void session
+      .prompt(request.prompt)
+      .catch((err: unknown) => {
+        promptError = err;
+      })
+      .finally(() => {
+        turnDone = true;
+        resolveNext?.();
+        resolveNext = null;
+      });
+
+    try {
+      // ── Drain loop: map Pi events → StreamEvent ──────────────────────────────────
+      while (!turnDone || queue.length > 0) {
+        if (queue.length === 0) {
+          await new Promise<void>((r) => {
+            resolveNext = r;
+          });
+        }
+        while (queue.length > 0) {
+          const event = queue.shift()!;
+          const e = event as {
+            type: string;
+            message?: any;
+            toolCallId?: string;
+            toolName?: string;
+            result?: any;
+            isError?: boolean;
+          };
+          switch (e.type) {
+            case "message_update": {
+              // Snapshot-diff (Decision 2) — assistant text only.
+              if (e.message?.role === "assistant" && Array.isArray(e.message.content)) {
+                const text = e.message.content
+                  .filter((b: any) => b?.type === "text")
+                  .map((b: any) => b.text ?? "")
+                  .join("");
+                if (text.length > fullText.length && text.startsWith(fullText)) {
+                  yield {
+                    type: "text_delta",
+                    delta: text.slice(fullText.length),
+                    index: textIndex++,
+                  } satisfies Extract<StreamEvent, { type: "text_delta" }>;
+                  fullText = text;
+                } else if (text.length > fullText.length) {
+                  // Non-prefix growth (rare replays) — emit the whole new tail.
+                  yield { type: "text_delta", delta: text.slice(fullText.length), index: textIndex++ } satisfies Extract<StreamEvent, { type: "text_delta" }>;
+                  fullText = text;
+                }
+              }
+              break;
+            }
+            case "tool_execution_start":
+              yield {
+                type: "tool_call_start",
+                id: String(e.toolCallId ?? ""),
+                name: String(e.toolName ?? ""),
+                index: toolIndex++,
+              } satisfies Extract<StreamEvent, { type: "tool_call_start" }>;
+              break;
+            case "tool_execution_end":
+              yield {
+                type: "tool_call_done",
+                id: String(e.toolCallId ?? ""),
+                result: e.result ?? null,
+              } satisfies Extract<StreamEvent, { type: "tool_call_done" }>;
+              break;
+            case "turn_end": {
+              const msg = e.message;
+              if (msg && msg.role === "assistant" && msg.usage) {
+                lastInput = msg.usage.input ?? 0;
+                lastOutput = msg.usage.output ?? 0;
+                lastCache = msg.usage.cacheRead ?? msg.usage.cacheWrite; // mirror ClaudeCodeHarness L843-845
+              }
+              break;
+            }
+            // session_start/session_shutdown/agent_end/turn_start/etc. handled by hooks or ignored.
+          }
+        }
+      }
+
+      // ── Terminal ─────────────────────────────────────────────────────────────────
+      if (promptError) {
+        const message = promptError instanceof Error ? promptError.message : String(promptError);
+        yield {
+          type: "error",
+          error: new Error(`Pi agent execution failed: ${message}`),
+          code: AGENT_ERROR_CODES.EXECUTION_FAILED,
+          retryable: true,
+        } satisfies Extract<StreamEvent, { type: "error" }>;
+        return createErrorResponse(
+          AGENT_ERROR_CODES.EXECUTION_FAILED,
+          `Pi agent execution failed: ${message}`,
+          {
+            prompt: request.prompt,
+            model: modelSpec.raw,
+            ...(promptError instanceof Error && promptError.stack ? { stack: promptError.stack } : {}),
+          },
+          true,
+        ) as AgentResponse<T>;
+      }
+
+      // Usage (one event — final turn wins; GOTCHA #9).
+      if (lastInput || lastOutput) {
+        const usageEvent: Extract<StreamEvent, { type: "usage" }> = {
+          type: "usage",
+          inputTokens: lastInput,
+          outputTokens: lastOutput,
+        };
+        if (lastCache !== undefined) usageEvent.cacheTokens = lastCache;
+        yield usageEvent;
+      }
+
+      yield { type: "done", finishReason: "stop" } satisfies Extract<StreamEvent, { type: "done" }>;
+
+      return createSuccessResponse(fullText as unknown as T, {
+        agentId: this.id,
+        timestamp: Date.now(),
+        duration: Date.now() - startTime,
+        usage: { input_tokens: lastInput, output_tokens: lastOutput },
+      });
+    } finally {
+      unsubscribe(); // detach even on early break / abort (GOTCHA #16)
+    }
   }
 
   async registerMCPs(servers: MCPServer[]): Promise<Tool[]> {
