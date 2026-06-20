@@ -220,7 +220,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Harness Adapter Implementation",
-      "status": "Planned",
+      "status": "Researching",
       "description": "Implement the two Harness adapters that PRD §7 requires: ClaudeCodeHarness (a rename/reinterface of the existing AnthropicProvider) and the new PiHarness wrapping @earendil-works/pi-coding-agent (the default). Includes the MCPHandler→Pi tool bridge so both harnesses delegate tool execution to Groundswell's MCPHandler (PRD §7.10, §7.12 parity without Pi plugins).",
       "milestones": [
         {
@@ -451,21 +451,21 @@
           "type": "Milestone",
           "id": "P2.M4",
           "title": "MCPHandler Pi Tool Bridge",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Add the MCPHandler→Pi bridge so Groundswell's MCP tools can be passed to Pi as customTools ToolDefinition[] (PRD §7.10 parity without a Pi plugin). Independent of the harness scaffolding—pure converter work.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M4.T1",
               "title": "JSON-Schema → TypeBox converter and toPiCustomTools bridge",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Build the schema converter (JSON-Schema input_schema → TypeBox TSchema) and the MCPHandler.toPiCustomTools() method returning ToolDefinition[].",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M4.T1.S1",
                   "title": "JSON-Schema → TypeBox schema converter",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.4 gotcha + §4: Pi ToolDefinition.parameters is TypeBox (TSchema from @sinclair/typebox, transitive via Pi); current MCPHandler.jsonSchemaToZodRawShape() (consumer-analysis.md §5) converts JSON-Schema→Zod for Claude. A parallel JSON-Schema→TypeBox converter is needed. @sinclair/typebox is available transitively; verify it resolves or add as direct dep.\n2. INPUT: Tool.input_schema (JSON-Schema object) from src/types/sdk-primitives.ts.\n3. LOGIC: Add src/harnesses/pi-schema-converter.ts (or src/core/mcp-handler.ts sibling) jsonSchemaToTypebox(schema): TSchema supporting object/string/number/boolean/array/enum/$ref basics (parity with the Zod converter's coverage). Export Type.Type.* builders. Mock: none (pure function).\n4. OUTPUT: jsonSchemaToTypebox converter; unit-tested against representative JSON-Schema shapes. Consumed by S2.",
@@ -479,7 +479,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S2",
                   "title": "MCPHandler.toPiCustomTools() returning ToolDefinition[]",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M4.T1.S1"
