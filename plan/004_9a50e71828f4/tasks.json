@@ -18,7 +18,7 @@
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "Define Harness Type Surface",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Create src/types/harnesses.ts containing HarnessId, ModelProviderId, HarnessCapabilities, HarnessOptions, HarnessRequest, HarnessHookEvents, ToolExecutionRequest/Result, and the Harness interface.",
               "subtasks": [
                 {
@@ -43,7 +43,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S2",
                   "title": "Add GlobalHarnessConfig and ModelSpec (open provider set)",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1"

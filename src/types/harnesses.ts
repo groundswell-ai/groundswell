@@ -429,3 +429,114 @@ export interface Harness {
    */
   requiresFeatures(features: (keyof HarnessCapabilities)[]): boolean;
 }
+
+/**
+ * Global harness configuration (PRD §7.6).
+ *
+ * Configures the default harness, optional per-harness options, and the default LLM provider
+ * that resolve unqualified model strings (PRD §7.8). Set once at application startup via
+ * `configureHarnesses()` (owned by P1.M2.T2.S1) — it cascades to all agents unless explicitly
+ * overridden (PRD §7.7).
+ *
+ * The two default axes are INDEPENDENT:
+ *  - `defaultHarness`        — the agent RUNTIME ('pi' | 'claude-code').
+ *  - `defaultModelProvider`  — the LLM HOST / vendor (open `ModelProviderId` set).
+ *
+ * This is the v1.2 successor to the legacy `GlobalProviderConfig`: it adds the orthogonal
+ * `defaultModelProvider` field and re-keys `harnessDefaults` by `HarnessId` (the legacy
+ * `providerDefaults` was keyed by the conflated `ProviderId`).
+ *
+ * @example
+ * ```ts
+ * const config: GlobalHarnessConfig = {
+ *   defaultHarness: 'pi',                  // vendor-neutral default runtime
+ *   defaultModelProvider: 'anthropic',     // LLM host — independent of harness
+ *   harnessDefaults: {
+ *     'claude-code': { apiKey: process.env.ANTHROPIC_API_KEY },
+ *   },
+ * };
+ * ```
+ */
+export interface GlobalHarnessConfig {
+  /** Default agent runtime used when none is specified (PRD §7.6 / §7.7 cascade root). */
+  defaultHarness: HarnessId;
+
+  /** Optional per-harness default options, keyed by HarnessId (runtime axis). */
+  harnessDefaults?: Partial<Record<HarnessId, HarnessOptions>>;
+
+  /**
+   * Default LLM provider used to resolve unqualified (plain) model strings (PRD §7.8).
+   *
+   * Open `ModelProviderId` set — independent of `defaultHarness`. When a caller passes a
+   * plain model id like `'claude-sonnet-4-20250514'`, `parseModelSpec` resolves its
+   * `provider` against this value.
+   */
+  defaultModelProvider?: ModelProviderId;
+}
+
+// ---------------------------------------------------------------------------
+// Model-spec parsing contract (PRD §7.8)
+// ---------------------------------------------------------------------------
+//
+// TYPE-ONLY AMBIENT DECLARATIONS.
+//
+// These `declare function`s declare the CANONICAL SIGNATURE of the model-spec
+// helpers. They have NO body here and are ERASED at compile time — `harnesses.ts`
+// remains a pure-types module (no runtime emission, per S1's contract).
+//
+// The RUNTIME IMPLEMENTATIONS live in `src/utils/model-spec.ts` (owned by
+// P1.M1.T2.S1). P1.M1.T2.S1 imports `ModelSpec` / `ModelProviderId` from this
+// file and implements both functions against the signatures below, with open-set
+// validation (reject empty strings; reject harness-qualified 3-segment strings
+// like `pi/anthropic/...`; no closed-union provider check).
+//
+// CONSUMER GUIDANCE:
+//   - Need the TYPE / SIGNATURE?  → `import type { parseModelSpec } from './harnesses.js'`
+//   - Need the RUNTIME VALUE?     → `import { parseModelSpec } from '../utils/model-spec.js'`
+//   Importing the value from `./harnesses.js` and calling it is a RUNTIME ERROR
+//   (the binding is erased). The public API (P3.M3.T1.S1) MUST re-export the
+//   value from `utils/model-spec.ts`, not from here.
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a model specification string into a {@link ModelSpec} (PRD §7.8).
+ *
+ * Accepts two formats:
+ *  - Qualified: `"anthropic/claude-sonnet-4-20250514"` → `{ provider: 'anthropic', model: 'claude-sonnet-4-20250514', raw: … }`
+ *  - Plain:     `"claude-sonnet-4-20250514"`           → resolved against `defaultProvider`.
+ *
+ * `provider` is the LLM host (`ModelProviderId`, open set) — NEVER the harness
+ * (PRD §7.8 critical rule). Harness-qualified strings (`pi/anthropic/...`) are
+ * invalid and rejected by the implementation (P1.M1.T2.S1).
+ *
+ * @param model - Model string (`"provider/model"` or plain model id).
+ * @param defaultProvider - Provider used when `model` is unqualified (open set;
+ *        implementation default is `'anthropic'`).
+ * @returns Parsed {@link ModelSpec} (provider, model, raw).
+ *
+ * @remarks TYPE-ONLY ambient declaration — see file-level block comment.
+ *          Runtime implementation: `src/utils/model-spec.ts` (P1.M1.T2.S1).
+ */
+export declare function parseModelSpec(
+  model: string,
+  defaultProvider?: ModelProviderId,
+): ModelSpec;
+
+/**
+ * Format a {@link ModelSpec} for a specific target provider (PRD §7.8).
+ *
+ * Pass-through (returns `spec.model`) when `spec.provider === targetProvider`;
+ * otherwise the implementation throws a cross-translation error (MVP behavior —
+ * same-provider validation / API preparation is the primary use case).
+ *
+ * @param spec - {@link ModelSpec} from `parseModelSpec()` or `Harness.normalizeModel()`.
+ * @param targetProvider - The LLM host to format the model for (open `ModelProviderId` set).
+ * @returns Formatted model string (model name only, when providers match).
+ *
+ * @remarks TYPE-ONLY ambient declaration — see file-level block comment.
+ *          Runtime implementation: `src/utils/model-spec.ts` (P1.M1.T2.S1).
+ */
+export declare function formatModelForProvider(
+  spec: ModelSpec,
+  targetProvider: ModelProviderId,
+): string;
