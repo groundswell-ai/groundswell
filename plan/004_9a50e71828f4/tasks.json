@@ -279,14 +279,14 @@
           "type": "Milestone",
           "id": "P2.M2",
           "title": "PiHarness Foundation & Session Lifecycle",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Build the NEW PiHarness adapter foundation: add the @earendil-works/pi-coding-agent dependency, scaffold the class, implement initialize/terminate + model resolution, and wire the session lifecycle (createAgentSession/prompt/subscribe/shutdown).",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M2.T1",
               "title": "PiHarness scaffold, dependency, and model resolution",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Add the Pi SDK dependency, create the PiHarness class skeleton implementing Harness, and implement initialize/terminate with ModelSpec→Model<any> resolution.",
               "subtasks": [
                 {
@@ -311,7 +311,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S2",
                   "title": "Implement initialize/terminate + model resolution (ModelSpec→Model<any>)",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T1.S1"
@@ -329,14 +329,14 @@
               "type": "Task",
               "id": "P2.M2.T2",
               "title": "PiHarness session lifecycle (createAgentSession/prompt/subscribe)",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Implement the Pi session lifecycle driving execute() for the non-streaming path: create the session, run the prompt, observe terminal result, and return AgentResponse<T>.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T2.S1",
                   "title": "createAgentSession + prompt + result aggregation → AgentResponse",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T1.S2"
