@@ -750,21 +750,21 @@
           "type": "Milestone",
           "id": "P4.M2",
           "title": "Cross-Harness Feature Parity (PRD §7.14)",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Add the parity + adversarial test suites proving all features work identically across pi and claude-code: AgentResponse shape, tool execution semantics, deterministic hook ordering, and cache isolation.",
           "tasks": [
             {
               "type": "Task",
               "id": "P4.M2.T1",
               "title": "Feature-parity and adversarial test suites",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Author the PRD §7.14 parity tests covering identical AgentResponse, tool semantics, hook ordering, and cache-key isolation across both harnesses.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P4.M2.T1.S1",
                   "title": "Parity tests: identical AgentResponse + tool execution semantics",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M1.T2.S3",
@@ -781,7 +781,7 @@
                   "type": "Subtask",
                   "id": "P4.M2.T1.S2",
                   "title": "Cache isolation + deterministic hook ordering tests",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S1",
