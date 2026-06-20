@@ -501,7 +501,7 @@
       "type": "Phase",
       "id": "P3",
       "title": "Agent & Public API Integration",
-      "status": "Planned",
+      "status": "Researching",
       "description": "Rewire the central Agent class to the harness axis (dual cascade, HarnessRegistry, HarnessRequest, cache-key harness/provider), migrate AgentConfig & PromptOverrides to harness/harnessOptions fields, and finalize the public API surface in src/index.ts.",
       "milestones": [
         {
@@ -600,7 +600,7 @@
           "type": "Milestone",
           "id": "P3.M2",
           "title": "AgentConfig & PromptOverrides Migration",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Add harness/harnessOptions fields to AgentConfig and PromptOverrides (PRD §7.9), deprecating the provider fields while keeping them as aliases for backward compatibility.",
           "tasks": [
             {
@@ -632,14 +632,14 @@
               "type": "Task",
               "id": "P3.M2.T2",
               "title": "PromptOverrides harness fields",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Add harness?: HarnessId and harnessOptions?: HarnessOptions to PromptOverrides (highest cascade priority); deprecate provider fields.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T2.S1",
                   "title": "Add harness/harnessOptions to PromptOverrides",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S2"
@@ -659,21 +659,21 @@
           "type": "Milestone",
           "id": "P3.M3",
           "title": "Public API Surface",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Finalize src/index.ts exports: Harness* types, ClaudeCodeHarness, PiHarness, HarnessRegistry, configureHarnesses, and the dual-cascade utilities, alongside deprecated aliases.",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M3.T1",
               "title": "Update src/index.ts public exports",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Export the full harness surface and keep deprecated Provider*/AnthropicProvider/ProviderRegistry aliases for one release.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M3.T1.S1",
                   "title": "Export Harness surface + deprecated aliases in src/index.ts",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M3.T2.S3",

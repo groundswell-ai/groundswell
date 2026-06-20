@@ -201,17 +201,23 @@ export interface PromptOverrides {
   /**
    * Override provider for this prompt
    *
-   * ## Configuration Cascade (PRD 7.7)
+   * @deprecated Since v1.2. Use {@link PromptOverrides.harness} (and
+   *   {@link PromptOverrides.harnessOptions} for options) instead. The runtime/harness
+   *   axis (`'pi'` | `'claude-code'`) is now independent of the LLM provider/model
+   *   (PRD §7): the harness is chosen separately, and the model string is never
+   *   harness-qualified. This field is the highest-priority node in the PRD §7.7
+   *   **harness** cascade (GlobalHarnessConfig.defaultHarness → AgentConfig.harness →
+   *   PromptOverrides.harness). Retained for backward compatibility during the v1.2
+   *   migration; the Agent runtime reads it in lockstep with `harness`
+   *   (`overrides?.harness ?? overrides?.provider` in src/core/agent.ts).
    *
-   * This is the highest priority in the provider cascade:
-   * 1. PromptOverrides.provider (this field) - highest
-   * 2. AgentConfig.provider
-   * 3. GlobalProviderConfig.defaultProvider - lowest
-   *
-   * @example
-   * ```ts
-   * const result = await agent.prompt(prompt, {
-   *   provider: 'opencode'  // Override agent's default provider
+   * ```typescript
+   * // BEFORE (v1.x)
+   * const response = await agent.prompt(myPrompt, { provider: 'anthropic' });
+   * // AFTER (v1.2)
+   * const response = await agent.prompt(myPrompt, {
+   *   harness: 'claude-code',
+   *   model: 'anthropic/claude-sonnet-4-20250514',
    * });
    * ```
    */
@@ -220,23 +226,26 @@ export interface PromptOverrides {
   /**
    * Override provider options for this prompt
    *
-   * Merged with agent and global provider options using "last write wins"
-   * semantics. These options take highest priority in the cascade.
+   * @deprecated Since v1.2. Use {@link PromptOverrides.harnessOptions} instead.
    *
-   * ## Options Merge (PRD 7.7)
+   * Note: {@link HarnessOptions} is SLIMMED relative to this type — it omits
+   * `sessionStore`, `sessionPersistence`, `sessionTtl`, and `sessionPath` (those are
+   * now harness-adapter internals; see `src/types/providers.ts` → `ProviderOptions`
+   * @deprecated note). Migrating callers that relied on session-persistence config
+   * must move it to the concrete harness adapter.
    *
-   * Priority (highest to lowest):
-   * 1. PromptOverrides.providerOptions (this field) - highest
-   * 2. AgentConfig.providerOptions
-   * 3. GlobalProviderConfig.providerDefaults[provider] - lowest
+   * The v1.x provider-options merge cascade is superseded by the PRD §7.7 **harness**
+   * cascade (GlobalHarnessConfig.defaultHarness → AgentConfig.harness/harnessOptions →
+   * PromptOverrides.harness/harnessOptions), resolved via null-coalescing.
    *
-   * @example
-   * ```ts
-   * const result = await agent.prompt(prompt, {
-   *   providerOptions: {
-   *     temperature: 0.7,
-   *     timeout: 60000
-   *   }
+   * ```typescript
+   * // BEFORE (v1.x)
+   * const response = await agent.prompt(myPrompt, {
+   *   providerOptions: { endpoint: 'https://api.example.com', sessionPersistence: 'file' },
+   * });
+   * // AFTER (v1.2)
+   * const response = await agent.prompt(myPrompt, {
+   *   harnessOptions: { endpoint: 'https://api.example.com', apiKey: process.env.ANTHROPIC_API_KEY },
    * });
    * ```
    */
