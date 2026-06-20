@@ -151,9 +151,8 @@ describe('PiHarness - registerMCPs()', () => {
         createTestServer('fs', [createTestTool('read', 'reads')]),
       ]);
 
-      const noopExecutor = async () => ({ content: '', isError: false });
       // @ts-expect-error - Testing private method
-      const customTools = harness.buildCustomTools(noopExecutor);
+      const customTools = harness.buildCustomTools();
       expect(customTools).toHaveLength(1);
       expect(customTools[0].name).toBe('fs__read');
       expect(typeof customTools[0].execute).toBe('function');

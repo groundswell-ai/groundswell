@@ -220,7 +220,7 @@
       "type": "Phase",
       "id": "P2",
       "title": "Harness Adapter Implementation",
-      "status": "Researching",
+      "status": "Complete",
       "description": "Implement the two Harness adapters that PRD §7 requires: ClaudeCodeHarness (a rename/reinterface of the existing AnthropicProvider) and the new PiHarness wrapping @earendil-works/pi-coding-agent (the default). Includes the MCPHandler→Pi tool bridge so both harnesses delegate tool execution to Groundswell's MCPHandler (PRD §7.10, §7.12 parity without Pi plugins).",
       "milestones": [
         {
@@ -451,14 +451,14 @@
           "type": "Milestone",
           "id": "P2.M4",
           "title": "MCPHandler Pi Tool Bridge",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Add the MCPHandler→Pi bridge so Groundswell's MCP tools can be passed to Pi as customTools ToolDefinition[] (PRD §7.10 parity without a Pi plugin). Independent of the harness scaffolding—pure converter work.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M4.T1",
               "title": "JSON-Schema → TypeBox converter and toPiCustomTools bridge",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Build the schema converter (JSON-Schema input_schema → TypeBox TSchema) and the MCPHandler.toPiCustomTools() method returning ToolDefinition[].",
               "subtasks": [
                 {
@@ -479,7 +479,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S2",
                   "title": "MCPHandler.toPiCustomTools() returning ToolDefinition[]",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M4.T1.S1"
@@ -515,14 +515,14 @@
               "type": "Task",
               "id": "P3.M1.T1",
               "title": "Agent constructor harness resolution",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Rewire the Agent constructor to resolve the harness via the dual cascade and fetch it from HarnessRegistry.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T1.S1",
                   "title": "Agent: harness field + cascade + HarnessRegistry.get",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S1",

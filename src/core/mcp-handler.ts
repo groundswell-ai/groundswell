@@ -10,6 +10,13 @@ import {
   tool as sdkTool,
   type McpServerConfig,
 } from '@anthropic-ai/claude-agent-sdk';
+import { defineTool } from '@earendil-works/pi-coding-agent';
+import type {
+  ToolDefinition,
+  AgentToolResult,
+  ExtensionContext,
+} from '@earendil-works/pi-coding-agent';
+import { jsonSchemaToTypebox } from '../harnesses/pi-schema-converter.js';
 import { z } from 'zod';
 import type { MCPServer, Tool, ToolResult } from '../types/index.js';
 
@@ -210,6 +217,64 @@ export class MCPHandler {
       version: '1.0.0',
       tools: sdkTools,
     });
+  }
+
+  // ── Pi bridge (P2.M4.T1.S2) — PARALLEL of toAgentSDKServer (Claude) ─────────
+
+  /**
+   * Convert registered tools to Pi `ToolDefinition[]` (PRD §7.10, §7.12, §7.14.1).
+   *
+   * PARALLEL of {@link toAgentSDKServer} (Claude): iterates `registeredTools`, wraps each
+   * in a Pi ToolDefinition via `defineTool`, and delegates `execute` to
+   * `registered.executor`. `parameters` is the REAL TypeBox schema from
+   * `jsonSchemaToTypebox` (S1). Returns `[]` when no tools registered.
+   *
+   * `registered.executor` returns the RAW executor output (unknown) — stringified
+   * via {@link toAgentToolResult} (mirrors toAgentSDKServer's handler). Errors are
+   * caught → isError:true (never re-thrown), matching Claude-path semantics.
+   */
+  public toPiCustomTools(): ToolDefinition[] {
+    const tools = this.getTools();
+    if (tools.length === 0) return [];
+    return Array.from(this.registeredTools.entries()).map(([fullName, registered]) =>
+      defineTool({
+        name: fullName,
+        label: fullName,
+        description: registered.tool.description,
+        parameters: jsonSchemaToTypebox(registered.tool.input_schema),
+        execute: async (
+          _toolCallId: string,
+          params: unknown,
+          _signal: AbortSignal | undefined,
+          _onUpdate: undefined,
+          _ctx: ExtensionContext,
+        ): Promise<AgentToolResult<{ isError: boolean }>> => {
+          try {
+            const result = await registered.executor(params);
+            return this.toAgentToolResult(result, false);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return this.toAgentToolResult(`Error: ${message}`, true);
+          }
+        },
+      }),
+    );
+  }
+
+  /**
+   * Map a raw executor result (unknown) to a Pi `AgentToolResult`.
+   *
+   * Stringifies non-string values via `JSON.stringify` (mirrors toAgentSDKServer's
+   * handler). `registered.executor` returns RAW output (unknown), NOT a
+   * `ToolExecutionResult` — so we stringify the value DIRECTLY (do NOT read
+   * `result.content`).
+   */
+  private toAgentToolResult(
+    result: unknown,
+    isError: boolean,
+  ): AgentToolResult<{ isError: boolean }> {
+    const text = typeof result === 'string' ? result : JSON.stringify(result);
+    return { content: [{ type: 'text' as const, text }], details: { isError } };
   }
 
   /**
