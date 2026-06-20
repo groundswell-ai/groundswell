@@ -18,8 +18,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AnthropicProvider } from '../../../providers/anthropic-provider.js';
-import { ProviderRegistry } from '../../../providers/provider-registry.js';
+import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ProviderRegistry } from '../../../harnesses/provider-registry.js';
 import type { ProviderRequest, ToolExecutor } from '../../../types/providers.js';
 import type { StreamEvent } from '../../../types/streaming.js';
 import { createSuccessResponse, createErrorResponse } from '../../../types/agent.js';

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '../../core/agent.js';
 import { MCPHandler } from '../../core/mcp-handler.js';
 import { Prompt } from '../../core/prompt.js';
-import { ProviderRegistry } from '../../providers/provider-registry.js';
+import { ProviderRegistry } from '../../harnesses/provider-registry.js';
 import type { Provider, ProviderId, ProviderCapabilities } from '../../types/providers.js';
 import type { ModelSpec } from '../../types/providers.js';
 import { z } from 'zod';

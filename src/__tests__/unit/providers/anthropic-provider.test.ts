@@ -15,9 +15,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AnthropicProvider } from '../../../providers/anthropic-provider.js';
+import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
 import type { Provider } from '../../../types/providers.js';
-import { ProviderRegistry } from '../../../providers/provider-registry.js';
+import { ProviderRegistry } from '../../../harnesses/provider-registry.js';
 
 describe('AnthropicProvider', () => {
   describe('Class Structure', () => {

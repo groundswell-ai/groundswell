@@ -21,8 +21,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { OpenCodeProvider } from '../../../providers/opencode-provider.js';
-import { ProviderRegistry } from '../../../providers/provider-registry.js';
+import { OpenCodeProvider } from '../../../harnesses/opencode-provider.js';
+import { ProviderRegistry } from '../../../harnesses/provider-registry.js';
 import type { MCPServer, Tool } from '../../../types/sdk-primitives.js';
 
 describe('OpenCodeProvider - registerMCPs()', () => {

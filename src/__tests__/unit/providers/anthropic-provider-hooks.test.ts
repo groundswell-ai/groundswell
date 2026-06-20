@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AnthropicProvider } from '../../../providers/anthropic-provider.js';
+import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
 import type { ProviderHookEvents, ToolExecutionRequest, ToolExecutionResult } from '../../../types/providers.js';
 
 describe('AnthropicProvider.buildAgentSDKHooks()', () => {

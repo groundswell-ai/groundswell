@@ -145,9 +145,9 @@ export interface ProviderOptions {
    *
    * @remarks
    * Using type import to avoid circular dependency. The actual SessionStore
-   * type is imported from '../providers/session-store.js'.
+   * type is imported from '../harnesses/session-store.js'.
    */
-  sessionStore?: import("../providers/session-store.js").SessionStore<SessionState>;
+  sessionStore?: import("../harnesses/session-store.js").SessionStore<SessionState>;
 
   /**
    * Session persistence type

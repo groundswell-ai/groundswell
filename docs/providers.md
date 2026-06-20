@@ -418,7 +418,7 @@ console.log(registry.has('anthropic')); // false
 - Providers and states maps are cleared after termination
 - Individual provider `terminate()` methods are idempotent
 
-See `src/providers/provider-registry.ts` for complete implementation.
+See `src/harnesses/provider-registry.ts` for complete implementation.
 
 ## Model Specification
 
@@ -539,7 +539,7 @@ await provider.terminate();  // Safe, no-op
 - **AnthropicProvider**: Clears SDK reference, MCP config, skills, sessions (stateless SDK)
 - Idempotent and never throws (errors logged only)
 
-See `src/providers/anthropic-provider.ts:147-229` for implementation details.
+See `src/harnesses/anthropic-provider.ts:147-229` for implementation details.
 
 ## Sessions
 
@@ -576,7 +576,7 @@ await provider.execute(
 
 **Implementation Details:**
 
-- Sessions stored in `Map<string, SessionState>` (see `src/providers/anthropic-provider.ts:145`)
+- Sessions stored in `Map<string, SessionState>` (see `src/harnesses/anthropic-provider.ts:145`)
 - Each session tracks `history: SDKUserMessage[]` and `lastResult: SDKResultMessage`
 - For continuation: `continue: true` + `streamInput()` with history
 - **CRITICAL**: Anthropic SDK has no native sessions - this is a session abstraction layer provided by Groundswell
@@ -625,7 +625,7 @@ The Anthropic SDK is stateless and has no native session support. Groundswell pr
 3. Manages timestamps for TTL enforcement
 4. Persists data to the configured storage backend
 
-See `src/providers/session-store.ts` for implementation details.
+See `src/harnesses/session-store.ts` for implementation details.
 
 #### Session Lifecycle
 
@@ -836,7 +836,7 @@ Groundswell provides pluggable session storage backends. Choose the backend that
 
 **Memory Session Store**
 
-**File**: `src/providers/session-store.ts:108-183`
+**File**: `src/harnesses/session-store.ts:108-183`
 
 In-memory storage using a JavaScript Map. Sessions are lost when the process exits.
 
@@ -870,7 +870,7 @@ await provider.initialize({
 
 **File Session Store**
 
-**File**: `src/providers/session-store.ts:198-368`
+**File**: `src/harnesses/session-store.ts:198-368`
 
 Disk-based storage with JSON files. Each session is stored as `{sessionId}.json` in the configured directory.
 
@@ -940,7 +940,7 @@ await provider.initialize({
 
 **Redis Session Store (Future)**
 
-**File**: `src/providers/session-store.ts:380-411`
+**File**: `src/harnesses/session-store.ts:380-411`
 
 Interface stub for future Redis implementation. Currently NOT implemented.
 
@@ -1354,7 +1354,7 @@ const tools = await provider.registerMCPs([
 console.log(tools); // [{ name: 'demo__calculate', ... }]
 ```
 
-See `src/providers/anthropic-provider.ts:716-743` for registerMCPs implementation.
+See `src/harnesses/anthropic-provider.ts:716-743` for registerMCPs implementation.
 
 ## Hooks
 
@@ -1421,7 +1421,7 @@ const providerHooks: ProviderHookEvents = {
 };
 ```
 
-See `src/providers/anthropic-provider.ts:853-950` for buildAgentSDKHooks implementation.
+See `src/harnesses/anthropic-provider.ts:853-950` for buildAgentSDKHooks implementation.
 
 ### Hook Lifecycle Diagram
 
@@ -1528,7 +1528,7 @@ await provider.loadSkills([
 // ...content...
 ```
 
-See `src/providers/anthropic-provider.ts:768-804` for loadSkills implementation.
+See `src/harnesses/anthropic-provider.ts:768-804` for loadSkills implementation.
 
 **GOTCHA:** `skill.path` is the directory - must join with `'SKILL.md'` to read the file.
 
@@ -1626,7 +1626,7 @@ for await (const event of stream) {
 controller.abort();
 ```
 
-See `src/providers/anthropic-provider.ts:473-676` for executeStreaming implementation (lazy SDK loading via dynamic import).
+See `src/harnesses/anthropic-provider.ts:473-676` for executeStreaming implementation (lazy SDK loading via dynamic import).
 
 ## Usage Examples
 

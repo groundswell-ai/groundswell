@@ -387,7 +387,7 @@ export class AnthropicProvider implements Provider {
       }
 
       // PATTERN: Model resolution using normalizeModel()
-      // FROM: src/providers/anthropic-provider.ts:246-259
+      // FROM: src/harnesses/anthropic-provider.ts:246-259
       // Default model from src/core/agent.ts:320
       const modelSpec = this.normalizeModel(
         request.options.model ?? "claude-sonnet-4-20250514",

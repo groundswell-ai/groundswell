@@ -18,8 +18,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AnthropicProvider } from '../../../providers/anthropic-provider.js';
-import { ProviderRegistry } from '../../../providers/provider-registry.js';
+import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ProviderRegistry } from '../../../harnesses/provider-registry.js';
 import type { Skill } from '../../../types/sdk-primitives.js';
 
 // Mock fs/promises for file system operations

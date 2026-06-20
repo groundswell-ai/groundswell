@@ -20,7 +20,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { OpenCodeProvider } from '../../../providers/opencode-provider.js';
+import { OpenCodeProvider } from '../../../harnesses/opencode-provider.js';
 
 describe('OpenCodeProvider - Deprecation', () => {
   let provider: OpenCodeProvider;
@@ -245,7 +245,7 @@ describe('OpenCodeProvider - Deprecation', () => {
 
   describe('Integration with ProviderRegistry', () => {
     it('should show warning when initialized via ProviderRegistry', async () => {
-      const { ProviderRegistry } = await import('../../../providers/provider-registry.js');
+      const { ProviderRegistry } = await import('../../../harnesses/provider-registry.js');
 
       // Reset registry state
       ProviderRegistry._resetForTesting();
@@ -262,7 +262,7 @@ describe('OpenCodeProvider - Deprecation', () => {
     });
 
     it('should only show warning once even via ProviderRegistry', async () => {
-      const { ProviderRegistry } = await import('../../../providers/provider-registry.js');
+      const { ProviderRegistry } = await import('../../../harnesses/provider-registry.js');
 
       // Reset registry state
       ProviderRegistry._resetForTesting();

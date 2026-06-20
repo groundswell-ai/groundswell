@@ -40,7 +40,7 @@ import type {
   ToolExecutionRequest,
   ToolExecutionResult,
 } from '../types/providers.js';
-import { ProviderRegistry } from '../providers/index.js';
+import { ProviderRegistry } from '../harnesses/index.js';
 import type { Provider } from '../types/providers.js';
 import { resolveProviderConfig, getGlobalProviderConfig } from '../utils/provider-config.js';
 import type { AsyncStream, StreamEvent } from '../types/streaming.js';

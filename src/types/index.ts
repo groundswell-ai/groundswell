@@ -49,7 +49,7 @@ export type {
 } from './providers.js';
 
 // Provider classes
-export { AnthropicProvider } from '../providers/anthropic-provider.js';
+export { AnthropicProvider } from '../harnesses/anthropic-provider.js';
 
 // Agent types
 export type {

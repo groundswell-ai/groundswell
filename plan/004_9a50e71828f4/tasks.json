@@ -119,14 +119,14 @@
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Relocate provider modules and rename registry",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Move src/providers/ → src/harnesses/ and rename ProviderRegistry to HarnessRegistry keyed by HarnessId, preserving the singleton, InitializationStatus enum, and lifecycle methods.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Relocate src/providers → src/harnesses and fix import paths",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T3.S1"
@@ -140,7 +140,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S2",
                   "title": "Rename ProviderRegistry → HarnessRegistry (keyed by HarnessId)",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1"

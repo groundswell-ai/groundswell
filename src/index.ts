@@ -114,8 +114,8 @@ export { Prompt } from './core/prompt.js';
 export { MCPHandler } from './core/mcp-handler.js';
 
 // Providers
-export { AnthropicProvider } from './providers/anthropic-provider.js';
-export { ProviderRegistry } from './providers/provider-registry.js';
+export { AnthropicProvider } from './harnesses/anthropic-provider.js';
+export { ProviderRegistry } from './harnesses/provider-registry.js';
 
 // Context and event tree
 export { EventTreeHandleImpl, createEventTreeHandle } from './core/event-tree.js';

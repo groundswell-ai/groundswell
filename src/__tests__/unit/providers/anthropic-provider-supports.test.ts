@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AnthropicProvider } from '../../../providers/anthropic-provider.js';
+import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
 
 describe('AnthropicProvider.supports()', () => {
   let provider: AnthropicProvider;

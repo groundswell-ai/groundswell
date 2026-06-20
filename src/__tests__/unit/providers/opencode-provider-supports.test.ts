@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { OpenCodeProvider } from '../../../providers/opencode-provider.js';
+import { OpenCodeProvider } from '../../../harnesses/opencode-provider.js';
 
 describe('OpenCodeProvider.supports()', () => {
   let provider: OpenCodeProvider;

@@ -18,7 +18,7 @@ import {
   MemorySessionStore,
   FileSessionStore,
   RedisSessionStore,
-} from '../../../providers/session-store.js';
+} from '../../../harnesses/session-store.js';
 import type { SessionState } from '../../../../types/providers.js';
 
 describe('SessionStore Implementations (P2.M2.T1.S1)', () => {

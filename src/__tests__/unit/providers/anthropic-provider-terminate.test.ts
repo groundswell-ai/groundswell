@@ -15,8 +15,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AnthropicProvider } from '../../../providers/anthropic-provider.js';
-import { ProviderRegistry } from '../../../providers/provider-registry.js';
+import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ProviderRegistry } from '../../../harnesses/provider-registry.js';
 import type { ProviderOptions } from '../../../types/providers.js';
 
 describe('AnthropicProvider - terminate()', () => {

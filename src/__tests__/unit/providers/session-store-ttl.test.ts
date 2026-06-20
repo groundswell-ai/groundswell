@@ -17,7 +17,7 @@ import { rm } from 'node:fs/promises';
 import {
   FileSessionStore,
   MemorySessionStore,
-} from '../../../providers/session-store.js';
+} from '../../../harnesses/session-store.js';
 import type { SessionState } from '../../../../types/providers.js';
 
 describe('SessionStore TTL (P2.M2.T2.S2)', () => {

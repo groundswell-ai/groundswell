@@ -239,7 +239,7 @@ export interface ModelSpec {
  * The shared harness contract both `PiHarness` and `ClaudeCodeHarness` implement
  * (PRD §7.3). Identical method surface to the legacy Provider interface; the
  * `execute<T>()` return type matches the already-shipped AnthropicProvider.execute
- * (src/providers/anthropic-provider.ts lines 338–344).
+ * (src/harnesses/anthropic-provider.ts lines 338–344).
  *
  * Adapters: PiHarness wraps `createAgentSession()`; ClaudeCodeHarness (rename of
  * AnthropicProvider) wraps the Claude Code SDK. New harnesses implement this and

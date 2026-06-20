@@ -22,7 +22,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { ProviderRegistry, InitializationStatus } from '../../../providers/provider-registry.js';
+import { ProviderRegistry, InitializationStatus } from '../../../harnesses/provider-registry.js';
 import type { Provider, ProviderId, ProviderCapabilities } from '../../../types/providers.js';
 import type { ModelSpec } from '../../../types/providers.js';
 

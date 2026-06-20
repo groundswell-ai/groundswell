@@ -16,9 +16,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AnthropicProvider } from '../../../providers/anthropic-provider.js';
-import { ProviderRegistry } from '../../../providers/provider-registry.js';
-import { FileSessionStore } from '../../../providers/session-store.js';
+import { AnthropicProvider } from '../../../harnesses/anthropic-provider.js';
+import { ProviderRegistry } from '../../../harnesses/provider-registry.js';
+import { FileSessionStore } from '../../../harnesses/session-store.js';
 import { rm } from 'node:fs/promises';
 
 describe('AnthropicProvider - Session Storage (P2.M2.T1.S1)', () => {

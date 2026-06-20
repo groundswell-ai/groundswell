@@ -16,14 +16,14 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { AnthropicProvider } from "../../../providers/anthropic-provider.js";
+import { AnthropicProvider } from "../../../harnesses/anthropic-provider.js";
 import {
   FileSessionStore,
   MemorySessionStore,
   type SessionStore,
-} from "../../../providers/session-store.js";
+} from "../../../harnesses/session-store.js";
 import type { SessionState } from "../../../types/providers.js";
-import { ProviderRegistry } from "../../../providers/provider-registry.js";
+import { ProviderRegistry } from "../../../harnesses/provider-registry.js";
 import { rm } from "fs/promises";
 
 describe("AnthropicProvider - SessionStore Integration (P2.M2.T1.S3)", () => {

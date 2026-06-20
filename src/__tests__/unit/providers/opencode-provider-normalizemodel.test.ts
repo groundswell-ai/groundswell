@@ -23,7 +23,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { OpenCodeProvider } from '../../../providers/opencode-provider.js';
+import { OpenCodeProvider } from '../../../harnesses/opencode-provider.js';
 import type { ModelSpec } from '../../../types/providers.js';
 
 describe('OpenCodeProvider.normalizeModel()', () => {

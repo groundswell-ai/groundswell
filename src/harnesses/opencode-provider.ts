@@ -207,7 +207,7 @@ export class OpenCodeProvider implements Provider {
    */
   async initialize(options?: ProviderOptions): Promise<void> {
     // Idempotent check: if SDK is already loaded, return immediately
-    // FOLLOW: AnthropicProvider pattern at src/providers/anthropic-provider.ts:156-159
+    // FOLLOW: AnthropicProvider pattern at src/harnesses/anthropic-provider.ts:156-159
     if (this.sdk) {
       return;
     }
