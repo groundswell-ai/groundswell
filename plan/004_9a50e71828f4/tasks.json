@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Harness Type Foundation & Configuration",
-      "status": "Planned",
+      "status": "Complete",
       "description": "Establish the new two-axis type system (Harness = agent runtime pi|claude-code; ModelProviderId = LLM host anthropic|openai|google|zai|...), the HarnessRegistry singleton, the dual configuration cascade (PRD §7.7), and the cache-key extension (PRD §7.14.5). All work preserves backward compatibility via deprecated Provider* aliases so the build stays green throughout. Foundation for all adapter and integration work in later phases.",
       "milestones": [
         {
@@ -185,21 +185,21 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Cache Key Harness/Provider Isolation",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Extend the LLM response cache key to incorporate BOTH the harness id and the model provider, satisfying PRD §7.14.5 isolation requirement.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Add harness + provider axes to CacheKeyInputs",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Extend CacheKeyInputs and generateCacheKey to include the harness and resolved model provider so identical prompts on different harness/provider pairs never collide.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Extend CacheKeyInputs and generateCacheKey with harness + provider",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S2"
@@ -241,7 +241,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S1",
                   "title": "Rename class to ClaudeCodeHarness and align to Harness interface",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S1"

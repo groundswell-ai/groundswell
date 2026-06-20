@@ -7,6 +7,7 @@
 
 import { createHash } from 'node:crypto';
 import type { Tool, MCPServer, Skill } from '../types/index.js';
+import type { HarnessId, ModelProviderId } from '../types/harnesses.js';
 import type { z } from 'zod';
 
 /**
@@ -21,6 +22,25 @@ export interface CacheKeyInputs {
   system?: string;
   /** Model identifier */
   model: string;
+  /**
+   * Agent runtime identifier (PRD §7.2 / §7.14.5 cache isolation).
+   *
+   * Optional during the harness migration window: the Agent cache build-site (P3.M1.T2.S3)
+   * does not yet pass it, so omitting it preserves the pre-task key. Once P3.M1.T2.S3 rewires
+   * `agent.ts` to always pass the resolved harness, this field may be tightened to required.
+   * When provided, it becomes a component of the SHA-256 cache key so `pi` and `claude-code`
+   * runs never share cache entries.
+   */
+  harness?: HarnessId;
+  /**
+   * LLM host / model provider (PRD §7.8 / §7.14.5 cache isolation).
+   *
+   * The LLM-vendor axis (NOT the harness) — e.g. 'anthropic', 'openai', 'google', 'zai', or
+   * any open-set provider string. Optional; resolved from the ModelSpec. When provided, it
+   * becomes a component of the SHA-256 cache key so provider-qualified models with colliding
+   * bare ids get distinct entries.
+   */
+  provider?: ModelProviderId;
   /** Temperature setting */
   temperature?: number;
   /** Maximum tokens */
@@ -204,6 +224,16 @@ export function generateCacheKey(inputs: CacheKeyInputs): string {
     user: inputs.user,
     model: inputs.model,
   };
+
+  // PRD §7.14.5: incorporate the harness + provider axes for cross-harness/provider isolation.
+  // Conditional append (matches the optional-field pattern below) — omitting them yields the
+  // exact pre-task key, so the Agent build-site stays green until P3.M1.T2.S3 rewires it.
+  if (inputs.harness !== undefined) {
+    normalized.harness = inputs.harness;
+  }
+  if (inputs.provider !== undefined) {
+    normalized.provider = inputs.provider;
+  }
 
   // Include optional fields only if defined
   if (inputs.data !== undefined) {

@@ -180,3 +180,74 @@ describe('generateCacheKey', () => {
     expect(generateCacheKey(inputs1)).not.toBe(generateCacheKey(inputs2));
   });
 });
+
+describe('cache key isolation — harness + provider (PRD §7.14.5)', () => {
+  const base = { user: 'Hello', model: 'claude-sonnet-4-20250514' };
+
+  it('produces different keys for different harnesses (same model)', () => {
+    const pi = generateCacheKey({ ...base, harness: 'pi' });
+    const cc = generateCacheKey({ ...base, harness: 'claude-code' });
+    expect(pi).not.toBe(cc);
+    expect(pi).toMatch(/^[a-f0-9]{64}$/);
+    expect(cc).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('produces different keys for different providers (same harness + model)', () => {
+    const anthropic = generateCacheKey({ ...base, harness: 'pi', provider: 'anthropic' });
+    const openai    = generateCacheKey({ ...base, harness: 'pi', provider: 'openai' });
+    expect(anthropic).not.toBe(openai);
+  });
+
+  it('produces distinct keys per (harness, provider, model) tuple', () => {
+    const keys = new Set<string>([
+      generateCacheKey({ ...base, harness: 'pi',          provider: 'anthropic' }),
+      generateCacheKey({ ...base, harness: 'pi',          provider: 'openai' }),
+      generateCacheKey({ ...base, harness: 'claude-code', provider: 'anthropic' }),
+      generateCacheKey({ ...base, harness: 'claude-code', provider: 'openai' }),
+      generateCacheKey({ ...base, model: 'gpt-4o', harness: 'pi', provider: 'openai' }),
+    ]);
+    expect(keys.size).toBe(5);   // all 5 tuples distinct
+  });
+
+  it('produces the same key when harness + provider are identical', () => {
+    const a = generateCacheKey({ ...base, harness: 'pi', provider: 'anthropic' });
+    const b = generateCacheKey({ ...base, harness: 'pi', provider: 'anthropic' });
+    expect(a).toBe(b);
+  });
+
+  it('participates: omitting harness yields a different key than providing it', () => {
+    const without = generateCacheKey({ ...base });
+    const withPi  = generateCacheKey({ ...base, harness: 'pi' });
+    expect(without).not.toBe(withPi);   // proves harness actually feeds the digest
+  });
+
+  it('participates: omitting provider yields a different key than providing it', () => {
+    const without = generateCacheKey({ ...base, harness: 'pi' });
+    const withP   = generateCacheKey({ ...base, harness: 'pi', provider: 'anthropic' });
+    expect(without).not.toBe(withP);
+  });
+
+  it('accepts open-set provider strings (e.g. zai, google, custom)', () => {
+    const zai     = generateCacheKey({ ...base, harness: 'pi', provider: 'zai' });
+    const google  = generateCacheKey({ ...base, harness: 'pi', provider: 'google' });
+    const custom  = generateCacheKey({ ...base, harness: 'pi', provider: 'my-self-hosted' });
+    const set = new Set([zai, google, custom]);
+    expect(set.size).toBe(3);   // open-set ModelProviderId — all distinct
+  });
+
+  it('is unaffected by other-field ordering (deterministic via key sort)', () => {
+    // harness/provider declared in opposite order + data interleaved — must stay equal
+    const a = generateCacheKey({ user: 'Hi', model: 'm', harness: 'pi', provider: 'anthropic', data: { x: 1 } });
+    const b = generateCacheKey({ data: { x: 1 }, provider: 'anthropic', model: 'm', harness: 'pi', user: 'Hi' });
+    expect(a).toBe(b);
+  });
+
+  it('backward-compat: omitting both harness + provider preserves the pre-task key shape', () => {
+    // Same call shape as the existing 'identical inputs' test — must still be a valid 64-hex key
+    // and equal to another identical omission (zero behavioral regression for agent.ts today).
+    const a = generateCacheKey({ user: 'Hello', model: 'claude-sonnet-4-20250514' });
+    const b = generateCacheKey({ user: 'Hello', model: 'claude-sonnet-4-20250514' });
+    expect(a).toBe(b);
+    expect(a).toMatch(/^[a-f0-9]{64}$/);
+  });
+});
