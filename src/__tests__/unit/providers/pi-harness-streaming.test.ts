@@ -396,38 +396,6 @@ describe('PiHarness - executeStreaming()', () => {
     expect(onEnd).toHaveBeenCalledWith(expect.any(Number));
   });
 
-  // ── No tool/stream hooks wired (S2 boundary) ──────────────────────────
-
-  it('should NOT fire onToolStart/onToolEnd/onStream hooks (P2.M3.T2.S2 scope)', async () => {
-    const onToolStart = vi.fn();
-    const onToolEnd = vi.fn();
-    const onStream = vi.fn();
-    wireFakeSession(harness, [
-      SESSION_START,
-      messageUpdate('Hi'),
-      TOOL_EXECUTION_START,
-      TOOL_EXECUTION_END,
-      messageUpdate('Done'),
-      turnEndWithUsage({ input: 10, output: 5 }),
-      AGENT_END,
-    ]);
-
-    const result = harness.execute(
-      { prompt: 'hi', options: { streaming: true } },
-      dummyToolExecutor,
-      {
-        onToolStart,
-        onToolEnd,
-        onStream,
-      } as any,
-    );
-    await drainStreaming<string>(result as any);
-
-    expect(onToolStart).not.toHaveBeenCalled();
-    expect(onToolEnd).not.toHaveBeenCalled();
-    expect(onStream).not.toHaveBeenCalled();
-  });
-
   // ── createAgentSession reuses customTools ────────────────────────────
 
   it('should call createAgentSession with customTools from buildCustomTools (Decision 1)', async () => {

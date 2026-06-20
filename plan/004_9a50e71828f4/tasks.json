@@ -357,7 +357,7 @@
           "type": "Milestone",
           "id": "P2.M3",
           "title": "PiHarness Tools, Streaming, Hooks & Skills",
-          "status": "Planned",
+          "status": "Researching",
           "description": "Complete PiHarness parity: tool registration via customTools (delegating to MCPHandler/toolExecutor), streaming StreamEvent mapping, HarnessHookEvents adaptation, and native agentskills.io skill loading. Register PiHarness as default.",
           "tasks": [
             {
@@ -391,7 +391,7 @@
               "type": "Task",
               "id": "P2.M3.T2",
               "title": "PiHarness streaming, hooks & skills",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Add streaming (StreamEvent from session.subscribe), HarnessHookEvents adaptation, native skill loading, and streaming-mode execute().",
               "subtasks": [
                 {
@@ -414,7 +414,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T2.S2",
                   "title": "HarnessHookEvents adaptation (onToolStart/End, onSessionStart/End, onStream)",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M3.T2.S1"
@@ -430,7 +430,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T2.S3",
                   "title": "Native agentskills.io skill loading + register PiHarness as default",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M2.T2.S1",

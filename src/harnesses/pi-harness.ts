@@ -42,6 +42,17 @@ import { ModelRegistry, AuthStorage } from "@earendil-works/pi-coding-agent";
 type PiModel = NonNullable<ReturnType<ModelRegistry["find"]>>;
 
 /**
+ * Mutable context shared across events during a single execute()/executeStreaming() call, used by
+ * {@link PiHarness.fireHookEvents}. NOT exported (internal to PiHarness).
+ */
+interface HookDispatchContext {
+  /** toolCallId → start info (timestamp for duration; name/input for request reconstruction). */
+  toolStarts: Map<string, { name: string; input: unknown; timestamp: number }>;
+  /** Snapshot-diff accumulator for onStream (independent from the drain loop's `fullText`). */
+  streamText: { value: string };
+}
+
+/**
  * Pi harness implementation (PRD §7.1).
  *
  * Wraps `@earendil-works/pi-coding-agent` (the vendor-neutral default runtime). This file is the
@@ -192,7 +203,7 @@ export class PiHarness implements Harness {
    * Non-streaming path (P2.M2.T2.S1): returns Promise<AgentResponse<T>>.
    * Streaming path: delegates to executeStreaming() (P2.M3.T2.S1) — returns AsyncGenerator<StreamEvent, AgentResponse<T>>.
    * Tool delegation: customTools wired via buildCustomTools (P2.M3.T1).
-   * Remaining hooks (onToolStart/onToolEnd/onStream): owned by P2.M3.T2.S2.
+   * All hooks fire: session hooks inline (S1/P2.M2.T2.S1); tool/stream hooks via fireHookEvents() (P2.M3.T2.S2).
    */
   execute<T>(
     request: HarnessRequest,
@@ -238,7 +249,14 @@ export class PiHarness implements Harness {
       let totalOutput = 0;
       let toolCallCount = 0;
 
+      // Hook dispatch context — mutable accumulators for fireHookEvents (P2.M3.T2.S2).
+      const hookCtx: HookDispatchContext = {
+        toolStarts: new Map(),
+        streamText: { value: "" },
+      };
+
       const listener: AgentSessionEventListener = (event: AgentSessionEvent) => {
+        this.fireHookEvents(event, hooks, hookCtx); // P2.M3.T2.S2 — tool/stream hooks
         // Structural cast — AgentMessage/AssistantMessage are NON-importable transitive types.
         const e = event as { type: string; message?: any; messages?: any[] };
         switch (e.type) {
@@ -368,10 +386,15 @@ export class PiHarness implements Harness {
     let lastOutput = 0;
     let lastCache: number | undefined;
 
+    // Hook dispatch context — mutable accumulators for fireHookEvents (P2.M3.T2.S2).
+    const hookCtx: HookDispatchContext = {
+      toolStarts: new Map(),
+      streamText: { value: "" },
+    };
+
     const listener: AgentSessionEventListener = (event: AgentSessionEvent) => {
       const e = event as { type: string; message?: any };
       // Session lifecycle hooks — parity with non-streaming (Decision 5).
-      // onToolStart/onToolEnd/onStream are P2.M3.T2.S2 (deliberately NOT wired here).
       switch (e.type) {
         case "session_start":
           void hooks?.onSessionStart?.();
@@ -380,6 +403,7 @@ export class PiHarness implements Harness {
           void hooks?.onSessionEnd?.(Date.now() - startTime);
           break;
       }
+      this.fireHookEvents(event, hooks, hookCtx); // P2.M3.T2.S2 — BEFORE enqueue → ordering (PRD §7.14.3)
       enqueue(event); // every event flows through the bridge for mapping
     };
 
@@ -510,6 +534,94 @@ export class PiHarness implements Harness {
       });
     } finally {
       unsubscribe(); // detach even on early break / abort (GOTCHA #16)
+    }
+  }
+
+  /**
+   * Dispatch the three harness hooks owned by P2.M3.T2.S2 (PRD §7.11):
+   *   tool_execution_start → onToolStart({name, input})
+   *   tool_execution_end   → onToolEnd({name, input}, {content, isError}, duration)
+   *   message_update       → onStream(delta)   [snapshot-diff; assistant text only]
+   *
+   * Session hooks (onSessionStart/onSessionEnd) are NOT handled here — they stay inline in the
+   * listeners as S1/P2.M2.T2.S1 wrote them (no scope overlap, no merge conflict).
+   *
+   * Pi fidelity advantage over claude-code (item note): onToolEnd observes the REAL isError
+   * (ToolExecutionEndEvent.isError) and a REAL duration (computed from the stashed start timestamp);
+   * claude-code's PostToolUse cannot (always isError:false, duration:0).
+   *
+   * Hooks are FIRE-AND-TRACK (`void`): the Pi listener runs SYNCHRONOUSLY during session.prompt()
+   * and cannot `await` a hook Promise (would block/reorder the SDK event loop). Matches the existing
+   * `void hooks?.onSessionStart?.()` pattern. Tests use sync vi.fn() hooks for deterministic assertions.
+   *
+   * @param event  Pi session event (structurally cast — transitive types are non-importable).
+   * @param hooks  Optional HarnessHookEvents. Early-returns on `!hooks` (cheap no-op).
+   * @param ctx    Mutable accumulators (toolStarts for duration/input reconstruction; streamText for onStream).
+   */
+  private fireHookEvents(
+    event: AgentSessionEvent,
+    hooks: HarnessHookEvents | undefined,
+    ctx: HookDispatchContext,
+  ): void {
+    if (!hooks) return; // no hooks → cheap no-op
+    const e = event as {
+      type: string;
+      message?: any;
+      toolCallId?: string;
+      toolName?: string;
+      args?: any;
+      result?: any;
+      isError?: boolean;
+    };
+    switch (e.type) {
+      case "tool_execution_start": {
+        const req: ToolExecutionRequest = { name: e.toolName ?? "", input: e.args };
+        if (e.toolCallId) {
+          ctx.toolStarts.set(e.toolCallId, {
+            name: req.name,
+            input: req.input,
+            timestamp: Date.now(), // tool events carry NO timestamp; we record it
+          });
+        }
+        void hooks.onToolStart?.(req); // fire-and-track
+        break;
+      }
+      case "tool_execution_end": {
+        const id = e.toolCallId ?? "";
+        const start = ctx.toolStarts.get(id);
+        const duration = start ? Date.now() - start.timestamp : 0;
+        // Reconstruct the request from the STASHED start info (end event lacks args).
+        const req: ToolExecutionRequest = start
+          ? { name: start.name, input: start.input }
+          : { name: e.toolName ?? "", input: undefined }; // graceful degradation
+        const result: ToolExecutionResult = {
+          content: e.result ?? null,
+          isError: e.isError ?? false, // REAL isError (Pi > claude-code)
+        };
+        if (id) ctx.toolStarts.delete(id); // defend against duplicate end events
+        void hooks.onToolEnd?.(req, result, duration); // fire-and-track
+        break;
+      }
+      case "message_update": {
+        // onStream snapshot-diff; INDEPENDENT accumulator (ctx.streamText) decoupled
+        // from the drain loop's `fullText` so S2 never edits the drain loop. Both produce identical
+        // deltas for the same chunk (same algorithm, same event).
+        const msg = e.message;
+        if (msg?.role === "assistant" && Array.isArray(msg.content)) {
+          const text = msg.content
+            .filter((b: any) => b?.type === "text")
+            .map((b: any) => b.text ?? "")
+            .join("");
+          if (text.length > ctx.streamText.value.length) {
+            const delta = text.slice(ctx.streamText.value.length);
+            void hooks.onStream?.(delta);
+            ctx.streamText.value = text;
+          }
+        }
+        break;
+      }
+      // session_start/session_shutdown handled inline in the listeners (NOT here — scope boundary).
+      // tool_execution_update/turn_end/etc. — no hook mapping (PRD §7.11 table).
     }
   }
 
