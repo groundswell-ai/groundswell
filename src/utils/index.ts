@@ -1,6 +1,7 @@
 export { analyzeErrorForRestart, TRANSIENT_ERROR_CODES, TRANSIENT_ERROR_SET } from './restart-analysis.js';
 export { validateAgentResponse } from './agent-validation.js';
 export { configureProviders } from './provider-config.js';
+export { configureHarnesses, getGlobalHarnessConfig, resolveHarnessConfig, resetGlobalHarnessConfig } from './harness-config.js';
 export { delay } from './delay.js';
 export { generateId } from './id.js';
 export { mergeWorkflowErrors } from './workflow-error-utils.js';

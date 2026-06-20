@@ -112,7 +112,7 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Harness Registry & Configuration Cascade",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Relocate the provider modules to src/harnesses/, rename ProviderRegistry→HarnessRegistry (keyed by HarnessId), and implement configureHarnesses/getGlobalHarnessConfig/resolveHarnessConfig with the dual independent cascade (harness axis + defaultModelProvider) per PRD §7.6-7.7.",
           "tasks": [
             {
@@ -157,14 +157,14 @@
               "type": "Task",
               "id": "P1.M2.T2",
               "title": "Harness configuration cascade utilities",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Implement configureHarnesses/getGlobalHarnessConfig/resolveHarnessConfig with the dual independent cascade (harness selection + model provider) per PRD §7.6-7.7.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M2.T2.S1",
                   "title": "configureHarnesses + getGlobalHarnessConfig + resolveHarnessConfig (dual cascade)",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S2"
