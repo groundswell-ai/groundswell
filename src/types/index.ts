@@ -38,7 +38,6 @@ export type {
   ProviderHookEvents,
   ToolExecutionRequest,
   ToolExecutionResult,
-  ModelSpec,
   ToolExecutor,
   ProviderResult,
   ProviderResponseStatus,
@@ -47,6 +46,19 @@ export type {
   GlobalProviderConfig,
   SessionState,
 } from './providers.js';
+
+// Harness types (PRD §7.2–§7.8) — canonical in types/harnesses.ts
+export type {
+  Harness,
+  HarnessId,
+  ModelProviderId,
+  HarnessCapabilities,
+  HarnessOptions,
+  HarnessRequest,
+  HarnessHookEvents,
+  GlobalHarnessConfig,
+  ModelSpec,
+} from './harnesses.js';
 
 // Provider classes
 export { ClaudeCodeHarness, AnthropicProvider } from '../harnesses/claude-code-harness.js';

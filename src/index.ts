@@ -39,13 +39,22 @@ export type {
   ProviderHookEvents,
   ToolExecutionRequest,
   ToolExecutionResult,
-  ModelSpec,
   ToolExecutor,
   ProviderResult,
   ProviderResponseStatus,
   ProviderErrorDetails,
   ProviderResponseMetadata,
   GlobalProviderConfig,
+  // Harness types (PRD §7.2–§7.8)
+  Harness,
+  HarnessId,
+  ModelProviderId,
+  HarnessCapabilities,
+  HarnessOptions,
+  HarnessRequest,
+  HarnessHookEvents,
+  GlobalHarnessConfig,
+  ModelSpec,
   // AgentResponse types (PRD 6.1-6.5)
   AgentResponseStatus,
   AgentResponse,
@@ -116,6 +125,13 @@ export { MCPHandler } from './core/mcp-handler.js';
 // Providers
 export { ClaudeCodeHarness, AnthropicProvider } from './harnesses/claude-code-harness.js';
 export { HarnessRegistry, ProviderRegistry } from './harnesses/harness-registry.js';
+
+// Harness adapters (PRD §7.3) — PiHarness joins the already-exported ClaudeCodeHarness/HarnessRegistry
+export { PiHarness } from './harnesses/pi-harness.js';
+
+// Harness configuration & model-spec utilities (PRD §7.6 / §7.8)
+export { configureHarnesses } from './utils/harness-config.js';
+export { parseModelSpec, formatModelForProvider } from './utils/model-spec.js';
 
 // Context and event tree
 export { EventTreeHandleImpl, createEventTreeHandle } from './core/event-tree.js';

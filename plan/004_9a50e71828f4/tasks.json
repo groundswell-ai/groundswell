@@ -501,7 +501,7 @@
       "type": "Phase",
       "id": "P3",
       "title": "Agent & Public API Integration",
-      "status": "Researching",
+      "status": "Complete",
       "description": "Rewire the central Agent class to the harness axis (dual cascade, HarnessRegistry, HarnessRequest, cache-key harness/provider), migrate AgentConfig & PromptOverrides to harness/harnessOptions fields, and finalize the public API surface in src/index.ts.",
       "milestones": [
         {
@@ -659,21 +659,21 @@
           "type": "Milestone",
           "id": "P3.M3",
           "title": "Public API Surface",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Finalize src/index.ts exports: Harness* types, ClaudeCodeHarness, PiHarness, HarnessRegistry, configureHarnesses, and the dual-cascade utilities, alongside deprecated aliases.",
           "tasks": [
             {
               "type": "Task",
               "id": "P3.M3.T1",
               "title": "Update src/index.ts public exports",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Export the full harness surface and keep deprecated Provider*/AnthropicProvider/ProviderRegistry aliases for one release.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M3.T1.S1",
                   "title": "Export Harness surface + deprecated aliases in src/index.ts",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M3.T2.S3",
@@ -717,7 +717,7 @@
                   "type": "Subtask",
                   "id": "P4.M1.T1.S1",
                   "title": "Delete opencode-provider.ts, tests, literal, and dependency",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M3.T1.S1"
