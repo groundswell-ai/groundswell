@@ -227,14 +227,14 @@
           "type": "Milestone",
           "id": "P2.M1",
           "title": "ClaudeCodeHarness (AnthropicProvider rename)",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Rename AnthropicProvider to ClaudeCodeHarness, align it to the Harness interface (id 'claude-code'), enforce the anthropic-only model constraint (PRD §7.8), and register it.",
           "tasks": [
             {
               "type": "Task",
               "id": "P2.M1.T1",
               "title": "Rename and reinterface AnthropicProvider as ClaudeCodeHarness",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Produce ClaudeCodeHarness implementing Harness with id 'claude-code', default model provider 'anthropic', preserving the existing SDK wrapping logic.",
               "subtasks": [
                 {
@@ -259,7 +259,7 @@
                   "type": "Subtask",
                   "id": "P2.M1.T1.S2",
                   "title": "Enforce anthropic-only constraint and register default harnesses",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M1.T1.S1"
@@ -293,7 +293,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S1",
                   "title": "Add Pi SDK dependency and PiHarness class skeleton",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T2.S1"

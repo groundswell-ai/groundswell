@@ -48,7 +48,7 @@ import type {
 } from "../types/harnesses.js";
 import type { SessionState } from "../types/providers.js";
 import type { AgentResponse } from "../types/agent.js";
-import { createSuccessResponse, createErrorResponse } from "../types/agent.js";
+import { createSuccessResponse, createErrorResponse, AGENT_ERROR_CODES } from "../types/agent.js";
 import type { Tool, MCPServer, Skill } from "../types/sdk-primitives.js";
 import {
   MemorySessionStore,
@@ -75,6 +75,29 @@ export interface ClaudeCodeHarnessOptions extends HarnessOptions {
   sessionTtl?: number;
   /** Directory for FileSessionStore (default './sessions'). Only when sessionPersistence='file'. */
   sessionPath?: string;
+}
+
+/**
+ * Thrown when a harness receives a configuration it cannot honour — e.g. a model
+ * provider it cannot run (ClaudeCodeHarness + non-anthropic, PRD §7.8). Carries a
+ * machine-readable `code` (default `AGENT_ERROR_CODES.CONFIG_ERROR`) so callers and
+ * Agent retry logic can branch structurally rather than parsing message text.
+ *
+ * @see AGENT_ERROR_CODES
+ */
+export class ConfigError extends Error {
+  readonly code: string;
+  readonly details?: Record<string, unknown>;
+
+  constructor(
+    message: string,
+    options: { code?: string; details?: Record<string, unknown> } = {},
+  ) {
+    super(message);
+    this.name = 'ConfigError';
+    this.code = options.code ?? AGENT_ERROR_CODES.CONFIG_ERROR;
+    this.details = options.details;
+  }
 }
 
 export class ClaudeCodeHarness implements Harness {
@@ -347,6 +370,8 @@ export class ClaudeCodeHarness implements Harness {
    * @param toolExecutor - Callback for executing tools (used in P2.M1.T1.S6)
    * @param hooks - Optional lifecycle hooks (adapter in P2.M1.T2.S1)
    * @returns Typed agent response or AsyncGenerator for streaming
+   * @throws {ConfigError} (code CONFIG_ERROR) if request.options.model resolves to a
+   *   non-anthropic provider (PRD §7.8) — enforced via normalizeModel.
    * @remarks
    * P2.M1.T1.S5: Query construction - builds AgentSDKOptions and calls SDK query()
    * P2.M1.T1.S6: Message iteration - iterates AsyncGenerator and builds AgentResponse
@@ -1157,7 +1182,7 @@ Each skill provides specific capabilities and guidelines.
    * @param model - Model string to normalize (required)
    * @returns Parsed ModelSpec with provider='anthropic'
    * @throws {Error} When model specification is invalid (delegated to parseModelSpec)
-   * @throws {Error} When provider is not 'anthropic'
+   * @throws {ConfigError} When provider is not 'anthropic' (code === AGENT_ERROR_CODES.CONFIG_ERROR)
    *
    * @example
    * ```ts
@@ -1184,10 +1209,14 @@ Each skill provides specific capabilities and guidelines.
     // Compare against the literal LLM-host 'anthropic', NOT this.id (which is the harness id
     // 'claude-code' — a different axis). A naive `!== this.id` would throw on every call.
     if (spec.provider !== "anthropic") {
-      throw new Error(
+      throw new ConfigError(
         `Cannot normalize ${spec.provider}/${spec.model} with ClaudeCodeHarness. ` +
           `The claude-code harness only supports anthropic/* models (PRD §7.8). ` +
           `Use HarnessRegistry to select a harness that supports the '${spec.provider}' provider.`,
+        {
+          code: AGENT_ERROR_CODES.CONFIG_ERROR,
+          details: { provider: spec.provider, model: spec.model, harnessId: this.id },
+        },
       );
     }
 

@@ -357,6 +357,8 @@ describe('Error Code Handling', () => {
             return 'Handle tool error';
           case AGENT_ERROR_CODES.INTERNAL_ERROR:
             return 'Handle internal error';
+          case AGENT_ERROR_CODES.CONFIG_ERROR:
+            return 'Handle config error';
           default:
             return 'Unknown error code';
         }
@@ -375,6 +377,7 @@ describe('Error Code Handling', () => {
       expect(AGENT_ERROR_CODES.API_REQUEST_FAILED).toBe('API_REQUEST_FAILED');
       expect(AGENT_ERROR_CODES.TOOL_EXECUTION_FAILED).toBe('TOOL_EXECUTION_FAILED');
       expect(AGENT_ERROR_CODES.INTERNAL_ERROR).toBe('INTERNAL_ERROR');
+      expect(AGENT_ERROR_CODES.CONFIG_ERROR).toBe('CONFIG_ERROR');
     });
 
     it('should allow error code comparison', () => {

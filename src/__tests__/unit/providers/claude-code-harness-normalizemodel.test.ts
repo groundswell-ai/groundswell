@@ -15,7 +15,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
+import { ClaudeCodeHarness, ConfigError } from '../../../harnesses/claude-code-harness.js';
+import { AGENT_ERROR_CODES } from '../../../types/agent.js';
 import type { ModelSpec } from '../../../types/providers.js';
 
 describe('ClaudeCodeHarness.normalizeModel()', () => {
@@ -96,6 +97,36 @@ describe('ClaudeCodeHarness.normalizeModel()', () => {
   });
 
   describe('provider validation', () => {
+    it('throws a ConfigError with code CONFIG_ERROR on a non-anthropic provider', () => {
+      let err: unknown;
+      try {
+        provider.normalizeModel('opencode/gpt-4');
+        expect.fail('Should have thrown');
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(ConfigError);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as ConfigError).code).toBe(AGENT_ERROR_CODES.CONFIG_ERROR);
+      expect((err as ConfigError).code).toBe('CONFIG_ERROR');
+      // S1 message-text assertions STILL hold (message preserved):
+      expect((err as Error).message).toContain('Cannot normalize');
+      expect((err as Error).message).toContain('opencode/gpt-4');
+      expect((err as Error).message).toContain('ClaudeCodeHarness');
+      expect((err as Error).message).toContain('HarnessRegistry');
+      // structured details carry the offending provider/model + harness id
+      expect((err as ConfigError).details).toMatchObject({
+        provider: 'opencode', model: 'gpt-4', harnessId: 'claude-code',
+      });
+    });
+
+    it('still rejects openai provider with CONFIG_ERROR (open-set provider, non-anthropic)', () => {
+      expect(() => provider.normalizeModel('openai/gpt-4o')).toThrow(ConfigError);
+      try { provider.normalizeModel('openai/gpt-4o'); } catch (e) {
+        expect((e as ConfigError).code).toBe('CONFIG_ERROR');
+      }
+    });
+
     it('should throw on opencode provider', () => {
       expect(() => provider.normalizeModel('opencode/gpt-4')).toThrow(
         /Cannot normalize opencode\/gpt-4 with ClaudeCodeHarness/

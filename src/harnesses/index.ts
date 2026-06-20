@@ -17,3 +17,5 @@ export type {
   SessionStore,
   RedisSessionStore,
 } from './session-store.js';
+
+export { registerDefaultHarnesses } from './register-defaults.js';

@@ -651,6 +651,15 @@ export const AGENT_ERROR_CODES = {
    * Per PRD 6.6: Internal validation failures should return this error code.
    */
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+
+  /**
+   * Invalid harness/provider configuration
+   *
+   * Use when a harness receives a configuration it cannot honour — e.g. a model
+   * provider it cannot run (ClaudeCodeHarness only runs anthropic/* per PRD §7.8).
+   * Non-recoverable: the caller must select a different harness or model, not retry.
+   */
+  CONFIG_ERROR: 'CONFIG_ERROR',
 } as const;
 
 // ========================
