@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Harness Core Type System",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Create the new harness types in src/types/harnesses.ts per PRD §7.2-7.5, migrate model-spec to the open ModelProviderId set (PRD §7.8), and rewrite src/types/providers.ts as deprecated aliases re-exporting from the new module.",
           "tasks": [
             {
@@ -85,14 +85,14 @@
               "type": "Task",
               "id": "P1.M1.T3",
               "title": "Backward-compatible deprecated Provider* aliases",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Rewrite src/types/providers.ts as a thin shim of @deprecated type aliases re-exporting the new Harness* types, preserving the public API for existing consumers during the transition.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T3.S1",
                   "title": "Provider* → Harness* deprecated alias shim",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S2"
@@ -126,7 +126,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S1",
                   "title": "Relocate src/providers → src/harnesses and fix import paths",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M1.T3.S1"

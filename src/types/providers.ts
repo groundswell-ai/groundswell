@@ -1,35 +1,128 @@
+// src/types/providers.ts — Backward-compatible deprecated alias shim (v1.2)
+//
+// Every Provider* symbol is either:
+//   Bucket A — @deprecated alias → structurally-identical Harness* counterpart (types/harnesses.ts)
+//   Bucket B — @deprecated superset union (ProviderId = HarnessId | legacy literals)
+//   Bucket C — KEPT CONCRETE (shape diverges or consumers depend on specifics)
+//
+// The ProviderResult family is already @deprecated → AgentResponse and is left byte-for-byte
+// unchanged.  ToolExecutionRequest / ToolExecutionResult are shared types re-exported from
+// harnesses.ts (NOT renamed, NOT deprecated).  ToolExecutor is a concrete util (not deprecated).
+//
+// NO runtime code.  NO edits to any consumer file.
+
 import type { Tool, MCPServer, Skill, TokenUsage } from "./sdk-primitives.js";
 import type { AgentResponse } from "./agent.js";
 import type { StreamEvent } from "./streaming.js";
+import type {
+  HarnessId,
+  HarnessCapabilities,
+  HarnessHookEvents,
+  HarnessExecutionOptions,
+  HarnessRequest,
+  ToolExecutionRequest,
+  ToolExecutionResult,
+  ModelSpec,
+} from "./harnesses.js";
+
+// ── Bucket B: deprecated SUPERSET (preserves legacy literals + adds harness axis) ───────────
 
 /**
- * Provider identifier union type
- * Defines supported Agent SDK providers
+ * @deprecated Since v1.2. The single `ProviderId` axis is SPLIT:
+ *   - runtime axis  → {@link HarnessId} ('pi' | 'claude-code')  — types/harnesses.ts
+ *   - LLM-host axis → {@link ModelProviderId} (open set)         — types/harnesses.ts
+ *
+ * This union is a SUPERSET kept only so pre-migration consumers (AnthropicProvider
+ * id:'anthropic', OpenCodeProvider id:'opencode', ProviderRegistry) keep compiling.
+ * `'anthropic'` / `'opencode'` will be REMOVED when the adapters are renamed (P2.M1) /
+ * deleted (P4.M1).
  */
-export type ProviderId = "anthropic" | "opencode";
+export type ProviderId = HarnessId | 'anthropic' | 'opencode';
+
+// ── Bucket A: @deprecated aliases → Harness* counterparts ───────────────────────────────────
 
 /**
- * Provider capability flags
- * Indicates which features a provider supports
+ * @deprecated Since v1.2. Use {@link HarnessCapabilities} from types/harnesses.ts.
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { ProviderCapabilities } from 'groundswell';
+ * // AFTER (v1.2)
+ * import type { HarnessCapabilities } from 'groundswell';
+ * ```
  */
-export interface ProviderCapabilities {
-  /** MCP server connections */
-  mcp: boolean;
-  /** Skill loading */
-  skills: boolean;
-  /** Language Server Protocol integration */
-  lsp: boolean;
-  /** Streaming responses */
-  streaming: boolean;
-  /** Session-based state */
-  sessions: boolean;
-  /** Extended thinking/reasoning */
-  extendedThinking: boolean;
-}
+export type ProviderCapabilities = HarnessCapabilities;
 
 /**
- * Provider configuration options
- * Used for provider initialization and configuration
+ * @deprecated Since v1.2. Use {@link HarnessHookEvents} from types/harnesses.ts.
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { ProviderHookEvents } from 'groundswell';
+ * // AFTER (v1.2)
+ * import type { HarnessHookEvents } from 'groundswell';
+ * ```
+ */
+export type ProviderHookEvents = HarnessHookEvents;
+
+/**
+ * @deprecated Since v1.2. Use {@link HarnessExecutionOptions} from types/harnesses.ts.
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { ProviderExecutionOptions } from 'groundswell';
+ * // AFTER (v1.2)
+ * import type { HarnessExecutionOptions } from 'groundswell';
+ * ```
+ */
+export type ProviderExecutionOptions = HarnessExecutionOptions;
+
+/**
+ * @deprecated Since v1.2. Use {@link HarnessRequest} from types/harnesses.ts.
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { ProviderRequest } from 'groundswell';
+ * // AFTER (v1.2)
+ * import type { HarnessRequest } from 'groundswell';
+ * ```
+ */
+export type ProviderRequest = HarnessRequest;
+
+/**
+ * @deprecated Since v1.2. Use {@link ModelSpec} from types/harnesses.ts directly.
+ * `provider` is now the open `ModelProviderId` set (anthropic/openai/google/zai/…).
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { ModelSpec } from 'groundswell';
+ * // AFTER (v1.2)
+ * import type { ModelSpec } from 'groundswell';
+ * ```
+ */
+export type { ModelSpec };
+
+// Shared tool-exec types — now canonical in harnesses.ts (copied verbatim there by S1).
+// Re-exported here so legacy imports keep resolving to the SAME type.
+// NOT deprecated — these are the canonical names; they just live in harnesses.ts now.
+export type { ToolExecutionRequest, ToolExecutionResult };
+
+// ── Bucket C: KEPT CONCRETE (shape diverges / consumers depend on specifics) + @deprecated ──
+
+/**
+ * @deprecated Since v1.2. Use {@link HarnessOptions} from types/harnesses.ts.
+ *
+ * Note: HarnessOptions is SLIMMED — it omits `sessionStore`, `sessionPersistence`,
+ * `sessionTtl`, and `sessionPath` (those move to the concrete harness adapter).
+ *
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { ProviderOptions } from 'groundswell';
+ * const opts: ProviderOptions = { sessionPersistence: 'file', sessionPath: '/tmp' };
+ * // AFTER (v1.2)
+ * import type { HarnessOptions } from 'groundswell';
+ * const opts: HarnessOptions = { apiKey: 'sk-...' };
+ * ```
  */
 export interface ProviderOptions {
   /** API endpoint override */
@@ -105,15 +198,15 @@ export interface ProviderOptions {
 }
 
 /**
- * Session state for maintaining conversation history
+ * @deprecated Since v1.2. Session state is harness-adapter-internal; do not depend on
+ * this Anthropic-SDK-specific shape from public code.
  *
- * @remarks
- * Stores conversation context for session-based execution.
- * Used when {@link ProviderOptions.sessionId} is provided.
- *
- * @see {@link https://docs.anthropic.com/en/api/messages#continuous-conversations | Anthropic Continuous Conversations}
- *
- * @public
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { SessionState } from 'groundswell';
+ * // AFTER (v1.2)
+ * // Access session state through the harness adapter internals; do not import.
+ * ```
  */
 export interface SessionState {
   /** Conversation history - all user messages in this session */
@@ -144,96 +237,6 @@ export interface SessionState {
    */
   lastAccessedAt?: number;
 }
-
-/**
- * Tool execution request
- */
-export interface ToolExecutionRequest {
-  /** Tool name (may be namespaced: "server__tool") */
-  name: string;
-
-  /** Tool input parameters */
-  input: unknown;
-}
-
-/**
- * Tool execution result
- */
-export interface ToolExecutionResult {
-  /** Result content */
-  content: string | unknown;
-
-  /** Whether the execution resulted in an error */
-  isError: boolean;
-}
-
-/**
- * Provider hook events
- * Maps from AgentHooks to provider-specific events
- */
-export interface ProviderHookEvents {
-  /** Called before tool execution */
-  onToolStart?: (tool: ToolExecutionRequest) => Promise<void> | void;
-
-  /** Called after tool execution */
-  onToolEnd?: (
-    tool: ToolExecutionRequest,
-    result: ToolExecutionResult,
-    duration: number,
-  ) => Promise<void> | void;
-
-  /** Called when provider session starts */
-  onSessionStart?: () => Promise<void> | void;
-
-  /** Called when provider session ends */
-  onSessionEnd?: (totalDuration: number) => Promise<void> | void;
-
-  /** Called for each streaming chunk */
-  onStream?: (chunk: string) => void;
-}
-
-/**
- * Provider execution options
- * Wraps parameters for provider execution requests
- */
-export interface ProviderExecutionOptions {
-  /** Model identifier */
-  model?: string;
-
-  /** System prompt override */
-  systemPrompt?: string;
-
-  /** Available tools */
-  tools?: Tool[];
-
-  /** Lifecycle hooks */
-  hooks?: ProviderHookEvents;
-
-  /** Session identifier for session-based providers */
-  sessionId?: string;
-
-  /** Enable streaming mode (returns AsyncGenerator instead of complete response) */
-  streaming?: boolean;
-}
-
-/**
- * Provider request interface
- * Wraps prompt and execution options for provider execution
- */
-export interface ProviderRequest {
-  /** The user prompt/message */
-  prompt: string;
-
-  /** Execution options */
-  options: ProviderExecutionOptions;
-}
-
-// v1.2: ModelSpec is owned by types/harnesses.ts (provider is the open ModelProviderId set).
-// Re-exported here as a TRANSITIONAL alias so legacy Provider* consumers compile until they
-// are renamed/removed (P2.M1 ClaudeCodeHarness, P4.M1 opencode removal). Full deprecated
-// Provider*→Harness* alias shim is P1.M1.T3.
-import type { ModelSpec } from './harnesses.js';
-export type { ModelSpec };
 
 /**
  * Tool executor callback function
@@ -510,27 +513,22 @@ export interface ProviderResult<T = unknown> {
 // ========================
 
 /**
- * Global provider configuration
+ * @deprecated Since v1.2. Use {@link GlobalHarnessConfig} from types/harnesses.ts.
  *
- * Configures default provider and per-provider options that cascade
- * to all agents unless explicitly overridden.
+ * Note the field renames:
+ *   `defaultProvider`     → `defaultHarness`
+ *   `providerDefaults`    → `harnessDefaults`
+ *   (plus the new `defaultModelProvider` axis)
  *
- * ## Configuration Cascade (PRD 7.7)
+ * Successor `configureHarnesses()` lands in P1.M2.T2.S1.
  *
- * Priority order (lowest to highest):
- * 1. GlobalProviderConfig (this config)
- * 2. AgentConfig.provider / AgentConfig.providerOptions
- * 3. Prompt-level overrides
- *
- * @example
- * ```ts
- * configureProviders({
- *   defaultProvider: 'opencode',
- *   providerDefaults: {
- *     opencode: { endpoint: 'http://localhost:8080' },
- *     anthropic: { apiKey: process.env.ANTHROPIC_API_KEY }
- *   }
- * });
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { GlobalProviderConfig } from 'groundswell';
+ * const cfg: GlobalProviderConfig = { defaultProvider: 'anthropic' };
+ * // AFTER (v1.2)
+ * import type { GlobalHarnessConfig } from 'groundswell';
+ * const cfg: GlobalHarnessConfig = { defaultHarness: 'claude-code', defaultModelProvider: 'anthropic' };
  * ```
  */
 export interface GlobalProviderConfig {
@@ -551,75 +549,21 @@ export interface GlobalProviderConfig {
 // ========================
 
 /**
- * Provider interface for LLM backend abstraction
+ * @deprecated Since v1.2. Implement {@link Harness} (types/harnesses.ts) instead.
  *
- * Defines the contract all providers must implement to support
- * multi-provider Agent SDK execution. Providers encapsulate
- * SDK-specific details while presenting a uniform API.
+ * NOTE: this interface is kept CONCRETE (not `extends Harness`) because Harness.id is the
+ * narrow `HarnessId` while adapters still declare `id: ProviderId` with the legacy
+ * `'anthropic'`/`'opencode'` literals. It is removed when AnthropicProvider→ClaudeCodeHarness
+ * (P2.M1) and OpenCodeProvider deletion (P4.M1) land. The method surface is identical to
+ * Harness — only the `id` union width differs today.
  *
- * @remarks
- *
- * ## Implementation Requirements
- *
- * All provider implementations MUST:
- * - Use readonly properties for `id` and `capabilities`
- * - Implement all 6 methods with exact signatures
- * - Delegate tool execution via the `toolExecutor` callback
- * - Return `AgentResponse<T>` wrappers (not raw `T`)
- * - Handle optional `options` parameter in `initialize()`
- *
- * ## Lifecycle
- *
- * 1. **Construction**: Provider is instantiated with identifier and capabilities
- * 2. **Initialization**: `initialize(options?)` is called to set up SDK clients
- * 3. **MCP Registration**: `registerMCPs(servers)` discovers and returns available tools
- * 4. **Skill Loading**: `loadSkills(skills)` registers prompt templates/capabilities
- * 5. **Execution**: `execute<T>(request, toolExecutor, hooks?)` runs prompts
- * 6. **Termination**: `terminate()` cleans up resources and closes connections
- *
- * @example
- * ```ts
- * import { Provider, type ProviderId, type ProviderCapabilities } from '@groundswell/sdk';
- *
- * class AnthropicProvider implements Provider {
- *   readonly id: ProviderId = 'anthropic';
- *   readonly capabilities: ProviderCapabilities = {
- *     mcp: true,
- *     skills: true,
- *     lsp: true,
- *     streaming: true,
- *     sessions: false,
- *     extendedThinking: false
- *   };
- *
- *   async initialize(options?: ProviderOptions): Promise<void> {
- *     // Initialize Anthropic SDK client
- *   }
- *
- *   async terminate(): Promise<void> {
- *     // Cleanup resources
- *   }
- *
- *   async execute<T>(
- *     request: ProviderRequest,
- *     toolExecutor: ToolExecutor,
- *     hooks?: ProviderHookEvents
- *   ): Promise<AgentResponse<T>> {
- *     // Execute prompt via Anthropic SDK
- *   }
- *
- *   async registerMCPs(servers: MCPServer[]): Promise<Tool[]> {
- *     // Register MCP servers and return discovered tools
- *   }
- *
- *   async loadSkills(skills: Skill[]): Promise<void> {
- *     // Load skills into the provider
- *   }
- *
- *   normalizeModel(model: string): ModelSpec {
- *     // Parse model specification
- *   }
- * }
+ * ```typescript
+ * // BEFORE (v1.x)
+ * import type { Provider } from 'groundswell';
+ * class MyProvider implements Provider { readonly id: ProviderId = 'anthropic'; … }
+ * // AFTER (v1.2)
+ * import type { Harness } from 'groundswell';
+ * class MyHarness implements Harness { readonly id: HarnessId = 'claude-code'; … }
  * ```
  */
 export interface Provider {
