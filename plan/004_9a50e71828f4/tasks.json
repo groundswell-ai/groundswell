@@ -750,14 +750,14 @@
           "type": "Milestone",
           "id": "P4.M2",
           "title": "Cross-Harness Feature Parity (PRD §7.14)",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Add the parity + adversarial test suites proving all features work identically across pi and claude-code: AgentResponse shape, tool execution semantics, deterministic hook ordering, and cache isolation.",
           "tasks": [
             {
               "type": "Task",
               "id": "P4.M2.T1",
               "title": "Feature-parity and adversarial test suites",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Author the PRD §7.14 parity tests covering identical AgentResponse, tool semantics, hook ordering, and cache-key isolation across both harnesses.",
               "subtasks": [
                 {
@@ -781,7 +781,7 @@
                   "type": "Subtask",
                   "id": "P4.M2.T1.S2",
                   "title": "Cache isolation + deterministic hook ordering tests",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S1",
@@ -809,14 +809,14 @@
               "type": "Task",
               "id": "P4.M3.T1",
               "title": "Harness documentation rewrite",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Author docs/harnesses.md (from docs/providers.md) covering the two-axis model, configuration cascade, and both adapters; update the agent-response migration guide.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P4.M3.T1.S1",
                   "title": "Write docs/harnesses.md + update migration guides",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M3.T1.S1"
