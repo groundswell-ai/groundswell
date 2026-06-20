@@ -103,47 +103,50 @@ export interface AgentConfig {
   /**
    * Provider to use for this agent
    *
-   * @deprecated Use `harness` instead. Retained for backward compatibility during the v1.2 migration.
+   * @deprecated Since v1.2. Use {@link AgentConfig.harness} (and
+   *   {@link AgentConfig.harnessOptions} for options) instead. The runtime/harness
+   *   axis (`'pi'` | `'claude-code'`) is now independent of the LLM provider/model
+   *   (PRD §7): the harness is chosen separately, and the model string is never
+   *   harness-qualified. Retained for backward compatibility during the v1.2 migration
+   *   and removed when the legacy adapters are renamed/deleted (P2.M1 / P4.M1).
+   *
+   * ```typescript
+   * // BEFORE (v1.x)
+   * const config: AgentConfig = { provider: 'anthropic' };
+   * // AFTER (v1.2)
+   * const config: AgentConfig = {
+   *   harness: 'claude-code',
+   *   model: 'anthropic/claude-sonnet-4-20250514',
+   * };
+   * ```
    */
   provider?: ProviderId;
 
   /**
    * Provider-specific options for this agent
    *
-   * Merged with global provider defaults using "last write wins"
-   * semantics. This agent's options take precedence over global
-   * defaults, but can be overridden by prompt-level options.
+   * @deprecated Since v1.2. Use {@link AgentConfig.harnessOptions} instead.
    *
-   * ## Options Merge (PRD 7.7)
+   * Note: {@link HarnessOptions} is SLIMMED relative to this type — it omits
+   * `sessionStore`, `sessionPersistence`, `sessionTtl`, and `sessionPath` (those are
+   * now harness-adapter internals; see `src/types/providers.ts` → `ProviderOptions`
+   * @deprecated note). Migrating callers that relied on session-persistence config
+   * must move it to the concrete harness adapter.
    *
-   * Options are merged with priority (highest to lowest):
-   * 1. Prompt-level providerOptions (highest)
-   * 2. AgentConfig.providerOptions (this field)
-   * 3. GlobalProviderConfig.providerDefaults[provider] (lowest)
+   * The v1.x provider-options merge cascade is superseded by the PRD §7.7 **harness**
+   * cascade (GlobalHarnessConfig.defaultHarness → AgentConfig.harness/harnessOptions →
+   * PromptOverrides.harness/harnessOptions), resolved via null-coalescing.
    *
-   * @example <caption>Custom endpoint and timeout</caption>
-   * ```ts
+   * ```typescript
+   * // BEFORE (v1.x)
    * const config: AgentConfig = {
-   *   providerOptions: {
-   *     endpoint: 'https://api.example.com',
-   *     timeout: 60000
-   *   }
+   *   providerOptions: { endpoint: 'https://api.example.com', sessionPersistence: 'file' },
+   * };
+   * // AFTER (v1.2)
+   * const config: AgentConfig = {
+   *   harnessOptions: { endpoint: 'https://api.example.com', apiKey: process.env.ANTHROPIC_API_KEY },
    * };
    * ```
-   *
-   * @example <caption>Custom headers for authentication</caption>
-   * ```ts
-   * const config: AgentConfig = {
-   *   providerOptions: {
-   *     headers: {
-   *       'X-Custom-Auth': 'Bearer token123'
-   *     }
-   *   }
-   * };
-   * ```
-   *
-   * @see {@link ProviderOptions} for all available options
-   * @see {@link resolveProviderConfig} for merge implementation
    */
   providerOptions?: ProviderOptions;
 }
