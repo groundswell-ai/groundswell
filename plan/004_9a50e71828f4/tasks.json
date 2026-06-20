@@ -286,14 +286,14 @@
               "type": "Task",
               "id": "P2.M2.T1",
               "title": "PiHarness scaffold, dependency, and model resolution",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Add the Pi SDK dependency, create the PiHarness class skeleton implementing Harness, and implement initialize/terminate with ModelSpec→Model<any> resolution.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P2.M2.T1.S1",
                   "title": "Add Pi SDK dependency and PiHarness class skeleton",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T2.S1"
@@ -311,7 +311,7 @@
                   "type": "Subtask",
                   "id": "P2.M2.T1.S2",
                   "title": "Implement initialize/terminate + model resolution (ModelSpec→Model<any>)",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [
                     "P2.M2.T1.S1"
