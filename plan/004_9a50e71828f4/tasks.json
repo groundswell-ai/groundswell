@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Harness Type Foundation & Configuration",
-      "status": "Researching",
+      "status": "Planned",
       "description": "Establish the new two-axis type system (Harness = agent runtime pi|claude-code; ModelProviderId = LLM host anthropic|openai|google|zai|...), the HarnessRegistry singleton, the dual configuration cascade (PRD §7.7), and the cache-key extension (PRD §7.14.5). All work preserves backward compatibility via deprecated Provider* aliases so the build stays green throughout. Foundation for all adapter and integration work in later phases.",
       "milestones": [
         {
@@ -25,11 +25,19 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S1",
                   "title": "Create harnesses.ts with core harness interfaces",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [],
-                  "prd_selectors": ["h1.7", "h2.12", "h2.13", "h2.14", "h2.15", "h2.20", "h2.21"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See plan/004_9a50e71828f4/architecture/system_context.md §3 (target type mapping) and external_deps.md. The existing src/types/providers.ts is the 1:1 source to port from; current execute() signature in anthropic-provider.ts ALREADY matches PRD §7.3 Harness.execute().\n2. INPUT: PRD §7.2 (HarnessId='pi'|'claude-code'), §7.3 (Harness interface incl. execute<T> returning Promise<AgentResponse<T>>|AsyncGenerator<StreamEvent,AgentResponse<T>>), §7.4 (HarnessCapabilities), §7.5 (HarnessOptions), §7.10 (ToolExecutionRequest/Result), §7.11 (HarnessHookEvents). AgentResponse<T> from src/types/agent.ts; StreamEvent from src/types/streaming.ts; Tool/MCPServer/Skill from src/types/sdk-primitives.ts.\n3. LOGIC: Create NEW file src/types/harnesses.ts. Define exactly: HarnessId='pi'|'claude-code'; ModelProviderId = 'anthropic'|'openai'|'google'|'zai'|(string&{}); HarnessCapabilities {mcp,skills,lsp,streaming,sessions,extendedThinking: boolean}; HarnessOptions {endpoint?,apiKey?,sessionId?,timeout?,headers?} (drop sessionStore/sessionPersistence from the harness-level options—those belong to adapter internals); HarnessHookEvents {onToolStart?,onToolEnd?,onSessionStart?,onSessionEnd?,onStream?}; HarnessRequest {prompt:string; options:{model?,systemPrompt?,tools?,hooks?,sessionId?,streaming?}}; ToolExecutionRequest/Result (copy from current providers.ts verbatim); Harness interface with readonly id:HarnessId, readonly capabilities, initialize(options?), terminate(), execute<T>(request,toolExecutor:(req:ToolExecutionRequest)=>Promise<ToolExecutionResult>,hooks?): Promise<AgentResponse<T>>|AsyncGenerator<StreamEvent,AgentResponse<T>,unknown>, registerMCPs(servers):Promise<Tool[]>, loadSkills(skills):Promise<void>, normalizeModel(model):ModelSpec, supports(cap):boolean, requiresFeatures(features):boolean. Use `import type` with .js extensions (ESM requirement). Mock: none (pure types).\n4. OUTPUT: src/types/harnesses.ts exporting all above, importable by S2. No runtime behavior. Verify with `npm run lint` (tsc --noEmit) after S3 wires re-exports."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See plan/004_9a50e71828f4/architecture/system_context.md §3 (target type mapping) and external_deps.md. The existing src/types/providers.ts is the 1:1 source to port from; current execute() signature in anthropic-provider.ts ALREADY matches PRD §7.3 Harness.execute().\n2. INPUT: PRD §7.2 (HarnessId='pi'|'claude-code'), §7.3 (Harness interface incl. execute<T> returning Promise<AgentResponse<T>>|AsyncGenerator<StreamEvent,AgentResponse<T>>), §7.4 (HarnessCapabilities), §7.5 (HarnessOptions), §7.10 (ToolExecutionRequest/Result), §7.11 (HarnessHookEvents). AgentResponse<T> from src/types/agent.ts; StreamEvent from src/types/streaming.ts; Tool/MCPServer/Skill from src/types/sdk-primitives.ts.\n3. LOGIC: Create NEW file src/types/harnesses.ts. Define exactly: HarnessId='pi'|'claude-code'; ModelProviderId = 'anthropic'|'openai'|'google'|'zai'|(string&{}); HarnessCapabilities {mcp,skills,lsp,streaming,sessions,extendedThinking: boolean}; HarnessOptions {endpoint?,apiKey?,sessionId?,timeout?,headers?} (drop sessionStore/sessionPersistence from the harness-level options—those belong to adapter internals); HarnessHookEvents {onToolStart?,onToolEnd?,onSessionStart?,onSessionEnd?,onStream?}; HarnessRequest {prompt:string; options:{model?,systemPrompt?,tools?,hooks?,sessionId?,streaming?}}; ToolExecutionRequest/Result (copy from current providers.ts verbatim); Harness interface with readonly id:HarnessId, readonly capabilities, initialize(options?), terminate(), execute<T>(request,toolExecutor:(req:ToolExecutionRequest)=>Promise<ToolExecutionResult>,hooks?): Promise<AgentResponse<T>>|AsyncGenerator<StreamEvent,AgentResponse<T>,unknown>, registerMCPs(servers):Promise<Tool[]>, loadSkills(skills):Promise<void>, normalizeModel(model):ModelSpec, supports(cap):boolean, requiresFeatures(features):boolean. Use `import type` with .js extensions (ESM requirement). Mock: none (pure types).\n4. OUTPUT: src/types/harnesses.ts exporting all above, importable by S2. No runtime behavior. Verify with `npm run lint` (tsc --noEmit) after S3 wires re-exports.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.12",
+                    "h2.13",
+                    "h2.14",
+                    "h2.15",
+                    "h2.20",
+                    "h2.21"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -37,9 +45,15 @@
                   "title": "Add GlobalHarnessConfig and ModelSpec (open provider set)",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.16", "h2.18"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD §7.6 adds defaultModelProvider (LLM host) alongside defaultHarness; §7.8 makes ModelSpec.provider a ModelProviderId (open set), NOT a closed union. Current src/types/providers.ts ModelSpec.provider is ProviderId.\n2. INPUT: HarnessId + ModelProviderId + HarnessOptions from S1. PRD §7.6 GlobalHarnessConfig, §7.8 ModelSpec + parseModelSpec/formatModelForProvider signatures.\n3. LOGIC: Append to src/types/harnesses.ts: ModelSpec {provider: ModelProviderId; model: string; raw: string}; GlobalHarnessConfig {defaultHarness: HarnessId; harnessDefaults?: Partial<Record<HarnessId, HarnessOptions>>; defaultModelProvider?: ModelProviderId}. Export ModelProviderId type alias functions parseModelSpec(model, defaultProvider?: ModelProviderId): ModelSpec and formatModelForProvider(spec, targetProvider: ModelProviderId): string as TYPE-ONLY declarations referencing the implementations in utils/model-spec.ts (do not implement here—T2.S1 owns impl). Mock: none.\n4. OUTPUT: types ModelSpec, GlobalHarnessConfig, parseModelSpec, formatModelForProvider added to harnesses.ts for consumption by utils/model-spec.ts (T2) and config (P1.M2)."
+                  "dependencies": [
+                    "P1.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD §7.6 adds defaultModelProvider (LLM host) alongside defaultHarness; §7.8 makes ModelSpec.provider a ModelProviderId (open set), NOT a closed union. Current src/types/providers.ts ModelSpec.provider is ProviderId.\n2. INPUT: HarnessId + ModelProviderId + HarnessOptions from S1. PRD §7.6 GlobalHarnessConfig, §7.8 ModelSpec + parseModelSpec/formatModelForProvider signatures.\n3. LOGIC: Append to src/types/harnesses.ts: ModelSpec {provider: ModelProviderId; model: string; raw: string}; GlobalHarnessConfig {defaultHarness: HarnessId; harnessDefaults?: Partial<Record<HarnessId, HarnessOptions>>; defaultModelProvider?: ModelProviderId}. Export ModelProviderId type alias functions parseModelSpec(model, defaultProvider?: ModelProviderId): ModelSpec and formatModelForProvider(spec, targetProvider: ModelProviderId): string as TYPE-ONLY declarations referencing the implementations in utils/model-spec.ts (do not implement here—T2.S1 owns impl). Mock: none.\n4. OUTPUT: types ModelSpec, GlobalHarnessConfig, parseModelSpec, formatModelForProvider added to harnesses.ts for consumption by utils/model-spec.ts (T2) and config (P1.M2).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.16",
+                    "h2.18"
+                  ]
                 }
               ]
             },
@@ -56,9 +70,14 @@
                   "title": "Open-set model spec parsing and formatting",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S2"],
-                  "prd_selectors": ["h1.7", "h2.18"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: src/utils/model-spec.ts currently hard-codes isValidProviderId==='anthropic'||'opencode' (DUPLICATED in utils/provider-config.ts). PRD §7.8: model is 'provider/model' or plain; harness NEVER in the string; provider is open set so validation changes from closed-union-check to non-empty-string-check. Must REJECT harness-qualified strings like 'pi/anthropic/...' (3 segments = error).\n2. INPUT: ModelSpec/ModelProviderId/parseModelSpec/formatModelForProvider types from S1 (src/types/harnesses.ts).\n3. LOGIC: Rewrite src/utils/model-spec.ts: parseModelSpec(model, defaultProvider: ModelProviderId='anthropic')—trim, reject empty; split on FIRST '/' only; if qualified, validate provider is non-empty string (no closed-union check) and reject if MORE THAN ONE '/' present (would indicate harness-qualified 'pi/anthropic/x' → throw 'Harness must not appear in model string'); return {provider,model,raw}. formatModelForProvider(spec,targetProvider): pass-through if equal, else throw cross-translation error (keep current MVP behavior). Remove the duplicate isValidProviderId helper (consolidate). Update error messages to reflect open provider set.\n4. OUTPUT: parseModelSpec/formatModelForProvider operate on ModelProviderId; consumed by ClaudeCodeHarness (P2.M1) and PiHarness (P2.M2). Existing tests in src/__tests__/unit/utils/model-spec.test.ts must be updated to reflect open-set semantics."
+                  "dependencies": [
+                    "P1.M1.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: src/utils/model-spec.ts currently hard-codes isValidProviderId==='anthropic'||'opencode' (DUPLICATED in utils/provider-config.ts). PRD §7.8: model is 'provider/model' or plain; harness NEVER in the string; provider is open set so validation changes from closed-union-check to non-empty-string-check. Must REJECT harness-qualified strings like 'pi/anthropic/...' (3 segments = error).\n2. INPUT: ModelSpec/ModelProviderId/parseModelSpec/formatModelForProvider types from S1 (src/types/harnesses.ts).\n3. LOGIC: Rewrite src/utils/model-spec.ts: parseModelSpec(model, defaultProvider: ModelProviderId='anthropic')—trim, reject empty; split on FIRST '/' only; if qualified, validate provider is non-empty string (no closed-union check) and reject if MORE THAN ONE '/' present (would indicate harness-qualified 'pi/anthropic/x' → throw 'Harness must not appear in model string'); return {provider,model,raw}. formatModelForProvider(spec,targetProvider): pass-through if equal, else throw cross-translation error (keep current MVP behavior). Remove the duplicate isValidProviderId helper (consolidate). Update error messages to reflect open provider set.\n4. OUTPUT: parseModelSpec/formatModelForProvider operate on ModelProviderId; consumed by ClaudeCodeHarness (P2.M1) and PiHarness (P2.M2). Existing tests in src/__tests__/unit/utils/model-spec.test.ts must be updated to reflect open-set semantics.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.18"
+                  ]
                 }
               ]
             },
@@ -75,9 +94,15 @@
                   "title": "Provider* → Harness* deprecated alias shim",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S2"],
-                  "prd_selectors": ["h1.7", "h2.12", "h2.13"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §1 lists every Provider* type; consumer-analysis.md §7 documents the existing deprecation pattern (ProviderResult→AgentResponse @deprecated aliases with migration JSDoc). src/types/index.ts and src/index.ts re-export these names so external consumers depend on them.\n2. INPUT: All Harness* types from src/types/harnesses.ts (S1, S2). The current src/types/providers.ts defines ProviderId, ProviderCapabilities, ProviderOptions, ProviderRequest, ProviderHookEvents, Provider, GlobalProviderConfig, ModelSpec, ToolExecutionRequest/Result, ToolExecutor, ProviderResult family.\n3. LOGIC: Replace the body of src/types/providers.ts with `@deprecated` re-export aliases: `export type ProviderId = HarnessId; export interface Provider extends Harness {};` (etc. for every Provider* type → Harness* counterpart). Keep ProviderResult/ProviderResponseStatus/ProviderErrorDetails/ProviderResponseMetadata as-is (already deprecated → AgentResponse). Add @deprecated JSDoc with migration instructions to each alias. IMPORTANT: SessionState/SessionStore/ProviderOptions session fields may need to stay in providers.ts if adapters still reference them—keep those concrete, alias only the harness-interface types. Mock: none.\n4. OUTPUT: src/types/providers.ts is now a compat shim; `npm run lint` passes; existing tests that import Provider* continue to compile. This unblocks P1.M2 (registry) and all downstream work without breaking consumers."
+                  "dependencies": [
+                    "P1.M1.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §1 lists every Provider* type; consumer-analysis.md §7 documents the existing deprecation pattern (ProviderResult→AgentResponse @deprecated aliases with migration JSDoc). src/types/index.ts and src/index.ts re-export these names so external consumers depend on them.\n2. INPUT: All Harness* types from src/types/harnesses.ts (S1, S2). The current src/types/providers.ts defines ProviderId, ProviderCapabilities, ProviderOptions, ProviderRequest, ProviderHookEvents, Provider, GlobalProviderConfig, ModelSpec, ToolExecutionRequest/Result, ToolExecutor, ProviderResult family.\n3. LOGIC: Replace the body of src/types/providers.ts with `@deprecated` re-export aliases: `export type ProviderId = HarnessId; export interface Provider extends Harness {};` (etc. for every Provider* type → Harness* counterpart). Keep ProviderResult/ProviderResponseStatus/ProviderErrorDetails/ProviderResponseMetadata as-is (already deprecated → AgentResponse). Add @deprecated JSDoc with migration instructions to each alias. IMPORTANT: SessionState/SessionStore/ProviderOptions session fields may need to stay in providers.ts if adapters still reference them—keep those concrete, alias only the harness-interface types. Mock: none.\n4. OUTPUT: src/types/providers.ts is now a compat shim; `npm run lint` passes; existing tests that import Provider* continue to compile. This unblocks P1.M2 (registry) and all downstream work without breaking consumers.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.12",
+                    "h2.13"
+                  ]
                 }
               ]
             }
@@ -103,9 +128,13 @@
                   "title": "Relocate src/providers → src/harnesses and fix import paths",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M1.T3.S1"],
-                  "prd_selectors": ["h1.7"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §10 lists 5 files in src/providers/ (anthropic-provider.ts, opencode-provider.ts, provider-registry.ts, session-store.ts, index.ts). ~38 test files import from '../providers/...'. system_context.md §7 decision: RENAME the directory to adopt the harness vocabulary (all files are being edited anyway).\n2. INPUT: The completed P1.M1 type aliases (so files compile under either name during the move).\n3. LOGIC: `git mv src/providers src/harnesses`. Update ALL import specifiers repo-wide: '../providers/x.js' → '../harnesses/x.js' and '../../providers/x.js' → '../../harnesses/x.js' (src/, src/__tests__/, examples/). Keep src/harnesses/index.ts barrel intact (renamed exports come in S2). Leave file NAMES as-is for now (anthropic-provider.ts renamed in P2.M1; opencode-provider.ts deleted in P4.M1). Update tsconfig if rootDir globbing matters (it includes src/**, so fine). Mock: none.\n4. OUTPUT: src/harnesses/ exists; `npm run lint` + `npm test` green (tests still reference Provider* aliases which still resolve). Verifiable via `grep -rn \"providers/\" src/ | grep import` returning empty."
+                  "dependencies": [
+                    "P1.M1.T3.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §10 lists 5 files in src/providers/ (anthropic-provider.ts, opencode-provider.ts, provider-registry.ts, session-store.ts, index.ts). ~38 test files import from '../providers/...'. system_context.md §7 decision: RENAME the directory to adopt the harness vocabulary (all files are being edited anyway).\n2. INPUT: The completed P1.M1 type aliases (so files compile under either name during the move).\n3. LOGIC: `git mv src/providers src/harnesses`. Update ALL import specifiers repo-wide: '../providers/x.js' → '../harnesses/x.js' and '../../providers/x.js' → '../../harnesses/x.js' (src/, src/__tests__/, examples/). Keep src/harnesses/index.ts barrel intact (renamed exports come in S2). Leave file NAMES as-is for now (anthropic-provider.ts renamed in P2.M1; opencode-provider.ts deleted in P4.M1). Update tsconfig if rootDir globbing matters (it includes src/**, so fine). Mock: none.\n4. OUTPUT: src/harnesses/ exists; `npm run lint` + `npm test` green (tests still reference Provider* aliases which still resolve). Verifiable via `grep -rn \"providers/\" src/ | grep import` returning empty.",
+                  "prd_selectors": [
+                    "h1.7"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -113,9 +142,14 @@
                   "title": "Rename ProviderRegistry → HarnessRegistry (keyed by HarnessId)",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M2.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: src/harnesses/provider-registry.ts (moved) is a singleton Map<ProviderId,Provider> with InitializationStatus enum, register/get/has, initializeProvider (promise-caching), initializeAll, terminateProvider/terminateAll, getStatus/isReady/getAllStatuses, _resetForTesting/_resetInitStateForTesting. consumer-analysis.md §3.5 notes InitializationStatus must carry over.\n2. INPUT: HarnessId + Harness interface from src/types/harnesses.ts.\n3. LOGIC: Rename class ProviderRegistry→HarnessRegistry (file → harness-registry.ts). Change Map<ProviderId,Provider>→Map<HarnessId,Harness>; update all method signatures (id: HarnessId, provider: Harness). Keep InitializationStatus enum and all lifecycle logic VERBATIM. Export a deprecated `ProviderRegistry = HarnessRegistry` alias. Update src/harnesses/index.ts barrel + src/index.ts (P3.M3) to export HarnessRegistry. Mock: none (unit-testable in isolation with stub Harness instances).\n4. OUTPUT: HarnessRegistry class keyed by HarnessId; existing src/__tests__/unit/providers/provider-registry.test.ts (update path + rename) passes against the alias. Consumed by Agent (P3.M1)."
+                  "dependencies": [
+                    "P1.M2.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: src/harnesses/provider-registry.ts (moved) is a singleton Map<ProviderId,Provider> with InitializationStatus enum, register/get/has, initializeProvider (promise-caching), initializeAll, terminateProvider/terminateAll, getStatus/isReady/getAllStatuses, _resetForTesting/_resetInitStateForTesting. consumer-analysis.md §3.5 notes InitializationStatus must carry over.\n2. INPUT: HarnessId + Harness interface from src/types/harnesses.ts.\n3. LOGIC: Rename class ProviderRegistry→HarnessRegistry (file → harness-registry.ts). Change Map<ProviderId,Provider>→Map<HarnessId,Harness>; update all method signatures (id: HarnessId, provider: Harness). Keep InitializationStatus enum and all lifecycle logic VERBATIM. Export a deprecated `ProviderRegistry = HarnessRegistry` alias. Update src/harnesses/index.ts barrel + src/index.ts (P3.M3) to export HarnessRegistry. Mock: none (unit-testable in isolation with stub Harness instances).\n4. OUTPUT: HarnessRegistry class keyed by HarnessId; existing src/__tests__/unit/providers/provider-registry.test.ts (update path + rename) passes against the alias. Consumed by Agent (P3.M1).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.16"
+                  ]
                 }
               ]
             },
@@ -132,9 +166,16 @@
                   "title": "configureHarnesses + getGlobalHarnessConfig + resolveHarnessConfig (dual cascade)",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M2.T1.S2"],
-                  "prd_selectors": ["h1.7", "h2.16", "h2.17", "h2.18"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: src/utils/provider-config.ts (consumer-analysis.md §7) uses module-private `let globalConfig` singleton + DEFAULT_CONFIG. PRD §7.7: harness cascade (GlobalHarnessConfig.defaultHarness > AgentConfig.harness > PromptOverrides.harness) is INDEPENDENT of the model/provider cascade. §7.6 defaultModelProvider resolves unqualified model strings.\n2. INPUT: GlobalHarnessConfig, HarnessId, HarnessOptions, ModelProviderId from src/types/harnesses.ts.\n3. LOGIC: Create src/utils/harness-config.ts: configureHarnesses(config: GlobalHarnessConfig) validates defaultHarness ∈ {'pi','claude-code'} and harnessDefaults keys, stores in module-private globalConfig. getGlobalHarnessConfig() returns config ?? DEFAULT_CONFIG where DEFAULT_CONFIG={defaultHarness:'pi' as HarnessId} (PRD: pi is default!). resolveHarnessConfig(globalConfig, agentHarness?, agentOptions?, promptHarness?, promptOptions?) returns {harness: HarnessId, options: HarnessOptions} via nullish-coalescing (prompt ?? agent ?? globalConfig.defaultHarness) and object-spread merge. Export deprecated configureProviders/getGlobalProviderConfig/resolveProviderConfig aliases delegating to the new fns. Mock: none.\n4. OUTPUT: dual-cascade config utilities; consumed by Agent (P3.M1). Update src/__tests__/unit/utils/provider-config.test.ts to harness-config.test.ts. PRD §7.7 ordering verified."
+                  "dependencies": [
+                    "P1.M2.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: src/utils/provider-config.ts (consumer-analysis.md §7) uses module-private `let globalConfig` singleton + DEFAULT_CONFIG. PRD §7.7: harness cascade (GlobalHarnessConfig.defaultHarness > AgentConfig.harness > PromptOverrides.harness) is INDEPENDENT of the model/provider cascade. §7.6 defaultModelProvider resolves unqualified model strings.\n2. INPUT: GlobalHarnessConfig, HarnessId, HarnessOptions, ModelProviderId from src/types/harnesses.ts.\n3. LOGIC: Create src/utils/harness-config.ts: configureHarnesses(config: GlobalHarnessConfig) validates defaultHarness ∈ {'pi','claude-code'} and harnessDefaults keys, stores in module-private globalConfig. getGlobalHarnessConfig() returns config ?? DEFAULT_CONFIG where DEFAULT_CONFIG={defaultHarness:'pi' as HarnessId} (PRD: pi is default!). resolveHarnessConfig(globalConfig, agentHarness?, agentOptions?, promptHarness?, promptOptions?) returns {harness: HarnessId, options: HarnessOptions} via nullish-coalescing (prompt ?? agent ?? globalConfig.defaultHarness) and object-spread merge. Export deprecated configureProviders/getGlobalProviderConfig/resolveProviderConfig aliases delegating to the new fns. Mock: none.\n4. OUTPUT: dual-cascade config utilities; consumed by Agent (P3.M1). Update src/__tests__/unit/utils/provider-config.test.ts to harness-config.test.ts. PRD §7.7 ordering verified.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.16",
+                    "h2.17",
+                    "h2.18"
+                  ]
                 }
               ]
             }
@@ -160,9 +201,14 @@
                   "title": "Extend CacheKeyInputs and generateCacheKey with harness + provider",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S2"],
-                  "prd_selectors": ["h1.7", "h2.24"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §4 confirms current src/cache/cache-key.ts CacheKeyInputs has ONLY bare `model: string`—NO harness, NO provider axis. PRD §7.14.5 mandates cache keys incorporate both harness and provider/model.\n2. INPUT: HarnessId + ModelProviderId from src/types/harnesses.ts; existing CacheKeyInputs + generateCacheKey + deterministicStringify.\n3. LOGIC: Add fields `harness: HarnessId` and `provider?: ModelProviderId` to CacheKeyInputs. In generateCacheKey, add `harness: inputs.harness` and (if present) `provider: inputs.provider` to the normalized object BEFORE deterministicStringify+sha256. Keep all existing fields/sorting. Mock: none.\n4. OUTPUT: CacheKeyInputs requires harness; generateCacheKey produces distinct keys per (harness, provider, model). Consumed by Agent cache build-site (P3.M1.T2.S3). Update src/__tests__/unit/cache-key.test.ts with isolation cases."
+                  "dependencies": [
+                    "P1.M1.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §4 confirms current src/cache/cache-key.ts CacheKeyInputs has ONLY bare `model: string`—NO harness, NO provider axis. PRD §7.14.5 mandates cache keys incorporate both harness and provider/model.\n2. INPUT: HarnessId + ModelProviderId from src/types/harnesses.ts; existing CacheKeyInputs + generateCacheKey + deterministicStringify.\n3. LOGIC: Add fields `harness: HarnessId` and `provider?: ModelProviderId` to CacheKeyInputs. In generateCacheKey, add `harness: inputs.harness` and (if present) `provider: inputs.provider` to the normalized object BEFORE deterministicStringify+sha256. Keep all existing fields/sorting. Mock: none.\n4. OUTPUT: CacheKeyInputs requires harness; generateCacheKey produces distinct keys per (harness, provider, model). Consumed by Agent cache build-site (P3.M1.T2.S3). Update src/__tests__/unit/cache-key.test.ts with isolation cases.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.24"
+                  ]
                 }
               ]
             }
@@ -197,9 +243,17 @@
                   "title": "Rename class to ClaudeCodeHarness and align to Harness interface",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M2.T2.S1"],
-                  "prd_selectors": ["h1.7", "h2.11", "h2.13", "h2.14", "h2.21"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §1 documents src/harnesses/anthropic-provider.ts (1254 lines) fully—the execute() signature ALREADY matches PRD §7.3 Harness.execute(); it lazily imports @anthropic-ai/claude-agent-sdk in initialize(), builds mcpServers via toAgentSDKServer(), injects skills via system-prompt append, uses query() streaming, maps hooks via buildAgentSDKHooks(). This is a RENAME + interface-alignment, not a rewrite.\n2. INPUT: Harness interface + HarnessId + HarnessRequest + HarnessHookEvents from src/types/harnesses.ts; existing AnthropicProvider logic.\n3. LOGIC: Rename file claude-code-harness.ts, class AnthropicProvider→ClaudeCodeHarness. Change `readonly id` from 'anthropic' to 'claude-code' (HarnessId). Implement Harness interface (swap ProviderRequest→HarnessRequest, ProviderHookEvents→HarnessHookEvents, ToolExecutor→(req)=>Promise<ToolExecutionResult>). normalizeModel defaultProvider='anthropic'. Keep ALL SDK wrapping logic (query/createSdkMcpServer/hooks/resume) verbatim. Export deprecated `AnthropicProvider = ClaudeCodeHarness` alias. Mock the @anthropic-ai/claude-agent-sdk import in unit tests (existing tests already mock it).\n4. OUTPUT: ClaudeCodeHarness implements Harness; src/__tests__/unit/providers/anthropic-provider-*.test.ts renamed to claude-code-harness-*.test.ts and pass. Consumed by registry registration (S2) and Agent (P3.M1)."
+                  "dependencies": [
+                    "P1.M2.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §1 documents src/harnesses/anthropic-provider.ts (1254 lines) fully—the execute() signature ALREADY matches PRD §7.3 Harness.execute(); it lazily imports @anthropic-ai/claude-agent-sdk in initialize(), builds mcpServers via toAgentSDKServer(), injects skills via system-prompt append, uses query() streaming, maps hooks via buildAgentSDKHooks(). This is a RENAME + interface-alignment, not a rewrite.\n2. INPUT: Harness interface + HarnessId + HarnessRequest + HarnessHookEvents from src/types/harnesses.ts; existing AnthropicProvider logic.\n3. LOGIC: Rename file claude-code-harness.ts, class AnthropicProvider→ClaudeCodeHarness. Change `readonly id` from 'anthropic' to 'claude-code' (HarnessId). Implement Harness interface (swap ProviderRequest→HarnessRequest, ProviderHookEvents→HarnessHookEvents, ToolExecutor→(req)=>Promise<ToolExecutionResult>). normalizeModel defaultProvider='anthropic'. Keep ALL SDK wrapping logic (query/createSdkMcpServer/hooks/resume) verbatim. Export deprecated `AnthropicProvider = ClaudeCodeHarness` alias. Mock the @anthropic-ai/claude-agent-sdk import in unit tests (existing tests already mock it).\n4. OUTPUT: ClaudeCodeHarness implements Harness; src/__tests__/unit/providers/anthropic-provider-*.test.ts renamed to claude-code-harness-*.test.ts and pass. Consumed by registry registration (S2) and Agent (P3.M1).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.11",
+                    "h2.13",
+                    "h2.14",
+                    "h2.21"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -207,9 +261,15 @@
                   "title": "Enforce anthropic-only constraint and register default harnesses",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M1.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.18", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: anthropic-provider.ts normalizeModel() already throws if spec.provider !== this.id—that IS the claude-code constraint. PRD §7.8: 'Requesting a non-Anthropic provider on claude-code is a configuration error surfaced at initialize()/execute()'. The id is now 'claude-code' but the allowed MODEL provider is 'anthropic', so the check must compare spec.provider !== 'anthropic' (the model provider), NOT the harness id.\n2. INPUT: ClaudeCodeHarness from S1; HarnessRegistry from P1.M2.T1.S2; parseModelSpec from utils/model-spec.ts.\n3. LOGIC: Update ClaudeCodeHarness.normalizeModel/execute to throw a clear config error (code CONFIG_ERROR) when ModelSpec.provider !== 'anthropic'. Add a registry bootstrap helper (e.g. src/harnesses/register-defaults.ts) that registers ClaudeCodeHarness (id 'claude-code') — PiHarness registration added in P2.M3. Mock: SDK import in tests.\n4. OUTPUT: ClaudeCodeHarness rejects non-anthropic models; registered in HarnessRegistry. Unblocks PiHarness registration parity and Agent construction."
+                  "dependencies": [
+                    "P2.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: anthropic-provider.ts normalizeModel() already throws if spec.provider !== this.id—that IS the claude-code constraint. PRD §7.8: 'Requesting a non-Anthropic provider on claude-code is a configuration error surfaced at initialize()/execute()'. The id is now 'claude-code' but the allowed MODEL provider is 'anthropic', so the check must compare spec.provider !== 'anthropic' (the model provider), NOT the harness id.\n2. INPUT: ClaudeCodeHarness from S1; HarnessRegistry from P1.M2.T1.S2; parseModelSpec from utils/model-spec.ts.\n3. LOGIC: Update ClaudeCodeHarness.normalizeModel/execute to throw a clear config error (code CONFIG_ERROR) when ModelSpec.provider !== 'anthropic'. Add a registry bootstrap helper (e.g. src/harnesses/register-defaults.ts) that registers ClaudeCodeHarness (id 'claude-code') — PiHarness registration added in P2.M3. Mock: SDK import in tests.\n4. OUTPUT: ClaudeCodeHarness rejects non-anthropic models; registered in HarnessRegistry. Unblocks PiHarness registration parity and Agent construction.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.18",
+                    "h2.14"
+                  ]
                 }
               ]
             }
@@ -235,9 +295,17 @@
                   "title": "Add Pi SDK dependency and PiHarness class skeleton",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M2.T2.S1"],
-                  "prd_selectors": ["h1.7", "h2.11", "h2.12", "h2.13", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1 VERIFIES @earendil-works/pi-coding-agent@0.79.8 (npm: main ./dist/index.js, types ./dist/index.d.ts, ESM). PRD §7.1: pi is vendor-neutral, runs any LLM provider, MCP/Skills/LSP supplied by Groundswell. Pi capabilities per §7.4 table: mcp✓(via MCPHandler), skills✓native, lsp via MCP, streaming✓, sessions✓, extendedThinking✓.\n2. INPUT: Harness interface + HarnessCapabilities + HarnessId from src/types/harnesses.ts.\n3. LOGIC: `npm i @earendil-works/pi-coding-agent` (adds to package.json deps). Create src/harnesses/pi-harness.ts: `export class PiHarness implements Harness { readonly id: HarnessId = 'pi'; readonly capabilities: HarnessCapabilities = {mcp:true,skills:true,lsp:true,streaming:true,sessions:true,extendedThinking:true}; ... }`. Stub initialize/terminate/registerMCPs/loadSkills/normalizeModel/execute/supports/requiresFeatures (throw 'not implemented' or return stubs) so it compiles & registers. Mock: none at this layer (the SDK is the dependency).\n4. OUTPUT: PiHarness class compiles & can be instantiated; dep installed. S2 fills in initialize/execute."
+                  "dependencies": [
+                    "P1.M2.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1 VERIFIES @earendil-works/pi-coding-agent@0.79.8 (npm: main ./dist/index.js, types ./dist/index.d.ts, ESM). PRD §7.1: pi is vendor-neutral, runs any LLM provider, MCP/Skills/LSP supplied by Groundswell. Pi capabilities per §7.4 table: mcp✓(via MCPHandler), skills✓native, lsp via MCP, streaming✓, sessions✓, extendedThinking✓.\n2. INPUT: Harness interface + HarnessCapabilities + HarnessId from src/types/harnesses.ts.\n3. LOGIC: `npm i @earendil-works/pi-coding-agent` (adds to package.json deps). Create src/harnesses/pi-harness.ts: `export class PiHarness implements Harness { readonly id: HarnessId = 'pi'; readonly capabilities: HarnessCapabilities = {mcp:true,skills:true,lsp:true,streaming:true,sessions:true,extendedThinking:true}; ... }`. Stub initialize/terminate/registerMCPs/loadSkills/normalizeModel/execute/supports/requiresFeatures (throw 'not implemented' or return stubs) so it compiles & registers. Mock: none at this layer (the SDK is the dependency).\n4. OUTPUT: PiHarness class compiles & can be instantiated; dep installed. S2 fills in initialize/execute.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.11",
+                    "h2.12",
+                    "h2.13",
+                    "h2.14"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -245,9 +313,15 @@
                   "title": "Implement initialize/terminate + model resolution (ModelSpec→Model<any>)",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M2.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.13", "h2.18"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.3: model resolved via `getModel(provider, model)` from @earendil-works/pi-ai (transitive); createAgentSession takes `model?: Model<any>` and a ModelRegistry (auth/API-key resolution per provider). §1.8: setModel throws if no auth configured. PRD §7.8 model format provider/model already matches Pi's `openai/gpt-4o` convention.\n2. INPUT: PiHarness skeleton (S1); parseModelSpec (utils/model-spec.ts); HarnessOptions.\n3. LOGIC: initialize(options?): lazily `await import('@earendil-works/pi-coding-agent')` (mirror AnthropicProvider lazy-import pattern), build a ModelRegistry (ModelRegistry.create or inMemory), resolve API keys per provider from options.apiKey/env. Store sdk + modelRegistry + options on the instance. normalizeModel(model): parseModelSpec(model, defaultProvider) and map to Model<any> via getModel(provider, model) (default provider from global config). terminate(): null references. Mock @earendil-works/pi-coding-agent + pi-ai imports in unit tests.\n4. OUTPUT: PiHarness.initialize/terminate/normalizeModel functional; model resolution testable with mocked getModel. Unblocks session lifecycle (T2)."
+                  "dependencies": [
+                    "P2.M2.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.3: model resolved via `getModel(provider, model)` from @earendil-works/pi-ai (transitive); createAgentSession takes `model?: Model<any>` and a ModelRegistry (auth/API-key resolution per provider). §1.8: setModel throws if no auth configured. PRD §7.8 model format provider/model already matches Pi's `openai/gpt-4o` convention.\n2. INPUT: PiHarness skeleton (S1); parseModelSpec (utils/model-spec.ts); HarnessOptions.\n3. LOGIC: initialize(options?): lazily `await import('@earendil-works/pi-coding-agent')` (mirror AnthropicProvider lazy-import pattern), build a ModelRegistry (ModelRegistry.create or inMemory), resolve API keys per provider from options.apiKey/env. Store sdk + modelRegistry + options on the instance. normalizeModel(model): parseModelSpec(model, defaultProvider) and map to Model<any> via getModel(provider, model) (default provider from global config). terminate(): null references. Mock @earendil-works/pi-coding-agent + pi-ai imports in unit tests.\n4. OUTPUT: PiHarness.initialize/terminate/normalizeModel functional; model resolution testable with mocked getModel. Unblocks session lifecycle (T2).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.13",
+                    "h2.18"
+                  ]
                 }
               ]
             },
@@ -264,9 +338,16 @@
                   "title": "createAgentSession + prompt + result aggregation → AgentResponse",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M2.T1.S2"],
-                  "prd_selectors": ["h1.7", "h2.13", "h2.14", "h1.6"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.1-1.2: createAgentSession(options):Promise<{session,extensionsResult,modelFallbackMessage?}> is ASYNC. session.prompt(text, opts?):Promise<void>. session.subscribe(listener):unsubscribe. Result/usage surfaced via events (TurnEndEvent, AgentEndEvent, MessageEndEvent) — the terminal assistant text + usage must be aggregated from the event stream. PRD §7.14.4: identical AgentResponse<T> shape from both harnesses.\n2. INPUT: PiHarness.initialize (T1.S2); HarnessRequest; AgentResponse + createSuccessResponse/createErrorResponse (src/types/agent.ts).\n3. LOGIC: execute<T>(request, toolExecutor, hooks?): create AgentSession via createAgentSession({model, customTools(see P2.M3.T1), resourceLoader, sessionManager}); subscribe a listener that collects the final assistant message text + token usage + tool-call count from TurnEnd/AgentEnd events and fires hooks (onSessionStart/onSessionEnd via SessionStart/SessionShutdown events); await session.prompt(request.prompt); on completion return createSuccessResponse(data,{agentId:this.id,timestamp,duration,usage,toolCalls}) or createErrorResponse('EXECUTION_FAILED',...). Mock createAgentSession in tests with a fake session emitting scripted events.\n4. OUTPUT: PiHarness.execute non-streaming path returns AgentResponse<T>; unblocks streaming/hooks/skills (P2.M3.T2) and tool execution (P2.M3.T1)."
+                  "dependencies": [
+                    "P2.M2.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.1-1.2: createAgentSession(options):Promise<{session,extensionsResult,modelFallbackMessage?}> is ASYNC. session.prompt(text, opts?):Promise<void>. session.subscribe(listener):unsubscribe. Result/usage surfaced via events (TurnEndEvent, AgentEndEvent, MessageEndEvent) — the terminal assistant text + usage must be aggregated from the event stream. PRD §7.14.4: identical AgentResponse<T> shape from both harnesses.\n2. INPUT: PiHarness.initialize (T1.S2); HarnessRequest; AgentResponse + createSuccessResponse/createErrorResponse (src/types/agent.ts).\n3. LOGIC: execute<T>(request, toolExecutor, hooks?): create AgentSession via createAgentSession({model, customTools(see P2.M3.T1), resourceLoader, sessionManager}); subscribe a listener that collects the final assistant message text + token usage + tool-call count from TurnEnd/AgentEnd events and fires hooks (onSessionStart/onSessionEnd via SessionStart/SessionShutdown events); await session.prompt(request.prompt); on completion return createSuccessResponse(data,{agentId:this.id,timestamp,duration,usage,toolCalls}) or createErrorResponse('EXECUTION_FAILED',...). Mock createAgentSession in tests with a fake session emitting scripted events.\n4. OUTPUT: PiHarness.execute non-streaming path returns AgentResponse<T>; unblocks streaming/hooks/skills (P2.M3.T2) and tool execution (P2.M3.T1).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.13",
+                    "h2.14",
+                    "h1.6"
+                  ]
                 }
               ]
             }
@@ -292,9 +373,17 @@
                   "title": "customTools ToolDefinition mapping delegating to toolExecutor",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M2.T2.S1", "P2.M4.T1.S2"],
-                  "prd_selectors": ["h1.7", "h2.10", "h2.14", "h2.22"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.4 + §4: Pi customTools: ToolDefinition[] where ToolDefinition.execute(toolCallId,params,signal,onUpdate,ctx) returns Promise<AgentToolResult>. PRD §7.10: 'Groundswell passes its tool list into createAgentSession({tools}); when Pi emits a tool_call, the adapter invokes toolExecutor and returns the ToolExecutionResult.' So each MCPHandler tool becomes a ToolDefinition whose execute() calls the toolExecutor callback. The bridge (toPiCustomTools) is built in P2.M4.\n2. INPUT: MCPHandler.toPiCustomTools(): ToolDefinition[] (from P2.M4.T1.S2); toolExecutor:(req:ToolExecutionRequest)=>Promise<ToolExecutionResult> passed into execute().\n3. LOGIC: In PiHarness.execute, build customTools from this.mcpHandler.toPiCustomTools() but wire each tool's execute() to invoke the provided toolExecutor (binding the registered tool name). Pass customTools into createAgentSession options. registerMCPs(servers) forwards to this.mcpHandler.registerServer like AnthropicProvider does. Tools are namespaced serverName__toolName. Mock MCPHandler + toolExecutor in unit tests.\n4. OUTPUT: Pi executes Groundswell tools via toolExecutor delegation; tool round-trip parity with ClaudeCodeHarness (PRD §7.14.1)."
+                  "dependencies": [
+                    "P2.M2.T2.S1",
+                    "P2.M4.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.4 + §4: Pi customTools: ToolDefinition[] where ToolDefinition.execute(toolCallId,params,signal,onUpdate,ctx) returns Promise<AgentToolResult>. PRD §7.10: 'Groundswell passes its tool list into createAgentSession({tools}); when Pi emits a tool_call, the adapter invokes toolExecutor and returns the ToolExecutionResult.' So each MCPHandler tool becomes a ToolDefinition whose execute() calls the toolExecutor callback. The bridge (toPiCustomTools) is built in P2.M4.\n2. INPUT: MCPHandler.toPiCustomTools(): ToolDefinition[] (from P2.M4.T1.S2); toolExecutor:(req:ToolExecutionRequest)=>Promise<ToolExecutionResult> passed into execute().\n3. LOGIC: In PiHarness.execute, build customTools from this.mcpHandler.toPiCustomTools() but wire each tool's execute() to invoke the provided toolExecutor (binding the registered tool name). Pass customTools into createAgentSession options. registerMCPs(servers) forwards to this.mcpHandler.registerServer like AnthropicProvider does. Tools are namespaced serverName__toolName. Mock MCPHandler + toolExecutor in unit tests.\n4. OUTPUT: Pi executes Groundswell tools via toolExecutor delegation; tool round-trip parity with ClaudeCodeHarness (PRD §7.14.1).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.10",
+                    "h2.14",
+                    "h2.22"
+                  ]
                 }
               ]
             },
@@ -311,9 +400,15 @@
                   "title": "StreamEvent mapping from Pi session events",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M2.T2.S1"],
-                  "prd_selectors": ["h1.7", "h2.14", "h2.21"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.6 lists Pi events: MessageUpdateEvent (deltas), MessageStart/EndEvent, ToolExecutionStart/EndEvent, ToolResultEvent, TurnStart/EndEvent. Groundswell's StreamEvent type (src/types/streaming.ts) = {type:'text_delta'|'tool_call_start'|'tool_call_done'|'usage'|'done'|'error'|'metadata', ...}. PRD §7.14.3 hooks fire with consistent ordering.\n2. INPUT: AgentSession.subscribe (P2.M2.T2); StreamEvent union (src/types/streaming.ts).\n3. LOGIC: executeStreaming<T>(): AsyncGenerator<StreamEvent,AgentResponse<T>> — subscribe to session, map MessageUpdateEvent→{type:'text_delta',delta}, ToolExecutionStart→{type:'tool_call_start',name}, ToolExecutionEnd→{type:'tool_call_done'}, TurnEnd→{type:'usage',usage}, terminal→{type:'done'}, errors→{type:'error'}. Yield events; return final AgentResponse as generator return value. Wire execute() to return the generator when request.options.streaming===true (mirror AnthropicProvider.executeStreaming). Mock session events in tests.\n4. OUTPUT: PiHarness streaming parity with ClaudeCodeHarness (PRD §7.14)."
+                  "dependencies": [
+                    "P2.M2.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.6 lists Pi events: MessageUpdateEvent (deltas), MessageStart/EndEvent, ToolExecutionStart/EndEvent, ToolResultEvent, TurnStart/EndEvent. Groundswell's StreamEvent type (src/types/streaming.ts) = {type:'text_delta'|'tool_call_start'|'tool_call_done'|'usage'|'done'|'error'|'metadata', ...}. PRD §7.14.3 hooks fire with consistent ordering.\n2. INPUT: AgentSession.subscribe (P2.M2.T2); StreamEvent union (src/types/streaming.ts).\n3. LOGIC: executeStreaming<T>(): AsyncGenerator<StreamEvent,AgentResponse<T>> — subscribe to session, map MessageUpdateEvent→{type:'text_delta',delta}, ToolExecutionStart→{type:'tool_call_start',name}, ToolExecutionEnd→{type:'tool_call_done'}, TurnEnd→{type:'usage',usage}, terminal→{type:'done'}, errors→{type:'error'}. Yield events; return final AgentResponse as generator return value. Wire execute() to return the generator when request.options.streaming===true (mirror AnthropicProvider.executeStreaming). Mock session events in tests.\n4. OUTPUT: PiHarness streaming parity with ClaudeCodeHarness (PRD §7.14).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.14",
+                    "h2.21"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -321,9 +416,15 @@
                   "title": "HarnessHookEvents adaptation (onToolStart/End, onSessionStart/End, onStream)",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M3.T2.S1"],
-                  "prd_selectors": ["h1.7", "h2.21", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.6 + consumer-analysis.md §1 (anthropic buildAgentSDKHooks pattern). PRD §7.11 maps AgentHooks↔HarnessHookEvents with pi source events (tool_execution_start/end, session_start/shutdown, message_update). Note Pi tool events DO observe errors/duration (unlike claude-code's PostToolUse limitation).\n2. INPUT: HarnessHookEvents from execute() caller; Pi session events.\n3. LOGIC: In the subscribe listener, dispatch: ToolExecutionStartEvent→hooks.onToolStart(tool), ToolExecutionEndEvent→hooks.onToolEnd(tool,result,duration), SessionStartEvent→hooks.onSessionStart(), SessionShutdownEvent→hooks.onSessionEnd(totalDuration), MessageUpdateEvent→hooks.onStream(chunk). Ensure deterministic ordering. Mock events in tests.\n4. OUTPUT: All 5 HarnessHookEvents fire from Pi with correct context; parity with claude-code (PRD §7.14.3)."
+                  "dependencies": [
+                    "P2.M3.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.6 + consumer-analysis.md §1 (anthropic buildAgentSDKHooks pattern). PRD §7.11 maps AgentHooks↔HarnessHookEvents with pi source events (tool_execution_start/end, session_start/shutdown, message_update). Note Pi tool events DO observe errors/duration (unlike claude-code's PostToolUse limitation).\n2. INPUT: HarnessHookEvents from execute() caller; Pi session events.\n3. LOGIC: In the subscribe listener, dispatch: ToolExecutionStartEvent→hooks.onToolStart(tool), ToolExecutionEndEvent→hooks.onToolEnd(tool,result,duration), SessionStartEvent→hooks.onSessionStart(), SessionShutdownEvent→hooks.onSessionEnd(totalDuration), MessageUpdateEvent→hooks.onStream(chunk). Ensure deterministic ordering. Mock events in tests.\n4. OUTPUT: All 5 HarnessHookEvents fire from Pi with correct context; parity with claude-code (PRD §7.14.3).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.21",
+                    "h2.14"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -331,9 +432,16 @@
                   "title": "Native agentskills.io skill loading + register PiHarness as default",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M2.T2.S1", "P2.M3.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.22", "h2.16"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.5 + §3: Pi implements agentskills.io NATIVELY via loadSkills({cwd,agentDir,skillPaths,includeDefaults}) + formatSkillsForPrompt(skills) (XML format). A skill = dir with SKILL.md. PRD §7.12: skills cross-harness; Pi loads Claude skill dirs (~/.claude/skills) directly.\n2. INPUT: Skill[] ({name,path}) from Harness.loadSkills; Pi loadSkills/formatSkillsForPrompt.\n3. LOGIC: PiHarness.loadSkills(skills): map each Skill.path to loadSkillsFromDir({dir:skill.path, source:skill.name}) and feed into the session's system prompt via formatSkillsForPrompt, OR pass skillPaths to createAgentSession resourceLoader. registerMCPs/loadSkills may require session re-init—document. Finally update src/harnesses/register-defaults.ts (from P2.M1.T1.S2) to ALSO register PiHarness (id 'pi'); confirm GlobalHarnessConfig default is 'pi'. Mock loadSkills in tests.\n4. OUTPUT: PiHarness skills parity (PRD §7.14.2); both harnesses registered; 'pi' is the effective default. Unblocks Agent (P3.M1) and Public API (P3.M3)."
+                  "dependencies": [
+                    "P2.M2.T2.S1",
+                    "P2.M3.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.5 + §3: Pi implements agentskills.io NATIVELY via loadSkills({cwd,agentDir,skillPaths,includeDefaults}) + formatSkillsForPrompt(skills) (XML format). A skill = dir with SKILL.md. PRD §7.12: skills cross-harness; Pi loads Claude skill dirs (~/.claude/skills) directly.\n2. INPUT: Skill[] ({name,path}) from Harness.loadSkills; Pi loadSkills/formatSkillsForPrompt.\n3. LOGIC: PiHarness.loadSkills(skills): map each Skill.path to loadSkillsFromDir({dir:skill.path, source:skill.name}) and feed into the session's system prompt via formatSkillsForPrompt, OR pass skillPaths to createAgentSession resourceLoader. registerMCPs/loadSkills may require session re-init—document. Finally update src/harnesses/register-defaults.ts (from P2.M1.T1.S2) to ALSO register PiHarness (id 'pi'); confirm GlobalHarnessConfig default is 'pi'. Mock loadSkills in tests.\n4. OUTPUT: PiHarness skills parity (PRD §7.14.2); both harnesses registered; 'pi' is the effective default. Unblocks Agent (P3.M1) and Public API (P3.M3).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.22",
+                    "h2.16"
+                  ]
                 }
               ]
             }
@@ -360,8 +468,12 @@
                   "status": "Planned",
                   "story_points": 2,
                   "dependencies": [],
-                  "prd_selectors": ["h1.7", "h2.10", "h2.22"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.4 gotcha + §4: Pi ToolDefinition.parameters is TypeBox (TSchema from @sinclair/typebox, transitive via Pi); current MCPHandler.jsonSchemaToZodRawShape() (consumer-analysis.md §5) converts JSON-Schema→Zod for Claude. A parallel JSON-Schema→TypeBox converter is needed. @sinclair/typebox is available transitively; verify it resolves or add as direct dep.\n2. INPUT: Tool.input_schema (JSON-Schema object) from src/types/sdk-primitives.ts.\n3. LOGIC: Add src/harnesses/pi-schema-converter.ts (or src/core/mcp-handler.ts sibling) jsonSchemaToTypebox(schema): TSchema supporting object/string/number/boolean/array/enum/$ref basics (parity with the Zod converter's coverage). Export Type.Type.* builders. Mock: none (pure function).\n4. OUTPUT: jsonSchemaToTypebox converter; unit-tested against representative JSON-Schema shapes. Consumed by S2."
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.4 gotcha + §4: Pi ToolDefinition.parameters is TypeBox (TSchema from @sinclair/typebox, transitive via Pi); current MCPHandler.jsonSchemaToZodRawShape() (consumer-analysis.md §5) converts JSON-Schema→Zod for Claude. A parallel JSON-Schema→TypeBox converter is needed. @sinclair/typebox is available transitively; verify it resolves or add as direct dep.\n2. INPUT: Tool.input_schema (JSON-Schema object) from src/types/sdk-primitives.ts.\n3. LOGIC: Add src/harnesses/pi-schema-converter.ts (or src/core/mcp-handler.ts sibling) jsonSchemaToTypebox(schema): TSchema supporting object/string/number/boolean/array/enum/$ref basics (parity with the Zod converter's coverage). Export Type.Type.* builders. Mock: none (pure function).\n4. OUTPUT: jsonSchemaToTypebox converter; unit-tested against representative JSON-Schema shapes. Consumed by S2.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.10",
+                    "h2.22"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -369,9 +481,15 @@
                   "title": "MCPHandler.toPiCustomTools() returning ToolDefinition[]",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P2.M4.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.10", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §5: MCPHandler.toAgentSDKServer() is the existing Claude bridge iterating registeredTools and wrapping each in sdkTool()+createSdkMcpServer(). toPiCustomTools mirrors this but returns ToolDefinition[] (name/label/description/parameters/execute). Registered tools live in this.registeredTools Map (namespaced serverName__toolName) with registered.executor.\n2. INPUT: MCPHandler.registeredTools + getTools(); jsonSchemaToTypebox (S1); ToolDefinition shape (from Pi SDK types).\n3. LOGIC: Add MCPHandler.toPiCustomTools(): ToolDefinition[] — for each registered tool, build {name:fullName, label, description, parameters: jsonSchemaToTypebox(tool.input_schema), execute: async (id,params) => { const r = await registered.executor(params); return toAgentToolResult(r); }}. Return [] if no tools. Mock MCPHandler in tests.\n4. OUTPUT: MCPHandler exposes both toAgentSDKServer() (Claude) and toPiCustomTools() (Pi); tool-execution parity across harnesses (PRD §7.14.1). Consumed by PiHarness.execute (P2.M3.T1.S1)."
+                  "dependencies": [
+                    "P2.M4.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §5: MCPHandler.toAgentSDKServer() is the existing Claude bridge iterating registeredTools and wrapping each in sdkTool()+createSdkMcpServer(). toPiCustomTools mirrors this but returns ToolDefinition[] (name/label/description/parameters/execute). Registered tools live in this.registeredTools Map (namespaced serverName__toolName) with registered.executor.\n2. INPUT: MCPHandler.registeredTools + getTools(); jsonSchemaToTypebox (S1); ToolDefinition shape (from Pi SDK types).\n3. LOGIC: Add MCPHandler.toPiCustomTools(): ToolDefinition[] — for each registered tool, build {name:fullName, label, description, parameters: jsonSchemaToTypebox(tool.input_schema), execute: async (id,params) => { const r = await registered.executor(params); return toAgentToolResult(r); }}. Return [] if no tools. Mock MCPHandler in tests.\n4. OUTPUT: MCPHandler exposes both toAgentSDKServer() (Claude) and toPiCustomTools() (Pi); tool-execution parity across harnesses (PRD §7.14.1). Consumed by PiHarness.execute (P2.M3.T1.S1).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.10",
+                    "h2.14"
+                  ]
                 }
               ]
             }
@@ -406,9 +524,17 @@
                   "title": "Agent: harness field + cascade + HarnessRegistry.get",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P1.M2.T2.S1", "P2.M1.T1.S2", "P2.M3.T2.S3"],
-                  "prd_selectors": ["h1.7", "h2.17", "h2.19"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md + system_context.md §4.1: src/core/agent.ts ctor stores this.providerId/config.providerOptions, calls getGlobalProviderConfig()+resolveProviderConfig(), and ProviderRegistry.getInstance().get(effectiveProvider). The cascade runs in BOTH ctor AND executePrompt/stream (duplicate resolution). Lines ~84-130 (ctor), ~340-470 (executePrompt), ~580-770 (stream).\n2. INPUT: HarnessRegistry (P1.M2.T1.S2); resolveHarnessConfig/getGlobalHarnessConfig (P1.M2.T2.S1); AgentConfig.harness/harnessOptions (P3.M2.T1.S1).\n3. LOGIC: Rename private fields providerId→harnessId?:HarnessId, providerOptions→harnessOptions?:HarnessOptions, provider→harness:Harness. In ctor: resolveHarnessConfig(global, this.harnessId, this.harnessOptions) → effectiveHarness; HarnessRegistry.getInstance().get(effectiveHarness) throw if missing. Keep MCPHandler init + mcps registration unchanged. Mock HarnessRegistry with stub harnesses in unit tests.\n4. OUTPUT: Agent resolves & holds a Harness instance; src/__tests__/unit/agent.test.ts updated & green. Unblocks executePrompt/stream (T2)."
+                  "dependencies": [
+                    "P1.M2.T2.S1",
+                    "P2.M1.T1.S2",
+                    "P2.M3.T2.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md + system_context.md §4.1: src/core/agent.ts ctor stores this.providerId/config.providerOptions, calls getGlobalProviderConfig()+resolveProviderConfig(), and ProviderRegistry.getInstance().get(effectiveProvider). The cascade runs in BOTH ctor AND executePrompt/stream (duplicate resolution). Lines ~84-130 (ctor), ~340-470 (executePrompt), ~580-770 (stream).\n2. INPUT: HarnessRegistry (P1.M2.T1.S2); resolveHarnessConfig/getGlobalHarnessConfig (P1.M2.T2.S1); AgentConfig.harness/harnessOptions (P3.M2.T1.S1).\n3. LOGIC: Rename private fields providerId→harnessId?:HarnessId, providerOptions→harnessOptions?:HarnessOptions, provider→harness:Harness. In ctor: resolveHarnessConfig(global, this.harnessId, this.harnessOptions) → effectiveHarness; HarnessRegistry.getInstance().get(effectiveHarness) throw if missing. Keep MCPHandler init + mcps registration unchanged. Mock HarnessRegistry with stub harnesses in unit tests.\n4. OUTPUT: Agent resolves & holds a Harness instance; src/__tests__/unit/agent.test.ts updated & green. Unblocks executePrompt/stream (T2).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.17",
+                    "h2.19"
+                  ]
                 }
               ]
             },
@@ -425,9 +551,15 @@
                   "title": "executePrompt(): per-call harness resolution + HarnessRequest",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P3.M1.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.17", "h1.6"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: agent.ts executePrompt reads overrides?.provider/providerOptions (cascade), builds ProviderRequest{prompt,options:{model,systemPrompt,tools,sessionId,hooks}}, calls provider.execute<T>. Keep the AgentResponse validation + cache + workflow-event emission + env setup logic intact.\n2. INPUT: PromptOverrides.harness/harnessOptions (P3.M2.T2.S1); HarnessRequest type; resolved harness from cascade.\n3. LOGIC: Replace overrides?.provider→overrides?.harness, providerOptions→harnessOptions; build HarnessRequest instead of ProviderRequest; call this.harness.execute (or registry.get(resolved)). Convert AgentHooks→HarnessHookEvents (same shape as current ProviderHookEvents mapping). Keep cache + createSuccessResponse/createErrorResponse paths. Mock harness.execute in tests.\n4. OUTPUT: executePrompt runs through the Harness abstraction; agent-response parity preserved."
+                  "dependencies": [
+                    "P3.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: agent.ts executePrompt reads overrides?.provider/providerOptions (cascade), builds ProviderRequest{prompt,options:{model,systemPrompt,tools,sessionId,hooks}}, calls provider.execute<T>. Keep the AgentResponse validation + cache + workflow-event emission + env setup logic intact.\n2. INPUT: PromptOverrides.harness/harnessOptions (P3.M2.T2.S1); HarnessRequest type; resolved harness from cascade.\n3. LOGIC: Replace overrides?.provider→overrides?.harness, providerOptions→harnessOptions; build HarnessRequest instead of ProviderRequest; call this.harness.execute (or registry.get(resolved)). Convert AgentHooks→HarnessHookEvents (same shape as current ProviderHookEvents mapping). Keep cache + createSuccessResponse/createErrorResponse paths. Mock harness.execute in tests.\n4. OUTPUT: executePrompt runs through the Harness abstraction; agent-response parity preserved.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.17",
+                    "h1.6"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -435,9 +567,14 @@
                   "title": "stream(): harness resolution + streaming HarnessRequest",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P3.M1.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.14"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: agent.ts stream() (~line 580) duplicates the cascade resolution and builds a ProviderRequest with streaming:true, wraps provider.execute in an AsyncGenerator yielding StreamEvents. Symbol.asyncIterator branching handles generator vs promise.\n2. INPUT: HarnessRequest + resolved harness; StreamEvent type.\n3. LOGIC: Same rewire as S1 for the streaming path: overrides?.harness, HarnessRequest{...,streaming:true}, call harness.execute, preserve the streamGenerator + AbortController + cancellation logic verbatim. Mock harness streaming in tests.\n4. OUTPUT: Agent.stream() runs through Harness; streaming parity across harnesses (PRD §7.14)."
+                  "dependencies": [
+                    "P3.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: agent.ts stream() (~line 580) duplicates the cascade resolution and builds a ProviderRequest with streaming:true, wraps provider.execute in an AsyncGenerator yielding StreamEvents. Symbol.asyncIterator branching handles generator vs promise.\n2. INPUT: HarnessRequest + resolved harness; StreamEvent type.\n3. LOGIC: Same rewire as S1 for the streaming path: overrides?.harness, HarnessRequest{...,streaming:true}, call harness.execute, preserve the streamGenerator + AbortController + cancellation logic verbatim. Mock harness streaming in tests.\n4. OUTPUT: Agent.stream() runs through Harness; streaming parity across harnesses (PRD §7.14).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.14"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -445,9 +582,15 @@
                   "title": "Thread harness + provider into the cache key build-site",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M3.T1.S1", "P3.M1.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.24"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: agent.ts cache build-site (~line 621) constructs CacheKeyInputs with bare model only. P1.M3.T1.S1 added required `harness` + optional `provider` fields to CacheKeyInputs.\n2. INPUT: resolved harness (HarnessId), resolved ModelSpec.provider (ModelProviderId via parseModelSpec(effectiveModel)).\n3. LOGIC: In the cacheInputs object add `harness: resolvedHarness` and `provider: parseModelSpec(effectiveModel, defaultModelProvider).provider`. Verify generateCacheKey now isolates by harness+provider. Mock cache in tests.\n4. OUTPUT: Cache entries isolated per (harness, provider, model) — PRD §7.14.5 satisfied. Consumed by parity tests (P4.M2.T1.S2)."
+                  "dependencies": [
+                    "P1.M3.T1.S1",
+                    "P3.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: agent.ts cache build-site (~line 621) constructs CacheKeyInputs with bare model only. P1.M3.T1.S1 added required `harness` + optional `provider` fields to CacheKeyInputs.\n2. INPUT: resolved harness (HarnessId), resolved ModelSpec.provider (ModelProviderId via parseModelSpec(effectiveModel)).\n3. LOGIC: In the cacheInputs object add `harness: resolvedHarness` and `provider: parseModelSpec(effectiveModel, defaultModelProvider).provider`. Verify generateCacheKey now isolates by harness+provider. Mock cache in tests.\n4. OUTPUT: Cache entries isolated per (harness, provider, model) — PRD §7.14.5 satisfied. Consumed by parity tests (P4.M2.T1.S2).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.24"
+                  ]
                 }
               ]
             }
@@ -473,9 +616,15 @@
                   "title": "Add harness/harnessOptions to AgentConfig",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S2"],
-                  "prd_selectors": ["h1.7", "h2.19", "h2.17"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §4: src/types/agent.ts AgentConfig has provider?:ProviderId (line 127) + providerOptions?:ProviderOptions (line 167), importing from ./providers.js. PRD §7.9 defines harness?:HarnessId + harnessOptions?:HarnessOptions + model?:string.\n2. INPUT: HarnessId + HarnessOptions from src/types/harnesses.ts.\n3. LOGIC: Add `harness?: HarnessId` and `harnessOptions?: HarnessOptions` to AgentConfig. Mark provider/providerOptions @deprecated with migration JSDoc ('use harness/harnessOptions'). Update import to pull HarnessId/HarnessOptions (the Provider* aliases still resolve). Mock: none.\n4. OUTPUT: AgentConfig accepts harness config; consumed by Agent ctor (P3.M1.T1.S1)."
+                  "dependencies": [
+                    "P1.M1.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §4: src/types/agent.ts AgentConfig has provider?:ProviderId (line 127) + providerOptions?:ProviderOptions (line 167), importing from ./providers.js. PRD §7.9 defines harness?:HarnessId + harnessOptions?:HarnessOptions + model?:string.\n2. INPUT: HarnessId + HarnessOptions from src/types/harnesses.ts.\n3. LOGIC: Add `harness?: HarnessId` and `harnessOptions?: HarnessOptions` to AgentConfig. Mark provider/providerOptions @deprecated with migration JSDoc ('use harness/harnessOptions'). Update import to pull HarnessId/HarnessOptions (the Provider* aliases still resolve). Mock: none.\n4. OUTPUT: AgentConfig accepts harness config; consumed by Agent ctor (P3.M1.T1.S1).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.19",
+                    "h2.17"
+                  ]
                 }
               ]
             },
@@ -492,9 +641,15 @@
                   "title": "Add harness/harnessOptions to PromptOverrides",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M1.T1.S2"],
-                  "prd_selectors": ["h1.7", "h2.17", "h2.13"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §4: src/types/agent.ts PromptOverrides has provider?:ProviderId (line 228) + providerOptions?:ProviderOptions (line 253), highest cascade priority per PRD §7.7. PRD §7.13 shows prompt-level harness override `agent.prompt(myPrompt,{harness:'claude-code'})`.\n2. INPUT: HarnessId + HarnessOptions.\n3. LOGIC: Add harness?:HarnessId + harnessOptions?:HarnessOptions to PromptOverrides; @deprecated on provider/providerOptions. Mock: none.\n4. OUTPUT: PromptOverrides supports per-call harness switch (PRD §7.13); consumed by Agent.executePrompt/stream (P3.M1.T2)."
+                  "dependencies": [
+                    "P1.M1.T1.S2"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §4: src/types/agent.ts PromptOverrides has provider?:ProviderId (line 228) + providerOptions?:ProviderOptions (line 253), highest cascade priority per PRD §7.7. PRD §7.13 shows prompt-level harness override `agent.prompt(myPrompt,{harness:'claude-code'})`.\n2. INPUT: HarnessId + HarnessOptions.\n3. LOGIC: Add harness?:HarnessId + harnessOptions?:HarnessOptions to PromptOverrides; @deprecated on provider/providerOptions. Mock: none.\n4. OUTPUT: PromptOverrides supports per-call harness switch (PRD §7.13); consumed by Agent.executePrompt/stream (P3.M1.T2).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.17",
+                    "h2.13"
+                  ]
                 }
               ]
             }
@@ -520,9 +675,16 @@
                   "title": "Export Harness surface + deprecated aliases in src/index.ts",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P2.M3.T2.S3", "P3.M1.T1.S1", "P1.M2.T2.S1"],
-                  "prd_selectors": ["h1.7", "h1.19"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §5: src/index.ts currently exports Provider, ProviderId, ProviderCapabilities, ProviderOptions, ProviderRequest, ProviderHookEvents, ModelSpec, ToolExecutor, ProviderResult family, GlobalProviderConfig (types block lines 30-48) + AnthropicProvider, ProviderRegistry (class exports lines 117-118). configureHarnesses/parseModelSpec NOT currently in public API.\n2. INPUT: All Harness* types (src/types/harnesses.ts); ClaudeCodeHarness + PiHarness + HarnessRegistry (src/harnesses/); configureHarnesses/resolveHarnessConfig (src/utils/harness-config.ts).\n3. LOGIC: Add a '// Harness types' export block: Harness, HarnessId, ModelProviderId, HarnessCapabilities, HarnessOptions, HarnessRequest, HarnessHookEvents, GlobalHarnessConfig, ModelSpec. Add class exports: ClaudeCodeHarness (from src/harnesses/claude-code-harness.js), PiHarness (from src/harnesses/pi-harness.js), HarnessRegistry (from src/harnesses/harness-registry.js). Add configureHarnesses + parseModelSpec/formatModelForProvider to public API. Keep the existing Provider*/AnthropicProvider/ProviderRegistry exports (now deprecated aliases) so external consumers don't break. Mock: none.\n4. OUTPUT: Public API exposes the harness system; `npm run build` + `npm test` green; backward-compat aliases intact. Unblocks OpenCode removal (P4.M1)."
+                  "dependencies": [
+                    "P2.M3.T2.S3",
+                    "P3.M1.T1.S1",
+                    "P1.M2.T2.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §5: src/index.ts currently exports Provider, ProviderId, ProviderCapabilities, ProviderOptions, ProviderRequest, ProviderHookEvents, ModelSpec, ToolExecutor, ProviderResult family, GlobalProviderConfig (types block lines 30-48) + AnthropicProvider, ProviderRegistry (class exports lines 117-118). configureHarnesses/parseModelSpec NOT currently in public API.\n2. INPUT: All Harness* types (src/types/harnesses.ts); ClaudeCodeHarness + PiHarness + HarnessRegistry (src/harnesses/); configureHarnesses/resolveHarnessConfig (src/utils/harness-config.ts).\n3. LOGIC: Add a '// Harness types' export block: Harness, HarnessId, ModelProviderId, HarnessCapabilities, HarnessOptions, HarnessRequest, HarnessHookEvents, GlobalHarnessConfig, ModelSpec. Add class exports: ClaudeCodeHarness (from src/harnesses/claude-code-harness.js), PiHarness (from src/harnesses/pi-harness.js), HarnessRegistry (from src/harnesses/harness-registry.js). Add configureHarnesses + parseModelSpec/formatModelForProvider to public API. Keep the existing Provider*/AnthropicProvider/ProviderRegistry exports (now deprecated aliases) so external consumers don't break. Mock: none.\n4. OUTPUT: Public API exposes the harness system; `npm run build` + `npm test` green; backward-compat aliases intact. Unblocks OpenCode removal (P4.M1).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h1.19"
+                  ]
                 }
               ]
             }
@@ -557,9 +719,14 @@
                   "title": "Delete opencode-provider.ts, tests, literal, and dependency",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P3.M3.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.12"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §6 + consumer-analysis.md §2: src/harnesses/opencode-provider.ts (deprecated v1.5.0, NOT re-exported from src/index.ts). 9 test files under src/__tests__/unit/providers/opencode-provider-*.test.ts. 'opencode' literal appears in ProviderId, model-spec, provider-config error messages, ~564 occurrences in tests. package.json dep @opencode-ai/sdk:1.1.36 (pinned).\n2. INPUT: Completed harness migration (opencode no longer reachable from public API after P3.M3).\n3. LOGIC: Delete src/harnesses/opencode-provider.ts. Remove the 9 opencode-provider-*.test.ts files. Grep-and-remove the 'opencode' literal from any non-deprecated code (model-spec/provider-config examples & error strings). `npm uninstall @opencode-ai/sdk`. Confirm OpenCodeProvider is NOT exported anywhere. Update src/__tests__/compatibility/backward-compatibility.test.ts if it references opencode (migration-scope.md §3 says it currently does not). Mock: none.\n4. OUTPUT: Zero opencode references in src/; package.json clean; `npm test` green. Verifiable via `grep -rni opencode src/` returning empty (excluding intentional migration-doc references)."
+                  "dependencies": [
+                    "P3.M3.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: migration-scope.md §6 + consumer-analysis.md §2: src/harnesses/opencode-provider.ts (deprecated v1.5.0, NOT re-exported from src/index.ts). 9 test files under src/__tests__/unit/providers/opencode-provider-*.test.ts. 'opencode' literal appears in ProviderId, model-spec, provider-config error messages, ~564 occurrences in tests. package.json dep @opencode-ai/sdk:1.1.36 (pinned).\n2. INPUT: Completed harness migration (opencode no longer reachable from public API after P3.M3).\n3. LOGIC: Delete src/harnesses/opencode-provider.ts. Remove the 9 opencode-provider-*.test.ts files. Grep-and-remove the 'opencode' literal from any non-deprecated code (model-spec/provider-config examples & error strings). `npm uninstall @opencode-ai/sdk`. Confirm OpenCodeProvider is NOT exported anywhere. Update src/__tests__/compatibility/backward-compatibility.test.ts if it references opencode (migration-scope.md §3 says it currently does not). Mock: none.\n4. OUTPUT: Zero opencode references in src/; package.json clean; `npm test` green. Verifiable via `grep -rni opencode src/` returning empty (excluding intentional migration-doc references).",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.12"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -567,9 +734,13 @@
                   "title": "Update examples and finalize migration-opencode doc",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P4.M1.T1.S1"],
-                  "prd_selectors": ["h1.7"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §6: examples/providers/02,03,04,06-*.ts import/register OpenCodeProvider; 06 has a capability matrix comparing providers. docs/migration-opencode-removal.md documents the v2.0.0 removal timeline.\n2. INPUT: Cleaned source from S1.\n3. LOGIC: Edit example files to drop OpenCodeProvider usage (full example migration happens in P4.M3.T2, but remove opencode imports here so examples compile). Update docs/migration-opencode-removal.md to mark removal COMPLETE in v2.0.0. Mock: none.\n4. OUTPUT: Examples compile without opencode; migration doc finalized."
+                  "dependencies": [
+                    "P4.M1.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §6: examples/providers/02,03,04,06-*.ts import/register OpenCodeProvider; 06 has a capability matrix comparing providers. docs/migration-opencode-removal.md documents the v2.0.0 removal timeline.\n2. INPUT: Cleaned source from S1.\n3. LOGIC: Edit example files to drop OpenCodeProvider usage (full example migration happens in P4.M3.T2, but remove opencode imports here so examples compile). Update docs/migration-opencode-removal.md to mark removal COMPLETE in v2.0.0. Mock: none.\n4. OUTPUT: Examples compile without opencode; migration doc finalized.",
+                  "prd_selectors": [
+                    "h1.7"
+                  ]
                 }
               ]
             }
@@ -595,9 +766,16 @@
                   "title": "Parity tests: identical AgentResponse + tool execution semantics",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P3.M1.T2.S3", "P2.M3.T2.S3"],
-                  "prd_selectors": ["h1.7", "h2.24", "h1.6"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD §7.14.1 (MCP tools), §7.14.4 (identical AgentResponse), §7.14.6 (workflow integration events). existing adversarial suite src/__tests__/adversarial/ (prd-compliance.test.ts, prd-12-2-compliance.test.ts) is the pattern to follow.\n2. INPUT: Both registered harnesses (PiHarness, ClaudeCodeHarness) + a shared stub toolExecutor returning canned results.\n3. LOGIC: Create src/__tests__/integration/harness-parity.test.ts: run the same HarnessRequest through BOTH harnesses (with mocked SDKs), assert AgentResponse shape/status/metadata fields are identical, assert tool ToolExecutionRequest/Result round-trips identically (namespacing, isError handling), assert workflow events emit correctly in workflow context. Mock both SDK imports.\n4. OUTPUT: Parity guaranteed & regression-protected; PRD §7.14.1/4/6 verified."
+                  "dependencies": [
+                    "P3.M1.T2.S3",
+                    "P2.M3.T2.S3"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD §7.14.1 (MCP tools), §7.14.4 (identical AgentResponse), §7.14.6 (workflow integration events). existing adversarial suite src/__tests__/adversarial/ (prd-compliance.test.ts, prd-12-2-compliance.test.ts) is the pattern to follow.\n2. INPUT: Both registered harnesses (PiHarness, ClaudeCodeHarness) + a shared stub toolExecutor returning canned results.\n3. LOGIC: Create src/__tests__/integration/harness-parity.test.ts: run the same HarnessRequest through BOTH harnesses (with mocked SDKs), assert AgentResponse shape/status/metadata fields are identical, assert tool ToolExecutionRequest/Result round-trips identically (namespacing, isError handling), assert workflow events emit correctly in workflow context. Mock both SDK imports.\n4. OUTPUT: Parity guaranteed & regression-protected; PRD §7.14.1/4/6 verified.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.24",
+                    "h1.6"
+                  ]
                 },
                 {
                   "type": "Subtask",
@@ -605,9 +783,16 @@
                   "title": "Cache isolation + deterministic hook ordering tests",
                   "status": "Planned",
                   "story_points": 1,
-                  "dependencies": ["P1.M3.T1.S1", "P4.M2.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.24", "h2.21"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD §7.14.5 (cache keys incorporate both harness and provider/model) + §7.14.3 (hooks fire with consistent ordering). P1.M3 added harness/provider to the key; P2.M3.T2.S2 wired Pi hooks.\n2. INPUT: generateCacheKey (P1.M3) + hook wiring in both harnesses.\n3. LOGIC: Add cache-isolation cases (same prompt, different harness OR different provider → distinct keys; same harness+provider+model → identical key). Add hook-ordering tests asserting onToolStart before onToolEnd, onSessionStart before onSessionEnd, deterministic sequence across both harnesses. Mock SDKs.\n4. OUTPUT: PRD §7.14.3/5 verified; cache & hook regressions protected."
+                  "dependencies": [
+                    "P1.M3.T1.S1",
+                    "P4.M2.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: PRD §7.14.5 (cache keys incorporate both harness and provider/model) + §7.14.3 (hooks fire with consistent ordering). P1.M3 added harness/provider to the key; P2.M3.T2.S2 wired Pi hooks.\n2. INPUT: generateCacheKey (P1.M3) + hook wiring in both harnesses.\n3. LOGIC: Add cache-isolation cases (same prompt, different harness OR different provider → distinct keys; same harness+provider+model → identical key). Add hook-ordering tests asserting onToolStart before onToolEnd, onSessionStart before onSessionEnd, deterministic sequence across both harnesses. Mock SDKs.\n4. OUTPUT: PRD §7.14.3/5 verified; cache & hook regressions protected.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.24",
+                    "h2.21"
+                  ]
                 }
               ]
             }
@@ -633,9 +818,18 @@
                   "title": "Write docs/harnesses.md + update migration guides",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P3.M3.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.11", "h2.16", "h2.17", "h2.18", "h2.23"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §7: docs/providers.md (~1581 lines) is pre-§7 vocabulary and the largest doc rewrite; PRD §7 supersedes it. docs/migration-guide-agent-response.md documents the AgentResponse contract (steady-state, no timeline).\n2. INPUT: Finalized public API (P3.M3) + verified external_deps.md.\n3. LOGIC: Create docs/harnesses.md: explain Harness vs ModelProvider axes (§7.8 critical rule), supported harnesses table (§7.1), capabilities (§7.4), configureHarnesses + dual cascade (§7.6-7.7) with worked examples, model string formats, usage examples (§7.13), feature parity (§7.14). Deprecate docs/providers.md (add banner pointing to harnesses.md). Add a Provider*→Harness* migration section. Mock: none (docs).\n4. OUTPUT: docs/harnesses.md is the authoritative harness reference; providers.md deprecated."
+                  "dependencies": [
+                    "P3.M3.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §7: docs/providers.md (~1581 lines) is pre-§7 vocabulary and the largest doc rewrite; PRD §7 supersedes it. docs/migration-guide-agent-response.md documents the AgentResponse contract (steady-state, no timeline).\n2. INPUT: Finalized public API (P3.M3) + verified external_deps.md.\n3. LOGIC: Create docs/harnesses.md: explain Harness vs ModelProvider axes (§7.8 critical rule), supported harnesses table (§7.1), capabilities (§7.4), configureHarnesses + dual cascade (§7.6-7.7) with worked examples, model string formats, usage examples (§7.13), feature parity (§7.14). Deprecate docs/providers.md (add banner pointing to harnesses.md). Add a Provider*→Harness* migration section. Mock: none (docs).\n4. OUTPUT: docs/harnesses.md is the authoritative harness reference; providers.md deprecated.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.11",
+                    "h2.16",
+                    "h2.17",
+                    "h2.18",
+                    "h2.23"
+                  ]
                 }
               ]
             },
@@ -652,9 +846,16 @@
                   "title": "Rewrite provider examples as harness examples + update scripts",
                   "status": "Planned",
                   "story_points": 2,
-                  "dependencies": ["P4.M1.T1.S2", "P4.M3.T1.S1"],
-                  "prd_selectors": ["h1.7", "h2.13", "h2.23"],
-                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §6: 6 example files (01-basic..06-with-mcp-skills) use ProviderRegistry/AnthropicProvider/configureProviders; package.json has start:provider-* scripts.\n2. INPUT: Finalized harness API + docs/harnesses.md.\n3. LOGIC: Move examples/providers → examples/harnesses. Rewrite: 01-basic-harness-usage (new ClaudeCodeHarness/PiHarness + HarnessRegistry), 02-harness-configuration (configureHarnesses dual cascade), 03-harness-switching (per-call harness override §7.13), 04-multi-provider-scenarios (model axis: anthropic vs openai via pi), 05-harness-sessions, 06-harness-with-mcp-skills (capability matrix pi vs claude-code §7.4). Update package.json scripts start:provider-*→start:harness-*. Verify examples run with `tsx`. Mock: none (examples).\n4. OUTPUT: Examples demonstrate the full v1.2 harness system; package.json scripts updated; README links corrected. Project is implementation-complete per PRD §16 acceptance criteria."
+                  "dependencies": [
+                    "P4.M1.T1.S2",
+                    "P4.M3.T1.S1"
+                  ],
+                  "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: consumer-analysis.md §6: 6 example files (01-basic..06-with-mcp-skills) use ProviderRegistry/AnthropicProvider/configureProviders; package.json has start:provider-* scripts.\n2. INPUT: Finalized harness API + docs/harnesses.md.\n3. LOGIC: Move examples/providers → examples/harnesses. Rewrite: 01-basic-harness-usage (new ClaudeCodeHarness/PiHarness + HarnessRegistry), 02-harness-configuration (configureHarnesses dual cascade), 03-harness-switching (per-call harness override §7.13), 04-multi-provider-scenarios (model axis: anthropic vs openai via pi), 05-harness-sessions, 06-harness-with-mcp-skills (capability matrix pi vs claude-code §7.4). Update package.json scripts start:provider-*→start:harness-*. Verify examples run with `tsx`. Mock: none (examples).\n4. OUTPUT: Examples demonstrate the full v1.2 harness system; package.json scripts updated; README links corrected. Project is implementation-complete per PRD §16 acceptance criteria.",
+                  "prd_selectors": [
+                    "h1.7",
+                    "h2.13",
+                    "h2.23"
+                  ]
                 }
               ]
             }
