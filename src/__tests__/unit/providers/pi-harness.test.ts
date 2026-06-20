@@ -61,9 +61,9 @@ describe('PiHarness', () => {
   });
 
   describe('stub methods throw with downstream subtask references', () => {
-    it('loadSkills() should throw citing P2.M3.T2.S3', async () => {
+    it('loadSkills() should throw /not initialized/ when not initialized', async () => {
       const harness = new PiHarness();
-      await expect(harness.loadSkills([])).rejects.toThrow(/P2\.M3\.T2\.S3/);
+      await expect(harness.loadSkills([])).rejects.toThrow(/not initialized/i);
     });
   });
 

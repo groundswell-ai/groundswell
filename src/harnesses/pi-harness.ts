@@ -31,6 +31,7 @@ import type {
   AgentSession,
   AgentSessionEvent,
   AgentSessionEventListener,
+  Skill as PiSkill,
 } from "@earendil-works/pi-coding-agent";
 import { ModelRegistry, AuthStorage } from "@earendil-works/pi-coding-agent";
 
@@ -105,6 +106,15 @@ export class PiHarness implements Harness {
   private options: HarnessOptions | null = null;
   /** MCP tool registry — mirrors ClaudeCodeHarness L177. */
   private mcpHandler: MCPHandler = new MCPHandler();
+  /**
+   * Combined skills prompt (agentskills.io XML) from loadSkills(), injected into the session's system
+   * prompt during execute() via a DefaultResourceLoader.appendSystemPrompt (parity with
+   * ClaudeCodeHarness.skillsPrompt). Empty string when no skills are loaded (loadSkills not called, or
+   * called with []). When empty, execute() omits the resourceLoader → Pi builds its own default loader
+   * (current behavior preserved — no regression).
+   * @internal
+   */
+  private skillsPrompt: string = "";
 
   // ── S2: lifecycle ──────────────────────────────────────────────────────────────────────────
   /**
@@ -234,12 +244,17 @@ export class PiHarness implements Harness {
       );
       const model = this.resolveModel(modelSpec); // throws ConfigError if absent — let it propagate
 
+      // PiHarness creates a fresh AgentSession per execute() call, so loadSkills() state
+      // takes effect on the next execute() — no session rebuild is required.
+      const resourceLoader = await this.buildSkillsResourceLoader();
+
       // Create the Pi session. customTools: [] — Groundswell tools wired in P2.M3.T1.
       const { session } = await this.sdk!.createAgentSession({
         model,
         modelRegistry: this.modelRegistry,
         authStorage: this.authStorage,
         customTools: this.buildCustomTools(toolExecutor),
+        ...(resourceLoader ? { resourceLoader } : {}), // skills injection; omitted when no skills
       });
 
       // Aggregation closure — terminal assistant text + usage + tool-call count from events.
@@ -349,12 +364,17 @@ export class PiHarness implements Harness {
     const modelSpec = this.normalizeModel(request.options.model ?? "claude-sonnet-4-20250514");
     const model = this.resolveModel(modelSpec); // throws ConfigError if absent — let it propagate
 
+    // PiHarness creates a fresh AgentSession per execute() call, so loadSkills() state
+    // takes effect on the next execute() — no session rebuild is required.
+    const resourceLoader = await this.buildSkillsResourceLoader();
+
     // REUSE P2.M3.T1.S1's customTools seam (Decision 1) — do NOT pass customTools: [].
     const { session } = await this.sdk!.createAgentSession({
       model,
       modelRegistry: this.modelRegistry,
       authStorage: this.authStorage,
       customTools: this.buildCustomTools(toolExecutor),
+      ...(resourceLoader ? { resourceLoader } : {}), // skills injection; omitted when no skills
     });
 
     // Yield metadata FIRST (mirror ClaudeCodeHarness L696-701).
@@ -689,8 +709,99 @@ export class PiHarness implements Harness {
     );
   }
 
-  async loadSkills(_skills: Skill[]): Promise<void> {
-    throw new Error("PiHarness.loadSkills() not implemented — P2.M3.T2.S3 (native agentskills.io loading)");
+  /**
+   * Load skills via Pi's NATIVE agentskills.io implementation (PRD §7.12, §7.14.2).
+   *
+   * For each Groundswell {@link Skill} ({name, path}), calls Pi's `loadSkillsFromDir({dir: path,
+   * source: name})` (which reads SKILL.md from the dir), collects all returned Pi Skills, then formats
+   * them to agentskills.io XML via `formatSkillsForPrompt` and stores the result in {@link skillsPrompt}.
+   *
+   * ## No session re-init required
+   * PiHarness creates a FRESH AgentSession per execute()/executeStreaming() call (P2.M2.T2.S1 /
+   * P2.M3.T2.S1), so this stored skillsPrompt is consumed on the NEXT execute() when
+   * buildSkillsResourceLoader() builds the DefaultResourceLoader. This mirrors how registerMCPs()
+   * state is consumed when execute() builds customTools. (A long-lived-session model would need an
+   * explicit rebuild; not the case here.)
+   *
+   * ## Parity with ClaudeCodeHarness
+   * ClaudeCodeHarness reads each SKILL.md and joins with markdown; PiHarness uses Pi's native loaders
+   * and emits the agentskills.io XML format. Both store the result in a `skillsPrompt` field and inject
+   * at BOTH execute sites. EFFECT is identical: the skill's SKILL.md content reaches the model's system
+   * prompt.
+   *
+   * @param skills - Groundswell portable Skill list ({name, path}). path = dir containing SKILL.md.
+   * @throws {Error} /not initialized/i if initialize() has not been called.
+   * @throws {Error} "Failed to load skill '<name>' from <path>: <msg>" if loadSkillsFromDir throws.
+   */
+  async loadSkills(skills: Skill[]): Promise<void> {
+    // Init guard (mirror registerMCPs / ClaudeCodeHarness.loadSkills).
+    if (!this.sdk) {
+      throw new Error("PiHarness not initialized. Call initialize() first.");
+    }
+    // Empty → clear (mirror ClaudeCodeHarness; also ensures a prior loadSkills doesn't linger).
+    if (skills.length === 0) {
+      this.skillsPrompt = "";
+      return;
+    }
+    // NATIVE agentskills.io loading: map each Groundswell Skill {name,path} → Pi loadSkillsFromDir.
+    // Collect ALL Pi Skills, then format to ONE agentskills.io XML string.
+    const collected: PiSkill[] = [];
+    for (const skill of skills) {
+      try {
+        // loadSkillsFromDir is SYNC; reads SKILL.md from `dir` (skill root / .md children / recurse).
+        // `source` is the SourceInfo identifier (use the Groundswell skill name).
+        const result = this.sdk.loadSkillsFromDir({
+          dir: skill.path,
+          source: skill.name,
+        });
+        collected.push(...result.skills);
+      } catch (error) {
+        // Wrap with context (mirror ClaudeCodeHarness L983-988 error wrapping).
+        throw new Error(
+          `Failed to load skill '${skill.name}' from ${skill.path}: ` +
+            `${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+      }
+    }
+    // formatSkillsForPrompt → agentskills.io XML; EXCLUDES disableModelInvocation:true (Pi filters).
+    this.skillsPrompt = this.sdk.formatSkillsForPrompt(collected);
+  }
+
+  /**
+   * Build a DefaultResourceLoader that appends the loaded skills ({@link skillsPrompt}) to the
+   * session's system prompt (PRD §7.12, §7.14.2).
+   *
+   * Returns `undefined` when no skills are loaded (`skillsPrompt === ""`), so execute() OMITS the
+   * `resourceLoader` option and Pi builds its own default loader — current behavior is preserved
+   * (zero regression in the execute/streaming suites).
+   *
+   * ## Parity: noSkills: true
+   * Suppresses Pi's DEFAULT skill discovery (~/.pi/agent/skills, cwd-local) so the session's skills are
+   * EXACTLY Groundswell's portable Skill[] (parity with ClaudeCodeHarness, which builds its prompt only
+   * from the passed skills). `appendSystemPrompt` is INDEPENDENT of `noSkills`, so our pre-formatted
+   * agentskills.io XML is still appended to the system prompt.
+   *
+   * createAgentSession uses a caller-provided loader AS-IS (no reload), so we `await loader.reload()`.
+   *
+   * @returns A configured DefaultResourceLoader, or undefined when no skills are loaded.
+   * @throws {Error} /not initialized/i if called before initialize() (defensive — execute() guards too).
+   */
+  private async buildSkillsResourceLoader(): Promise<
+    import("@earendil-works/pi-coding-agent").DefaultResourceLoader | undefined
+  > {
+    if (!this.skillsPrompt) return undefined; // no skills → omit loader (preserve current behavior)
+    if (!this.sdk) {
+      throw new Error("PiHarness not initialized. Call initialize() first.");
+    }
+    // cwd/agentDir are REQUIRED by DefaultResourceLoaderOptions. agentDir = Pi's default (~/.pi/agent).
+    const loader = new this.sdk.DefaultResourceLoader({
+      cwd: process.cwd(),
+      agentDir: this.sdk.getAgentDir(),
+      appendSystemPrompt: [this.skillsPrompt], // our agentskills.io XML appended to the system prompt
+      noSkills: true, // parity: don't ALSO load Pi's default skills
+    });
+    await loader.reload(); // createAgentSession will NOT reload a caller-provided loader
+    return loader;
   }
 
   /**

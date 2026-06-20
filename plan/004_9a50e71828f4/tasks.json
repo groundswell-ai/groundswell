@@ -357,7 +357,7 @@
           "type": "Milestone",
           "id": "P2.M3",
           "title": "PiHarness Tools, Streaming, Hooks & Skills",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Complete PiHarness parity: tool registration via customTools (delegating to MCPHandler/toolExecutor), streaming StreamEvent mapping, HarnessHookEvents adaptation, and native agentskills.io skill loading. Register PiHarness as default.",
           "tasks": [
             {
@@ -391,7 +391,7 @@
               "type": "Task",
               "id": "P2.M3.T2",
               "title": "PiHarness streaming, hooks & skills",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Add streaming (StreamEvent from session.subscribe), HarnessHookEvents adaptation, native skill loading, and streaming-mode execute().",
               "subtasks": [
                 {
@@ -430,7 +430,7 @@
                   "type": "Subtask",
                   "id": "P2.M3.T2.S3",
                   "title": "Native agentskills.io skill loading + register PiHarness as default",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P2.M2.T2.S1",
@@ -465,7 +465,7 @@
                   "type": "Subtask",
                   "id": "P2.M4.T1.S1",
                   "title": "JSON-Schema → TypeBox schema converter",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 2,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: external_deps.md §1.4 gotcha + §4: Pi ToolDefinition.parameters is TypeBox (TSchema from @sinclair/typebox, transitive via Pi); current MCPHandler.jsonSchemaToZodRawShape() (consumer-analysis.md §5) converts JSON-Schema→Zod for Claude. A parallel JSON-Schema→TypeBox converter is needed. @sinclair/typebox is available transitively; verify it resolves or add as direct dep.\n2. INPUT: Tool.input_schema (JSON-Schema object) from src/types/sdk-primitives.ts.\n3. LOGIC: Add src/harnesses/pi-schema-converter.ts (or src/core/mcp-handler.ts sibling) jsonSchemaToTypebox(schema): TSchema supporting object/string/number/boolean/array/enum/$ref basics (parity with the Zod converter's coverage). Export Type.Type.* builders. Mock: none (pure function).\n4. OUTPUT: jsonSchemaToTypebox converter; unit-tested against representative JSON-Schema shapes. Consumed by S2.",

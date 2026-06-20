@@ -1,61 +1,57 @@
 /**
- * Unit tests for registerDefaultHarnesses() bootstrap helper
+ * Unit tests for registerDefaultHarnesses().
  *
- * Purpose: Verify the helper registers ClaudeCodeHarness under 'claude-code'
- * idempotently, returns the registry, uses the singleton by default, and
- * accepts a custom registry. P2.M1.T1.S2.
+ * PRP: P2.M3.T2.S3 — verifies both ClaudeCodeHarness and PiHarness are registered,
+ * 'pi' is a PiHarness instance, idempotency, and defaultHarness === 'pi'.
  */
 
-import { describe, it, expect, afterEach } from 'vitest';
-import {
-  HarnessRegistry,
-  ProviderRegistry,
-} from '../../../harnesses/harness-registry.js';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { registerDefaultHarnesses } from '../../../harnesses/register-defaults.js';
+import { HarnessRegistry } from '../../../harnesses/harness-registry.js';
+import { PiHarness } from '../../../harnesses/pi-harness.js';
 import { ClaudeCodeHarness } from '../../../harnesses/claude-code-harness.js';
+import {
+  getGlobalHarnessConfig,
+  resetGlobalHarnessConfig,
+} from '../../../utils/harness-config.js';
 
-afterEach(() => {
-  // identical isolation pattern to harness-registry.test.ts
-  const registry = HarnessRegistry.getInstance();
-  registry._resetInitStateForTesting();
-  HarnessRegistry._resetForTesting();
-});
-
-describe('registerDefaultHarnesses()', () => {
-  it('registers ClaudeCodeHarness under "claude-code" on the singleton by default', () => {
-    const registry = registerDefaultHarnesses();
-    expect(registry.has('claude-code')).toBe(true);
-    const cc = registry.get('claude-code');
-    expect(cc).toBeInstanceOf(ClaudeCodeHarness);
-    expect(cc?.id).toBe('claude-code');
-  });
-
-  it('returns the same registry instance it wrote to (the singleton)', () => {
-    const registry = registerDefaultHarnesses();
-    expect(registry).toBe(HarnessRegistry.getInstance());
-  });
-
-  it('is idempotent — calling twice does NOT throw (registry.register duplicate guard)', () => {
-    expect(() => {
-      registerDefaultHarnesses();
-      registerDefaultHarnesses();
-    }).not.toThrow();
-    // still exactly one claude-code harness registered
-    expect(HarnessRegistry.getInstance().has('claude-code')).toBe(true);
-  });
-
-  it('accepts a custom target registry', () => {
-    // fresh singleton after reset
+describe('registerDefaultHarnesses', () => {
+  beforeEach(() => {
     HarnessRegistry._resetForTesting();
-    const custom = HarnessRegistry.getInstance(); // fresh instance
-    const returned = registerDefaultHarnesses(custom);
-    expect(returned).toBe(custom);
-    expect(custom.has('claude-code')).toBe(true);
+    resetGlobalHarnessConfig();
   });
 
-  it('registers only claude-code today (pi is deferred to P2.M3)', () => {
+  it('should register both claude-code and pi harnesses', () => {
     const registry = registerDefaultHarnesses();
     expect(registry.has('claude-code')).toBe(true);
-    expect(registry.has('pi')).toBe(false); // added in P2.M3.T2.S3
+    expect(registry.has('pi')).toBe(true);
+  });
+
+  it('should register pi as a PiHarness instance', () => {
+    const registry = registerDefaultHarnesses();
+    expect(registry.get('pi')).toBeInstanceOf(PiHarness);
+  });
+
+  it('should register claude-code as a ClaudeCodeHarness instance', () => {
+    const registry = registerDefaultHarnesses();
+    expect(registry.get('claude-code')).toBeInstanceOf(ClaudeCodeHarness);
+  });
+
+  it('should be idempotent — calling twice does not throw', () => {
+    registerDefaultHarnesses();
+    expect(() => registerDefaultHarnesses()).not.toThrow();
+    const registry = HarnessRegistry.getInstance();
+    expect(registry.has('pi')).toBe(true);
+    expect(registry.has('claude-code')).toBe(true);
+  });
+
+  it('should return the HarnessRegistry singleton for chaining', () => {
+    const result = registerDefaultHarnesses();
+    expect(result).toBe(HarnessRegistry.getInstance());
+  });
+
+  it('should confirm defaultHarness is pi', () => {
+    registerDefaultHarnesses();
+    expect(getGlobalHarnessConfig().defaultHarness).toBe('pi');
   });
 });

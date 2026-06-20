@@ -4,10 +4,9 @@
  * (guards each registration with `registry.has(id)` so the registry's own
  * duplicate-error is never triggered).
  *
- * Today registers:
+ * Registers:
  *   - ClaudeCodeHarness (id 'claude-code') — Anthropic-only (PRD §7.8).
- *
- * P2.M3.T2.S3 will add PiHarness (id 'pi') as the vendor-neutral default here.
+ *   - PiHarness (id 'pi') — vendor-neutral default (PRD §7.1, §7.6).
  *
  * @param registry - Target registry (defaults to the HarnessRegistry singleton).
  * @returns The registry (for chaining / testing).
@@ -17,11 +16,13 @@
  * import { registerDefaultHarnesses } from 'groundswell/harnesses';
  * const registry = registerDefaultHarnesses();
  * const cc = registry.get('claude-code');  // ClaudeCodeHarness instance
+ * const pi = registry.get('pi');           // PiHarness instance
  * ```
  */
 
 import { HarnessRegistry } from './harness-registry.js';
 import { ClaudeCodeHarness } from './claude-code-harness.js';
+import { PiHarness } from './pi-harness.js';
 import type { HarnessId } from '../types/harnesses.js';
 
 export function registerDefaultHarnesses(
@@ -33,9 +34,13 @@ export function registerDefaultHarnesses(
     registry.register(new ClaudeCodeHarness());
   }
 
-  // TODO(P2.M3.T2.S3): register PiHarness (id 'pi') as the vendor-neutral default.
-  //   import { PiHarness } from "./pi-harness.js";
-  //   if (!registry.has("pi")) registry.register(new PiHarness());
+  // Pi harness — vendor-neutral DEFAULT (PRD §7.1, §7.6). defaultHarness is already 'pi' in
+  // src/utils/harness-config.ts (DEFAULT_HARNESS_CONFIG); this registration pairs the id with a
+  // live instance so registry.get('pi') resolves. Idempotent (guard mirrors the claude-code block).
+  const PI: HarnessId = 'pi';
+  if (!registry.has(PI)) {
+    registry.register(new PiHarness());
+  }
 
   return registry;
 }
