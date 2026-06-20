@@ -41,7 +41,7 @@ import type {
   ToolExecutionResult,
 } from '../types/providers.js';
 import { HarnessRegistry } from '../harnesses/index.js';
-import type { Harness, HarnessId, HarnessOptions } from '../types/harnesses.js';
+import type { Harness, HarnessId, HarnessOptions, HarnessRequest, HarnessHookEvents } from '../types/harnesses.js';
 import { resolveProviderConfig, getGlobalProviderConfig } from '../utils/provider-config.js';
 import type { AsyncStream, StreamEvent } from '../types/streaming.js';
 
@@ -585,34 +585,43 @@ export class Agent {
     // Get execution context for event emission
     const ctx = getExecutionContext();
 
-    // Extract prompt-level provider overrides
-    const promptProvider = overrides?.provider;
-    const promptProviderOptions = overrides?.providerOptions;
+    // Extract prompt-level harness overrides (PRD §7.7, §7.9).
+    // Backward-compat bridge: prefer the new `harness` field; fall back to the legacy `provider`
+    // field so existing callers (`agent.prompt(p, { provider: 'opencode' })`) keep working during
+    // the v1.2 migration. The fallback + legacy global-config singleton are removed once
+    // PromptOverrides + the test suite are fully on harness vocabulary (later lockstep milestone).
+    const promptHarness = overrides?.harness ?? (overrides?.provider as HarnessId | undefined);
+    const promptHarnessOptions = overrides?.harnessOptions ?? overrides?.providerOptions;
 
-    // Resolve provider configuration with cascade: global → agent → prompt
+    // Resolve the effective harness via the configuration cascade (PRD §7.7): global → agent → prompt.
+    // resolveProviderConfig DELEGATES to resolveHarnessConfig (harness-config.ts L367-368);
+    // getGlobalProviderConfig is used as the global source to honour the legacy configureProviders()
+    // singleton still consumed by stream() + the existing test suite.
     const globalConfig = getGlobalProviderConfig();
-    const { provider: resolvedProvider, options: resolvedProviderOptions } = resolveProviderConfig(
+    const { provider: resolvedHarness, options: resolvedHarnessOptions } = resolveProviderConfig(
       globalConfig,
       this.harnessId,
       this.harnessOptions,
-      promptProvider,
-      promptProviderOptions
+      promptHarness,
+      promptHarnessOptions
     );
 
-    // Get provider instance for resolved provider (may differ from this.harness)
+    // Fetch the harness instance from HarnessRegistry (may differ from this.harness when a prompt
+    // override is supplied). The cast bridges the legacy Provider return type to the Harness contract
+    // — structurally identical at runtime; the cast exists only because Provider.id is wider than Harness.id.
     const registry = HarnessRegistry.getInstance();
-    const providerInstance = registry.get(resolvedProvider);
-    if (!providerInstance) {
+    const harnessInstance = registry.get(resolvedHarness) as Harness | undefined;
+    if (!harnessInstance) {
       return createErrorResponse(
         'PROVIDER_NOT_FOUND',
-        `Provider '${resolvedProvider}' is not registered`,
-        { providerId: resolvedProvider },
+        `Harness '${resolvedHarness}' is not registered`,
+        { harnessId: resolvedHarness },
         false
       ) as AgentResponse<T>;
     }
 
-    // Capture non-null provider instance for use in closure (TypeScript strict mode requirement)
-    const provider = providerInstance;
+    // Capture non-null harness instance for use in closure (TypeScript strict mode requirement)
+    const harness = harnessInstance;
 
     // Merge configuration: Prompt > Overrides > Config
     const effectiveSystem =
@@ -698,10 +707,10 @@ export class Agent {
       // Build user message
       const userMessage = prompt.buildUserMessage();
 
-      // Convert Agent.hooks to ProviderHookEvents
-      const providerHooks: ProviderHookEvents = {};
+      // Convert AgentHooks → HarnessHookEvents (identical wiring, retyped).
+      const harnessHooks: HarnessHookEvents = {};
       if (effectiveHooks.preToolUse && effectiveHooks.preToolUse.length > 0) {
-        providerHooks.onToolStart = async (tool: ToolExecutionRequest) => {
+        harnessHooks.onToolStart = async (tool: ToolExecutionRequest) => {
           for (const hook of effectiveHooks.preToolUse!) {
             await hook({
               toolName: tool.name,
@@ -712,7 +721,7 @@ export class Agent {
         };
       }
       if (effectiveHooks.postToolUse && effectiveHooks.postToolUse.length > 0) {
-        providerHooks.onToolEnd = async (
+        harnessHooks.onToolEnd = async (
           tool: ToolExecutionRequest,
           result: ToolExecutionResult,
           duration: number
@@ -729,7 +738,7 @@ export class Agent {
         };
       }
       if (effectiveHooks.sessionStart && effectiveHooks.sessionStart.length > 0) {
-        providerHooks.onSessionStart = async () => {
+        harnessHooks.onSessionStart = async () => {
           for (const hook of effectiveHooks.sessionStart!) {
             await hook({
               agentId: this.id,
@@ -739,7 +748,7 @@ export class Agent {
         };
       }
       if (effectiveHooks.sessionEnd && effectiveHooks.sessionEnd.length > 0) {
-        providerHooks.onSessionEnd = async (totalDuration: number) => {
+        harnessHooks.onSessionEnd = async (totalDuration: number) => {
           for (const hook of effectiveHooks.sessionEnd!) {
             await hook({
               agentId: this.id,
@@ -750,32 +759,33 @@ export class Agent {
         };
       }
 
-      // Build ProviderRequest with nested structure
-      const providerRequest: ProviderRequest = {
+      // Build HarnessRequest with nested structure (PRD §7.3). Identical shape to the legacy
+      // ProviderRequest — the swap is a type rename (ProviderRequest = HarnessRequest alias).
+      const harnessRequest: HarnessRequest = {
         prompt: userMessage,
         options: {
           model: effectiveModel,
           systemPrompt: effectiveSystem,
           tools: effectiveTools,
-          sessionId: resolvedProviderOptions.sessionId,
-          hooks: providerHooks,
+          sessionId: resolvedHarnessOptions.sessionId,
+          hooks: harnessHooks,
         },
       };
 
-      // Execute via provider abstraction
-      // Provider returns: Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>>
-      // For non-streaming mode, it returns Promise<AgentResponse<T>>
-      const providerResult = provider.execute<T>(
-        providerRequest,
+      // Execute via the Harness abstraction (PRD §7.3).
+      // Harness returns: Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>>
+      // For non-streaming mode, it returns Promise<AgentResponse<T>>.
+      const harnessResult = harness.execute<T>(
+        harnessRequest,
         this.toolExecutor.bind(this),
-        providerHooks
+        harnessHooks
       );
 
       // Handle the union return type
-      const response: AgentResponse<T> = Symbol.asyncIterator in providerResult
+      const response: AgentResponse<T> = Symbol.asyncIterator in harnessResult
         ? (await (async () => {
-            // Provider returned AsyncGenerator (shouldn't happen without streaming: true, but handle gracefully)
-            const generator = providerResult as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
+            // Harness returned AsyncGenerator (shouldn't happen without streaming: true, but handle gracefully)
+            const generator = harnessResult as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
             // Consume all events
             for await (const _event of generator) {
               // Discard events, we just want the final response
@@ -784,7 +794,7 @@ export class Agent {
             // The value should be AgentResponse<T> when done=true
             return finalResult.value as AgentResponse<T>;
           })())
-        : await (providerResult as Promise<AgentResponse<T>>);
+        : await (harnessResult as Promise<AgentResponse<T>>);
 
       const duration = Date.now() - startTime;
 
@@ -876,8 +886,8 @@ export class Agent {
 
       return createErrorResponse(
         'PROVIDER_EXECUTION_FAILED',
-        `Provider execution error: ${message}`,
-        { duration, providerId: resolvedProvider },
+        `Harness execution error: ${message}`,
+        { duration, harnessId: resolvedHarness },
         true // Provider errors are typically recoverable
       ) as AgentResponse<T>;
     } finally {

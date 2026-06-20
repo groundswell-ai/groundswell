@@ -189,6 +189,12 @@ export interface PromptOverrides {
   /** Override model for this prompt */
   model?: string;
 
+  /** Override harness for this prompt (PRD §7.7, §7.9). Highest priority in the harness cascade. */
+  harness?: HarnessId;
+
+  /** Override harness options for this prompt (PRD §7.7). Merged via last-write-wins. */
+  harnessOptions?: HarnessOptions;
+
   /**
    * Override provider for this prompt
    *

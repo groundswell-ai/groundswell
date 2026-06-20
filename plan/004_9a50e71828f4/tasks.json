@@ -549,7 +549,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T2.S1",
                   "title": "executePrompt(): per-call harness resolution + HarnessRequest",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M1.T1.S1"
@@ -565,7 +565,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T2.S2",
                   "title": "stream(): harness resolution + streaming HarnessRequest",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P3.M1.T1.S1"
