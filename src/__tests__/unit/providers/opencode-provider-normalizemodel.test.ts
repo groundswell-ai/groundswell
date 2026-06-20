@@ -130,14 +130,13 @@ describe('OpenCodeProvider.normalizeModel()', () => {
       expect(result.model).toBe('gpt-4');
     });
 
-    // NOTE: Due to ProviderId type limitation ('anthropic' | 'opencode'),
-    // parseModelSpec will reject other providers like 'openai', 'google', etc.
-    // This is expected behavior - parseModelSpec enforces Groundswell's provider registry.
-    // The execute() method handles actual provider specification for OpenCode SDK.
-    it('should delegate provider validation to parseModelSpec', () => {
-      // parseModelSpec only accepts 'anthropic' and 'opencode' providers
-      // Other providers will be rejected by parseModelSpec, not by OpenCodeProvider
-      expect(() => provider.normalizeModel('openai/gpt-4')).toThrow(/Invalid provider/);
+    // NOTE: parseModelSpec accepts any non-empty provider (open set per PRD §7.8).
+    // This is correct — the provider axis is open. OpenCodeProvider is a multi-provider
+    // gateway and does not constrain providers at normalizeModel time.
+    it('should accept arbitrary provider via parseModelSpec (open set)', () => {
+      const result = provider.normalizeModel('openai/gpt-4');
+      expect(result.provider).toBe('openai');
+      expect(result.model).toBe('gpt-4');
     });
   });
 
@@ -150,8 +149,11 @@ describe('OpenCodeProvider.normalizeModel()', () => {
       expect(() => provider.normalizeModel('   ')).toThrow(/cannot be empty/i);
     });
 
-    it('should throw on invalid provider (delegated to parseModelSpec)', () => {
-      expect(() => provider.normalizeModel('invalid/model')).toThrow(/Invalid provider/i);
+    it('should accept arbitrary provider string via parseModelSpec (open set)', () => {
+      // parseModelSpec accepts any non-empty provider. OpenCodeProvider does not restrict.
+      const result = provider.normalizeModel('invalid/model');
+      expect(result.provider).toBe('invalid');
+      expect(result.model).toBe('model');
     });
 
     it('should throw on empty provider part', () => {

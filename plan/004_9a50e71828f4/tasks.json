@@ -61,14 +61,14 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "Migrate model-spec parsing to open ModelProviderId set",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Rewrite src/utils/model-spec.ts parseModelSpec/formatModelForProvider to validate against the open ModelProviderId set instead of the closed 'anthropic'|'opencode' union.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M1.T2.S1",
                   "title": "Open-set model spec parsing and formatting",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S2"

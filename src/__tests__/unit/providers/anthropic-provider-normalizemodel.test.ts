@@ -131,8 +131,10 @@ describe('AnthropicProvider.normalizeModel()', () => {
       expect(() => provider.normalizeModel('   ')).toThrow(/cannot be empty/i);
     });
 
-    it('should throw on invalid provider (delegated to parseModelSpec)', () => {
-      expect(() => provider.normalizeModel('invalid/model')).toThrow(/invalid provider/i);
+    it('should accept arbitrary provider via parseModelSpec (open set) but throw on provider mismatch', () => {
+      // parseModelSpec now accepts any non-empty provider (open set per PRD §7.8).
+      // AnthropicProvider rejects non-anthropic providers in its own normalizeModel wrapper.
+      expect(() => provider.normalizeModel('invalid/model')).toThrow();
     });
 
     it('should throw on empty provider part', () => {

@@ -228,32 +228,12 @@ export interface ProviderRequest {
   options: ProviderExecutionOptions;
 }
 
-/**
- * Model specification
- *
- * Represents a parsed model identifier with provider and model name.
- * Supports both plain ("claude-sonnet-4") and qualified ("anthropic/claude-opus-4")
- * formats per PRD 7.8.
- *
- * @example
- * ```ts
- * // Plain format (uses default provider)
- * parseModelSpec('claude-sonnet-4', 'anthropic')
- * // Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
- *
- * // Qualified format (explicit provider)
- * parseModelSpec('opencode/gpt-4')
- * // Returns: { provider: 'opencode', model: 'gpt-4', raw: 'opencode/gpt-4' }
- * ```
- */
-export interface ModelSpec {
-  /** Provider identifier */
-  provider: ProviderId;
-  /** Model name (without provider prefix) */
-  model: string;
-  /** Original raw model string (preserves user input) */
-  raw: string;
-}
+// v1.2: ModelSpec is owned by types/harnesses.ts (provider is the open ModelProviderId set).
+// Re-exported here as a TRANSITIONAL alias so legacy Provider* consumers compile until they
+// are renamed/removed (P2.M1 ClaudeCodeHarness, P4.M1 opencode removal). Full deprecated
+// Provider*→Harness* alias shim is P1.M1.T3.
+import type { ModelSpec } from './harnesses.js';
+export type { ModelSpec };
 
 /**
  * Tool executor callback function

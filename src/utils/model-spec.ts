@@ -2,43 +2,14 @@
  * Model specification parsing utility
  *
  * Provides parsing and validation of model specification strings
- * per PRD 7.8 and Decision 6.
+ * per PRD §7.8 (Model & Provider Specification).
+ *
+ * The provider axis is an OPEN set (PRD §7.8): any non-empty provider string
+ * is valid. The harness (pi | claude-code) is NEVER part of the model string —
+ * harness-qualified strings (e.g. `pi/anthropic/x`) are rejected.
  */
 
-import type { ProviderId, ModelSpec } from '../types/providers.js';
-
-/**
- * Type guard to check if a string is a valid ProviderId
- *
- * Use this function to validate and narrow string types to ProviderId.
- *
- * @param value - The string value to check
- * @returns True if the value is a valid ProviderId ('anthropic' | 'opencode')
- *
- * @example
- * ```ts
- * const value: string = getUserInput();
- *
- * if (isValidProviderId(value)) {
- *   // TypeScript knows value is ProviderId here
- *   console.log(`Valid provider: ${value}`);
- * } else {
- *   console.error(`Invalid provider: ${value}`);
- * }
- * ```
- */
-function isValidProviderId(value: string): value is ProviderId {
-  return value === 'anthropic' || value === 'opencode';
-}
-
-/**
- * Get comma-separated list of supported providers for error messages
- *
- * @returns Formatted list of valid provider IDs
- */
-function getSupportedProvidersList(): string {
-  return '"anthropic", "opencode"';
-}
+import type { ModelSpec, ModelProviderId } from '../types/harnesses.js';
 
 /**
  * Parse a model specification string into a ModelSpec object
@@ -58,9 +29,10 @@ function getSupportedProvidersList(): string {
  * ## Validation Rules
  *
  * 1. Input cannot be empty or whitespace-only
- * 2. Provider must be one of: `'anthropic'`, `'opencode'`
+ * 2. Provider must be a non-empty string (open set — any LLM provider accepted)
  * 3. Model name cannot be empty after provider split
- * 4. Only the first slash is considered the provider/model separator
+ * 4. Harness-qualified strings (3+ segments, e.g. `pi/anthropic/x`) are REJECTED
+ *    (PRD §7.8 critical rule: the harness must never appear in the model string)
  * 5. Input is trimmed before parsing, original preserved in `raw` field
  *
  * @param model - Model specification string to parse
@@ -68,103 +40,83 @@ function getSupportedProvidersList(): string {
  * @returns Parsed ModelSpec object with provider, model, and raw string
  * @throws {Error} When model specification is invalid:
  * - Empty or whitespace-only input
- * - Invalid provider (not 'anthropic' or 'opencode')
  * - Empty provider or model parts
+ * - Harness-qualified strings (3+ segments)
  *
  * @example
  * ```ts
- * // Qualified format with explicit provider
+ * // Qualified format with known provider
  * const spec1 = parseModelSpec('anthropic/claude-3-5-sonnet');
  * // Returns: { provider: 'anthropic', model: 'claude-3-5-sonnet', raw: 'anthropic/claude-3-5-sonnet' }
  *
- * // Qualified format with opencode
- * const spec2 = parseModelSpec('opencode/gpt-4');
- * // Returns: { provider: 'opencode', model: 'gpt-4', raw: 'opencode/gpt-4' }
+ * // Qualified format with custom provider (open set)
+ * const spec2 = parseModelSpec('openai/gpt-4o');
+ * // Returns: { provider: 'openai', model: 'gpt-4o', raw: 'openai/gpt-4o' }
  *
- * // Plain format with explicit default provider
- * const spec3 = parseModelSpec('gpt-4', 'opencode');
- * // Returns: { provider: 'opencode', model: 'gpt-4', raw: 'gpt-4' }
- *
- * // Plain format with default provider (anthropic)
- * const spec4 = parseModelSpec('claude-sonnet-4');
+ * // Plain format — resolved against default provider
+ * const spec3 = parseModelSpec('claude-sonnet-4');
  * // Returns: { provider: 'anthropic', model: 'claude-sonnet-4', raw: 'claude-sonnet-4' }
  *
- * // Error case: invalid provider
- * try {
- *   parseModelSpec('invalid/model');
- * } catch (error) {
- *   console.error(error.message);
- *   // "Invalid provider: "invalid". Supported providers: "anthropic", "opencode""
- * }
+ * // Harness-qualified — REJECTED (PRD §7.8 critical rule)
+ * parseModelSpec('pi/anthropic/claude-sonnet-4');
+ * // Throws: "Harness must not appear in model string …"
  * ```
  *
  * @see {@link ModelSpec} for the return type structure
- * @see {@link ProviderId} for valid provider identifiers
+ * @see {@link ModelProviderId} for the open provider set
  */
 export function parseModelSpec(
   model: string,
-  defaultProvider: ProviderId = 'anthropic'
+  defaultProvider: ModelProviderId = 'anthropic',
 ): ModelSpec {
-  // Preserve original input for raw field
+  // Preserve ORIGINAL (untrimmed) input — existing consumers rely on raw being exact.
   const raw = model;
 
-  // Step 1: Trim and validate input
+  // Trim for parsing — raw stays untouched.
   const trimmed = model.trim();
 
   if (trimmed.length === 0) {
     throw new Error(
-      'Model specification cannot be empty. ' +
-      'Expected format: "provider/model" or "model"'
+      'Model specification cannot be empty. Expected format: "provider/model" or "model"',
     );
   }
 
-  // Step 2: Split on first slash only
-  const parts = trimmed.split('/', 2);
+  // Split WITHOUT a limit — must observe ALL segments to detect harness-qualified forms.
+  const parts = trimmed.split('/');
 
-  // Step 3: Handle qualified format (provider/model)
+  if (parts.length === 1) {
+    // Plain format — resolve against defaultProvider (open set).
+    return { provider: defaultProvider, model: parts[0], raw };
+  }
+
   if (parts.length === 2) {
     const [provider, modelName] = parts;
 
-    // Validate provider part is not empty
     if (provider.length === 0) {
       throw new Error(
         `Invalid model specification: "${trimmed}". ` +
-        'Provider cannot be empty. Expected format: "provider/model"'
+        'Provider cannot be empty. Expected format: "provider/model"',
       );
     }
 
-    // Validate model part is not empty
     if (modelName.length === 0) {
       throw new Error(
         `Invalid model specification: "${trimmed}". ` +
-        'Model name cannot be empty. Expected format: "provider/model"'
+        'Model name cannot be empty. Expected format: "provider/model"',
       );
     }
 
-    // Validate provider is in union type
-    if (!isValidProviderId(provider)) {
-      throw new Error(
-        `Invalid provider: "${provider}". ` +
-        `Supported providers: ${getSupportedProvidersList()}`
-      );
-    }
-
-    // Return ModelSpec for qualified format
-    return {
-      provider,
-      model: modelName,
-      raw
-    };
+    // Open set: ANY non-empty provider string is a valid ModelProviderId (PRD §7.8).
+    // No closed-union check — the harness enforces provider constraints at initialize/execute.
+    return { provider, model: modelName, raw };
   }
 
-  // Step 4: Handle plain format (model only)
-  const modelName = parts[0];
-
-  return {
-    provider: defaultProvider,
-    model: modelName,
-    raw
-  };
+  // parts.length >= 3 → harness-qualified form (e.g. pi/anthropic/x, cc/anthropic/...).
+  // PRD §7.8 critical rule: the harness must NEVER appear in the model string.
+  throw new Error(
+    `Harness must not appear in model string. ` +
+    `Expected format "provider/model" (e.g. "anthropic/claude-sonnet-4-20250514"), got "${raw}".`,
+  );
 }
 
 /**
@@ -183,23 +135,6 @@ export function parseModelSpec(
  * When providers differ, throws an error. Cross-provider model translation
  * is not supported in the MVP.
  *
- * **Example:**
- * - Input: `{ provider: 'anthropic', model: 'claude-3-5-sonnet', raw: 'anthropic/claude-3-5-sonnet' }`, `'opencode'`
- * - Output: Throws `Error` with message:
- *   `"Cannot translate anthropic/claude-3-5-sonnet to opencode provider. Cross-provider model translation is not supported."`
- *
- * ## Use Cases
- *
- * 1. **Model Validation**: Validate that a model spec is compatible with a target provider
- * 2. **API Preparation**: Format model names for provider-specific API requests
- * 3. **Configuration**: Prepare model strings for provider initialization
- *
- * ## Future Enhancements (Out of Scope)
- *
- * - Cross-provider model mapping table (e.g., claude-3-5-sonnet → gpt-4-turbo)
- * - Capability-based model matching (tier-based translation)
- * - Alias support for model name variants
- *
  * @param spec - ModelSpec from parseModelSpec() or Provider.normalizeModel()
  * @param targetProvider - The provider to format the model for
  * @returns Formatted model string for target provider (model name only)
@@ -214,37 +149,30 @@ export function parseModelSpec(
  * console.log(model); // "claude-3-5-sonnet"
  *
  * // Different provider: error
- * const spec = parseModelSpec('anthropic/claude-3-5-sonnet');
  * try {
- *   formatModelForProvider(spec, 'opencode');
+ *   formatModelForProvider(spec, 'openai');
  * } catch (error) {
  *   console.error((error as Error).message);
- *   // "Cannot translate anthropic/claude-3-5-sonnet to opencode provider. Cross-provider model translation is not supported."
+ *   // "Cannot translate anthropic/claude-3-5-sonnet to openai provider. ..."
  * }
- *
- * // Use with Provider.normalizeModel()
- * const provider = new AnthropicProvider();
- * const spec = provider.normalizeModel('claude-opus-4');
- * const model = formatModelForProvider(spec, 'anthropic');
- * console.log(model); // "claude-opus-4"
  * ```
  *
  * @see {@link parseModelSpec} for creating ModelSpec objects
  * @see {@link ModelSpec} for the input type structure
- * @see {@link ProviderId} for valid provider identifiers
+ * @see {@link ModelProviderId} for the open provider set
  */
 export function formatModelForProvider(
   spec: ModelSpec,
-  targetProvider: ProviderId
+  targetProvider: ModelProviderId,
 ): string {
   // Pass-through: same provider
   if (spec.provider === targetProvider) {
     return spec.model;
   }
 
-  // Error: different providers (translation not supported in MVP)
+  // Error: different providers (translation not supported in MVP).
   throw new Error(
     `Cannot translate ${spec.provider}/${spec.model} to ${targetProvider} provider. ` +
-    'Cross-provider model translation is not supported.'
+    'Cross-provider model translation is not supported.',
   );
 }
