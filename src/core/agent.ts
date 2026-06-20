@@ -355,29 +355,41 @@ export class Agent {
     prompt: Prompt<T>,
     overrides?: PromptOverrides
   ): AsyncStream<T> {
-    // Extract prompt-level provider overrides
-    const promptProvider = overrides?.provider;
-    const promptProviderOptions = overrides?.providerOptions;
+    // Extract prompt-level harness overrides (PRD §7.7, §7.9).
+    // Backward-compat bridge: prefer the new `harness` field; fall back to the legacy `provider`
+    // field so existing callers (`agent.stream(p, { provider: 'opencode' })`) keep working during
+    // the v1.2 migration. The fallback + legacy global-config singleton are removed once
+    // PromptOverrides + the test suite are fully on harness vocabulary (later lockstep milestone).
+    const promptHarness = overrides?.harness ?? (overrides?.provider as HarnessId | undefined);
+    const promptHarnessOptions = overrides?.harnessOptions ?? overrides?.providerOptions;
 
-    // Resolve provider configuration with cascade: global → agent → prompt
+    // Resolve the effective harness via the configuration cascade (PRD §7.7): global → agent → prompt.
+    // resolveProviderConfig DELEGATES to resolveHarnessConfig (harness-config.ts L367-368);
+    // getGlobalProviderConfig is used as the global source to honour the legacy configureProviders()
+    // singleton still consumed by executePrompt + the existing test suite.
     const globalConfig = getGlobalProviderConfig();
-    const { provider: resolvedProvider, options: resolvedProviderOptions } = resolveProviderConfig(
+    const { provider: resolvedHarness, options: resolvedHarnessOptions } = resolveProviderConfig(
       globalConfig,
       this.harnessId,
       this.harnessOptions,
-      promptProvider,
-      promptProviderOptions
+      promptHarness,
+      promptHarnessOptions
     );
 
-    // Get provider instance for resolved provider (may differ from this.harness)
+    // Fetch the harness instance from HarnessRegistry (may differ from this.harness when a prompt
+    // override is supplied). The cast bridges the legacy Provider return type to the Harness contract
+    // — structurally identical at runtime; the cast exists only because Provider.id is wider than Harness.id.
     const registry = HarnessRegistry.getInstance();
-    const providerInstance = registry.get(resolvedProvider);
-    if (!providerInstance) {
-      throw new Error(`Provider '${resolvedProvider}' is not registered`);
+    const harnessInstance = registry.get(resolvedHarness) as Harness | undefined;
+    if (!harnessInstance) {
+      // THROW (synchronous at call time, before the generator is created) — preserves the existing
+      // .rejects.toThrow(...) contract. Reworded to harness vocab; message still contains the id +
+      // 'is not registered' so the updated legacy-test regex still matches.
+      throw new Error(`Harness '${resolvedHarness}' is not registered`);
     }
 
-    // Capture non-null provider instance for use in closure (TypeScript strict mode requirement)
-    const provider = providerInstance;
+    // Capture non-null harness instance for use in closure (TypeScript strict mode requirement)
+    const harness = harnessInstance;
 
     // Merge configuration: Prompt > Overrides > Config
     const effectiveSystem =
@@ -401,10 +413,10 @@ export class Agent {
     // Build user message
     const userMessage = prompt.buildUserMessage();
 
-    // Convert Agent.hooks to ProviderHookEvents
-    const providerHooks: ProviderHookEvents = {};
+    // Convert Agent.hooks to HarnessHookEvents
+    const harnessHooks: HarnessHookEvents = {};
     if (effectiveHooks.preToolUse && effectiveHooks.preToolUse.length > 0) {
-      providerHooks.onToolStart = async (tool: ToolExecutionRequest) => {
+      harnessHooks.onToolStart = async (tool: ToolExecutionRequest) => {
         for (const hook of effectiveHooks.preToolUse!) {
           await hook({
             toolName: tool.name,
@@ -415,7 +427,7 @@ export class Agent {
       };
     }
     if (effectiveHooks.postToolUse && effectiveHooks.postToolUse.length > 0) {
-      providerHooks.onToolEnd = async (
+      harnessHooks.onToolEnd = async (
         tool: ToolExecutionRequest,
         result: ToolExecutionResult,
         duration: number
@@ -432,7 +444,7 @@ export class Agent {
       };
     }
     if (effectiveHooks.sessionStart && effectiveHooks.sessionStart.length > 0) {
-      providerHooks.onSessionStart = async () => {
+      harnessHooks.onSessionStart = async () => {
         for (const hook of effectiveHooks.sessionStart!) {
           await hook({
             agentId: this.id,
@@ -442,7 +454,7 @@ export class Agent {
       };
     }
     if (effectiveHooks.sessionEnd && effectiveHooks.sessionEnd.length > 0) {
-      providerHooks.onSessionEnd = async (totalDuration: number) => {
+      harnessHooks.onSessionEnd = async (totalDuration: number) => {
         for (const hook of effectiveHooks.sessionEnd!) {
           await hook({
             agentId: this.id,
@@ -456,38 +468,40 @@ export class Agent {
     // Create AbortController for cancellation support
     const controller = new AbortController();
 
-    // Build ProviderRequest with streaming enabled
-    const providerRequest: ProviderRequest = {
+    // Build HarnessRequest with streaming enabled (PRD §7.3, §7.4). Identical shape to the legacy
+    // ProviderRequest — the swap is a type rename (ProviderRequest = HarnessRequest alias).
+    // streaming: true flips Harness.execute into AsyncGenerator mode.
+    const harnessRequest: HarnessRequest = {
       prompt: userMessage,
       options: {
         model: effectiveModel,
         systemPrompt: effectiveSystem,
         tools: effectiveTools,
-        sessionId: resolvedProviderOptions.sessionId,
-        hooks: providerHooks,
+        sessionId: resolvedHarnessOptions.sessionId,
+        hooks: harnessHooks,
         streaming: true, // CRITICAL: Enable streaming mode
       },
     };
 
-    // Create async generator that wraps provider streaming
+    // Create async generator that wraps harness streaming
     const self = this;
     async function* streamGenerator(): AsyncGenerator<StreamEvent, AgentResponse<T>, unknown> {
       try {
-        // Call provider with streaming enabled
-        // Provider returns: Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>>
-        const providerResult = provider.execute<T>(
-          providerRequest,
+        // Call harness with streaming enabled
+        // Harness returns: Promise<AgentResponse<T>> | AsyncGenerator<StreamEvent, AgentResponse<T>>
+        const harnessResult = harness.execute<T>(
+          harnessRequest,
           self.toolExecutor.bind(self),
-          providerHooks
+          harnessHooks
         );
 
-        // Check if provider returned an AsyncGenerator (streaming mode) directly
-        if (Symbol.asyncIterator in providerResult) {
-          // Provider is in streaming mode - iterate and yield events
-          const providerStream = providerResult as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
+        // Check if harness returned an AsyncGenerator (streaming mode) directly
+        if (Symbol.asyncIterator in harnessResult) {
+          // Harness is in streaming mode - iterate and yield events
+          const harnessStream = harnessResult as AsyncGenerator<StreamEvent, AgentResponse<T>, unknown>;
           let finalValue: AgentResponse<T> | undefined;
 
-          for await (const event of providerStream) {
+          for await (const event of harnessStream) {
             // Check for cancellation
             if (controller.signal.aborted) {
               yield {
@@ -505,13 +519,13 @@ export class Agent {
               ) as AgentResponse<T>;
             }
 
-            // Yield event from provider
+            // Yield event from harness
             yield event;
           }
 
           // After loop completes, the AsyncGenerator's return value is the final AgentResponse<T>
           // We need to get it by calling next() one more time
-          const finalResult = await providerStream.next();
+          const finalResult = await harnessStream.next();
           // The value should be AgentResponse<T> when done=true, but TypeScript sees it as StreamEvent | AgentResponse<T>
           finalValue = finalResult.value as AgentResponse<T>;
 
@@ -520,7 +534,7 @@ export class Agent {
         } else {
           // Provider returned a Promise<AgentResponse<T>> (non-streaming mode)
           // This shouldn't happen with streaming: true, but handle it gracefully
-          const responsePromise = providerResult as Promise<AgentResponse<T>>;
+          const responsePromise = harnessResult as Promise<AgentResponse<T>>;
           const response = await responsePromise;
           yield {
             type: 'done',

@@ -215,7 +215,7 @@ describe('Agent.stream()', () => {
         for await (const _event of stream) {
           // Just consume
         }
-      }).rejects.toThrow(/Provider 'opencode' is not registered/);
+      }).rejects.toThrow(/Harness 'opencode' is not registered/);
     });
 
     it('should switch providers between streams', async () => {
@@ -548,7 +548,7 @@ describe('Agent.stream()', () => {
         for await (const _event of stream) {
           // Just consume
         }
-      }).rejects.toThrow(/Provider 'opencode' is not registered/);
+      }).rejects.toThrow(/Harness 'opencode' is not registered/);
     });
 
     it('should yield error event on provider execution failure', async () => {
