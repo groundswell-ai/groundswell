@@ -2,7 +2,7 @@
  * Agent - Multi-provider agent for LLM prompt execution
  *
  * Agents execute prompts via provider abstraction layer, supporting
- * multiple LLM providers (Anthropic, OpenCode, etc.) with unified
+ * multiple LLM providers (Anthropic, Claude Code, etc.) with unified
  * configuration cascade and tool delegation.
  */
 
@@ -359,7 +359,7 @@ export class Agent {
   ): AsyncStream<T> {
     // Extract prompt-level harness overrides (PRD §7.7, §7.9).
     // Backward-compat bridge: prefer the new `harness` field; fall back to the legacy `provider`
-    // field so existing callers (`agent.stream(p, { provider: 'opencode' })`) keep working during
+    // field so existing callers (`agent.stream(p, { provider: 'claude-code' })`) keep working during
     // the v1.2 migration. The fallback + legacy global-config singleton are removed once
     // PromptOverrides + the test suite are fully on harness vocabulary (later lockstep milestone).
     const promptHarness = overrides?.harness ?? (overrides?.provider as HarnessId | undefined);
@@ -603,7 +603,7 @@ export class Agent {
 
     // Extract prompt-level harness overrides (PRD §7.7, §7.9).
     // Backward-compat bridge: prefer the new `harness` field; fall back to the legacy `provider`
-    // field so existing callers (`agent.prompt(p, { provider: 'opencode' })`) keep working during
+    // field so existing callers (`agent.prompt(p, { provider: 'claude-code' })`) keep working during
     // the v1.2 migration. The fallback + legacy global-config singleton are removed once
     // PromptOverrides + the test suite are fully on harness vocabulary (later lockstep milestone).
     const promptHarness = overrides?.harness ?? (overrides?.provider as HarnessId | undefined);

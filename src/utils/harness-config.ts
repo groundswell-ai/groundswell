@@ -13,9 +13,9 @@
  *
  * The legacy and harness functions validate **disjoint id sets**:
  *   - `configureHarnesses` accepts only `'pi' | 'claude-code'`
- *   - `configureProviders` accepts the full `ProviderId` superset (including `'anthropic'` / `'opencode'`)
+ *   - `configureProviders` accepts the full `ProviderId` superset (including `'anthropic'`)
  *
- * Existing consumers (agent.ts, 4 integration/override test files) pass `'anthropic'`/`'opencode'`
+ * Existing consumers (agent.ts, 4 integration/override test files) pass `'anthropic'`
  * through `configureProviders`. Making it delegate to `configureHarnesses` would throw and break
  * those consumers, which are out of scope for this task (owned by P3.M1 / P4.M1).
  *
@@ -251,28 +251,19 @@ const DEFAULT_PROVIDER_CONFIG: GlobalProviderConfig = {
 // ============================================================================
 
 /**
- * Type guard: checks if a string is a valid `ProviderId` (full superset).
+ * Type guard: checks if a string is a valid `ProviderId`.
  *
- * Accepts 'pi' and 'claude-code' (for forward-compat during migration) in addition
- * to the legacy 'anthropic' and 'opencode'.
+ * Accepts 'anthropic' (legacy), 'pi', and 'claude-code'.
  */
 function isValidProviderId(value: string): value is ProviderId {
-  return (
-    value === 'anthropic' ||
-    value === 'opencode' ||
-    value === 'pi' ||
-    value === 'claude-code'
-  );
+  return value === 'anthropic' || value === 'pi' || value === 'claude-code';
 }
 
 /**
  * Formatted list of supported providers for LEGACY error messages.
- *
- * Keeps the original text (only "anthropic" + "opencode") to match the 4 legacy
- * test files' regex assertions (`/anthropic/`, `/opencode/`).
  */
 function getSupportedProvidersList(): string {
-  return '"anthropic", "opencode"';
+  return '"anthropic", "pi", "claude-code"';
 }
 
 // ============================================================================
@@ -285,8 +276,8 @@ function getSupportedProvidersList(): string {
  * @deprecated Since v1.2. Use {@link configureHarnesses}.
  *
  * This function keeps its **own module-private singleton** (`globalProviderConfig`)
- * with permissive `ProviderId`-superset validation. It does NOT delegate to
- * `configureHarnesses` because the harness validator rejects `'anthropic'`/`'opencode'`,
+ * with permissive `ProviderId` validation. It does NOT delegate to
+ * `configureHarnesses` because the harness validator rejects `'anthropic'`,
  * which existing consumers still pass.
  *
  * @param config - Global provider configuration

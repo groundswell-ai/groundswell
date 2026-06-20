@@ -100,7 +100,7 @@ describe('ClaudeCodeHarness.normalizeModel()', () => {
     it('throws a ConfigError with code CONFIG_ERROR on a non-anthropic provider', () => {
       let err: unknown;
       try {
-        provider.normalizeModel('opencode/gpt-4');
+        provider.normalizeModel('openai/gpt-4');
         expect.fail('Should have thrown');
       } catch (e) {
         err = e;
@@ -111,12 +111,12 @@ describe('ClaudeCodeHarness.normalizeModel()', () => {
       expect((err as ConfigError).code).toBe('CONFIG_ERROR');
       // S1 message-text assertions STILL hold (message preserved):
       expect((err as Error).message).toContain('Cannot normalize');
-      expect((err as Error).message).toContain('opencode/gpt-4');
+      expect((err as Error).message).toContain('openai/gpt-4');
       expect((err as Error).message).toContain('ClaudeCodeHarness');
       expect((err as Error).message).toContain('HarnessRegistry');
       // structured details carry the offending provider/model + harness id
       expect((err as ConfigError).details).toMatchObject({
-        provider: 'opencode', model: 'gpt-4', harnessId: 'claude-code',
+        provider: 'openai', model: 'gpt-4', harnessId: 'claude-code',
       });
     });
 
@@ -127,27 +127,27 @@ describe('ClaudeCodeHarness.normalizeModel()', () => {
       }
     });
 
-    it('should throw on opencode provider', () => {
-      expect(() => provider.normalizeModel('opencode/gpt-4')).toThrow(
-        /Cannot normalize opencode\/gpt-4 with ClaudeCodeHarness/
+    it('should throw on openai provider', () => {
+      expect(() => provider.normalizeModel('openai/gpt-4')).toThrow(
+        /Cannot normalize openai\/gpt-4 with ClaudeCodeHarness/
       );
     });
 
     it('should throw with helpful error message for wrong provider', () => {
       try {
-        provider.normalizeModel('opencode/gpt-4');
+        provider.normalizeModel('openai/gpt-4');
         expect.fail('Should have thrown an error');
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
         expect((error as Error).message).toContain('Cannot normalize');
-        expect((error as Error).message).toContain('opencode/gpt-4');
+        expect((error as Error).message).toContain('openai/gpt-4');
         expect((error as Error).message).toContain('ClaudeCodeHarness');
         expect((error as Error).message).toContain('HarnessRegistry');
       }
     });
 
     it('should suggest using correct provider registry', () => {
-      expect(() => provider.normalizeModel('opencode/gpt-4')).toThrow(
+      expect(() => provider.normalizeModel('openai/gpt-4')).toThrow(
         /HarnessRegistry/
       );
     });

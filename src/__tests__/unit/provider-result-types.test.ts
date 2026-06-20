@@ -121,11 +121,11 @@ describe('ProviderResult Types', () => {
 
     it('should have providerId (not agentId)', () => {
       const metadata: ProviderResponseMetadata = {
-        providerId: 'opencode',
+        providerId: 'openai',
         timestamp: 1706140800000,
       };
 
-      expect(metadata.providerId).toBe('opencode');
+      expect(metadata.providerId).toBe('openai');
       // agentId should not exist on ProviderResponseMetadata
       expect((metadata as unknown as Record<string, unknown>).agentId).toBeUndefined();
     });
@@ -205,7 +205,7 @@ describe('ProviderResult Types', () => {
 
     it('should allow all optional fields together', () => {
       const metadata: ProviderResponseMetadata = {
-        providerId: 'opencode',
+        providerId: 'openai',
         timestamp: 1706140800000,
         duration: 2000,
         requestId: 'req-xyz789',
@@ -213,7 +213,7 @@ describe('ProviderResult Types', () => {
         toolCalls: 5,
       };
 
-      expect(metadata.providerId).toBe('opencode');
+      expect(metadata.providerId).toBe('openai');
       expect(metadata.duration).toBe(2000);
       expect(metadata.requestId).toBe('req-xyz789');
       expect(metadata.usage?.input_tokens).toBe(200);
@@ -408,14 +408,14 @@ describe('ProviderResult Types', () => {
         raw: 'anthropic/claude-sonnet-4',
       };
 
-      const opencodeSpec: ModelSpec = {
-        provider: 'opencode',
+      const openaiSpec: ModelSpec = {
+        provider: 'openai',
         model: 'gpt-4',
-        raw: 'opencode/gpt-4',
+        raw: 'openai/gpt-4',
       };
 
       expect(anthropicSpec.provider).toBe('anthropic');
-      expect(opencodeSpec.provider).toBe('opencode');
+      expect(openaiSpec.provider).toBe('openai');
     });
 
     it('should preserve raw model string', () => {
@@ -437,14 +437,14 @@ describe('ProviderResult Types', () => {
 
     it('should separate provider prefix from model name', () => {
       const spec: ModelSpec = {
-        provider: 'opencode',
+        provider: 'openai',
         model: 'gpt-4-turbo',
-        raw: 'opencode/gpt-4-turbo',
+        raw: 'openai/gpt-4-turbo',
       };
 
-      expect(spec.provider).toBe('opencode');
+      expect(spec.provider).toBe('openai');
       expect(spec.model).toBe('gpt-4-turbo');
-      expect(spec.raw).toBe('opencode/gpt-4-turbo');
+      expect(spec.raw).toBe('openai/gpt-4-turbo');
     });
   });
 
@@ -463,12 +463,12 @@ describe('ProviderResult Types', () => {
         defaultProvider: 'anthropic',
       };
 
-      const opencodeConfig: GlobalProviderConfig = {
-        defaultProvider: 'opencode',
+      const openaiConfig: GlobalProviderConfig = {
+        defaultProvider: 'openai',
       };
 
       expect(anthropicConfig.defaultProvider).toBe('anthropic');
-      expect(opencodeConfig.defaultProvider).toBe('opencode');
+      expect(openaiConfig.defaultProvider).toBe('openai');
     });
 
     it('should allow optional providerDefaults field', () => {
@@ -476,12 +476,12 @@ describe('ProviderResult Types', () => {
         defaultProvider: 'anthropic',
         providerDefaults: {
           anthropic: { apiKey: 'sk-test' },
-          opencode: { endpoint: 'http://localhost:8080' },
+          openai: { endpoint: 'http://localhost:8080' },
         },
       };
 
       const config2: GlobalProviderConfig = {
-        defaultProvider: 'opencode',
+        defaultProvider: 'openai',
       };
 
       expect(config1.providerDefaults).toBeDefined();
@@ -492,7 +492,7 @@ describe('ProviderResult Types', () => {
       const config: GlobalProviderConfig = {
         defaultProvider: 'anthropic',
         providerDefaults: {
-          // Only anthropic options provided, opencode omitted
+          // Only anthropic options provided, openai omitted
           anthropic: {
             apiKey: 'sk-123',
             endpoint: 'https://api.anthropic.com',
@@ -502,12 +502,12 @@ describe('ProviderResult Types', () => {
       };
 
       expect(config.providerDefaults?.anthropic?.apiKey).toBe('sk-123');
-      expect(config.providerDefaults?.opencode).toBeUndefined();
+      expect(config.providerDefaults?.openai).toBeUndefined();
     });
 
     it('should support all ProviderOptions fields in providerDefaults', () => {
       const config: GlobalProviderConfig = {
-        defaultProvider: 'opencode',
+        defaultProvider: 'openai',
         providerDefaults: {
           anthropic: {
             apiKey: 'sk-test',
@@ -535,7 +535,7 @@ describe('ProviderResult Types', () => {
           anthropic: {
             apiKey: process.env.ANTHROPIC_API_KEY || 'sk-anthropic',
           },
-          opencode: {
+          openai: {
             endpoint: 'http://localhost:8080',
             timeout: 30000,
           },
@@ -543,8 +543,8 @@ describe('ProviderResult Types', () => {
       };
 
       expect(config.providerDefaults?.anthropic?.apiKey).toBeDefined();
-      expect(config.providerDefaults?.opencode?.endpoint).toBe('http://localhost:8080');
-      expect(config.providerDefaults?.opencode?.timeout).toBe(30000);
+      expect(config.providerDefaults?.openai?.endpoint).toBe('http://localhost:8080');
+      expect(config.providerDefaults?.openai?.timeout).toBe(30000);
     });
   });
 

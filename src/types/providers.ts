@@ -33,11 +33,11 @@ import type {
  *   - LLM-host axis → {@link ModelProviderId} (open set)         — types/harnesses.ts
  *
  * This union is a SUPERSET kept only so pre-migration consumers (AnthropicProvider
- * id:'anthropic', OpenCodeProvider id:'opencode', ProviderRegistry) keep compiling.
- * `'anthropic'` / `'opencode'` will be REMOVED when the adapters are renamed (P2.M1) /
- * deleted (P4.M1).
+ * id:'anthropic', ProviderRegistry) keep compiling.
+ * `'anthropic'` remains for AnthropicProvider (ClaudeCodeHarness alias). The legacy
+ * non-harness provider was deleted in v2.0.0 (P4.M1).
  */
-export type ProviderId = HarnessId | 'anthropic' | 'opencode';
+export type ProviderId = HarnessId | 'anthropic';
 
 // ── Bucket A: @deprecated aliases → Harness* counterparts ───────────────────────────────────
 
@@ -553,8 +553,8 @@ export interface GlobalProviderConfig {
  *
  * NOTE: this interface is kept CONCRETE (not `extends Harness`) because Harness.id is the
  * narrow `HarnessId` while adapters still declare `id: ProviderId` with the legacy
- * `'anthropic'`/`'opencode'` literals. It is removed when AnthropicProvider→ClaudeCodeHarness
- * (P2.M1) and OpenCodeProvider deletion (P4.M1) land. The method surface is identical to
+ * `'anthropic'` literal. It is removed when AnthropicProvider→ClaudeCodeHarness
+ * (P2.M1) migration completes. The method surface is identical to
  * Harness — only the `id` union width differs today.
  *
  * ```typescript
@@ -577,7 +577,7 @@ export interface Provider {
    *
    * @example
    * ```ts
-   * readonly id: ProviderId;  // 'anthropic' | 'opencode'
+   * readonly id: ProviderId;  // 'anthropic'
    * ```
    */
   readonly id: ProviderId;
@@ -706,7 +706,7 @@ export interface Provider {
    * Load skills into the provider
    *
    * Skills are reusable prompt templates or capabilities.
-   * Anthropic provider uses system prompts; OpenCode has native /skills support.
+   * Anthropic provider uses system prompts; other providers have their own skill mechanisms.
    *
    * @param skills - Array of skill definitions to load
    *

@@ -1197,8 +1197,8 @@ Each skill provides specific capabilities and guidelines.
    * // Returns: { provider: 'anthropic', model: 'claude-opus-4', raw: 'anthropic/claude-opus-4' }
    *
    * // Error: wrong provider
-   * provider.normalizeModel('opencode/gpt-4');
-   * // Throws: "Cannot normalize opencode/gpt-4 with ClaudeCodeHarness..."
+   * provider.normalizeModel('openai/gpt-4');
+   * // Throws: "Cannot normalize openai/gpt-4 with ClaudeCodeHarness..."
    * ```
    */
   normalizeModel(model: string): ModelSpec {

@@ -205,7 +205,7 @@ describe('Provider Interface', () => {
       expect(provider.capabilities.mcp).toBe(true);
 
       // The following line would cause a TypeScript error if uncommented:
-      // provider.id = 'opencode'; // Error: Cannot assign to 'id' because it is a read-only property
+      // provider.id = 'claude-code'; // Error: Cannot assign to 'id' because it is a read-only property
     });
 
     it('should enforce readonly modifier on capabilities property', () => {
@@ -812,12 +812,14 @@ describe('Provider Interface', () => {
     });
 
     it('should support different ProviderId values', () => {
-      // Test that both 'anthropic' and 'opencode' are valid ProviderId values
+      // Test that all valid ProviderId values are accepted
       const anthropicId: ProviderId = 'anthropic';
-      const opencodeId: ProviderId = 'opencode';
+      const piId: ProviderId = 'pi';
+      const claudeCodeId: ProviderId = 'claude-code';
 
       expect(anthropicId).toBe('anthropic');
-      expect(opencodeId).toBe('opencode');
+      expect(piId).toBe('pi');
+      expect(claudeCodeId).toBe('claude-code');
     });
   });
 
@@ -1107,7 +1109,7 @@ describe('Provider Interface', () => {
       // provider.invalidMethod();
 
       // Error: Cannot assign to 'id' because it is a read-only property
-      // provider.id = 'opencode';
+      // provider.id = 'claude-code';
 
       // Error: Cannot assign to 'capabilities' because it is a read-only property
       // provider.capabilities = { mcp: false, skills: false, lsp: false, streaming: false, sessions: false, extendedThinking: false };

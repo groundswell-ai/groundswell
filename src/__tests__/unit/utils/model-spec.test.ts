@@ -23,12 +23,12 @@ describe('parseModelSpec', () => {
       } as ModelSpec);
     });
 
-    it('should parse opencode model', () => {
-      const result = parseModelSpec('opencode/gpt-4');
+    it('should parse openai model', () => {
+      const result = parseModelSpec('openai/gpt-4');
 
-      expect(result.provider).toBe('opencode');
+      expect(result.provider).toBe('openai');
       expect(result.model).toBe('gpt-4');
-      expect(result.raw).toBe('opencode/gpt-4');
+      expect(result.raw).toBe('openai/gpt-4');
     });
 
     it('should preserve trimmed whitespace in raw but trim parts', () => {
@@ -137,10 +137,10 @@ describe('parseModelSpec', () => {
       } as ModelSpec);
     });
 
-    it('should use opencode as default provider', () => {
-      const result = parseModelSpec('gpt-4', 'opencode');
+    it('should use openai as default provider', () => {
+      const result = parseModelSpec('gpt-4', 'openai');
 
-      expect(result.provider).toBe('opencode');
+      expect(result.provider).toBe('openai');
       expect(result.model).toBe('gpt-4');
     });
 
@@ -258,14 +258,14 @@ describe('formatModelForProvider', () => {
       expect(result).toBe('claude-3-5-sonnet');
     });
 
-    it('should return model name when providers match (opencode)', () => {
+    it('should return model name when providers match (openai)', () => {
       const spec: ModelSpec = {
-        provider: 'opencode',
+        provider: 'openai',
         model: 'gpt-4-turbo',
-        raw: 'opencode/gpt-4-turbo',
+        raw: 'openai/gpt-4-turbo',
       };
 
-      const result = formatModelForProvider(spec, 'opencode');
+      const result = formatModelForProvider(spec, 'openai');
 
       expect(result).toBe('gpt-4-turbo');
     });
@@ -279,36 +279,36 @@ describe('formatModelForProvider', () => {
     });
 
     it('should work with plain format specs from parseModelSpec', () => {
-      const spec = parseModelSpec('claude-sonnet-4', 'opencode');
+      const spec = parseModelSpec('claude-sonnet-4', 'openai');
 
-      const result = formatModelForProvider(spec, 'opencode');
+      const result = formatModelForProvider(spec, 'openai');
 
       expect(result).toBe('claude-sonnet-4');
     });
   });
 
   describe('cross-provider translation error', () => {
-    it('should throw when converting anthropic to opencode', () => {
+    it('should throw when converting anthropic to openai', () => {
       const spec: ModelSpec = {
         provider: 'anthropic',
         model: 'claude-3-5-sonnet',
         raw: 'anthropic/claude-3-5-sonnet',
       };
 
-      expect(() => formatModelForProvider(spec, 'opencode')).toThrow(
-        /Cannot translate.*anthropic\/claude-3-5-sonnet.*to.*opencode/,
+      expect(() => formatModelForProvider(spec, 'openai')).toThrow(
+        /Cannot translate.*anthropic\/claude-3-5-sonnet.*to.*openai/,
       );
     });
 
-    it('should throw when converting opencode to anthropic', () => {
+    it('should throw when converting openai to anthropic', () => {
       const spec: ModelSpec = {
-        provider: 'opencode',
+        provider: 'openai',
         model: 'gpt-4',
-        raw: 'opencode/gpt-4',
+        raw: 'openai/gpt-4',
       };
 
       expect(() => formatModelForProvider(spec, 'anthropic')).toThrow(
-        /Cannot translate.*opencode\/gpt-4.*to.*anthropic/,
+        /Cannot translate.*openai\/gpt-4.*to.*anthropic/,
       );
     });
 
@@ -319,20 +319,20 @@ describe('formatModelForProvider', () => {
         raw: 'anthropic/claude-sonnet-4',
       };
 
-      expect(() => formatModelForProvider(spec, 'opencode')).toThrow(
+      expect(() => formatModelForProvider(spec, 'openai')).toThrow(
         'Cross-provider model translation is not supported',
       );
     });
 
     it('should include all context in error message', () => {
       const spec: ModelSpec = {
-        provider: 'opencode',
+        provider: 'openai',
         model: 'gpt-4-turbo',
-        raw: 'opencode/gpt-4-turbo',
+        raw: 'openai/gpt-4-turbo',
       };
 
       expect(() => formatModelForProvider(spec, 'anthropic')).toThrow(
-        /Cannot translate opencode\/gpt-4-turbo to anthropic provider/,
+        /Cannot translate openai\/gpt-4-turbo to anthropic provider/,
       );
     });
   });

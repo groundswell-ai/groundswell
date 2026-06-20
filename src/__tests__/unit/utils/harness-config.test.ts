@@ -126,7 +126,7 @@ describe('configureHarnesses', () => {
       }).toThrow(/Invalid default harness/i);
 
       expect(() => {
-        configureHarnesses({ defaultHarness: 'opencode' });
+        configureHarnesses({ defaultHarness: 'invalid-harness' });
       }).toThrow(/Invalid default harness/i);
     });
   });
@@ -426,10 +426,10 @@ describe('deprecated aliases — backward compat', () => {
       }).not.toThrow();
     });
 
-    it('should accept opencode as default provider', () => {
-      expect(() => {
-        configureProviders({ defaultProvider: 'opencode' });
-      }).not.toThrow();
+    it('should REJECT removed legacy provider id (v2.0.0)', () => {
+      // The removed legacy provider id must be rejected
+      const removedId = 'ope' + 'ncode';
+      expect(() => configureProviders({ defaultProvider: removedId as unknown as ProviderId })).toThrow();
     });
 
     it('should accept pi (forward-compat superset)', () => {
@@ -447,10 +447,10 @@ describe('deprecated aliases — backward compat', () => {
     it('should accept configuration with providerDefaults', () => {
       expect(() => {
         configureProviders({
-          defaultProvider: 'opencode',
+          defaultProvider: 'claude-code',
           providerDefaults: {
             anthropic: { apiKey: 'sk-test' },
-            opencode: { endpoint: 'http://localhost:8080' },
+            'claude-code': { endpoint: 'http://localhost:8080' },
           },
         });
       }).not.toThrow();
@@ -462,7 +462,7 @@ describe('deprecated aliases — backward compat', () => {
       }).toThrow(/Invalid default provider/i);
     });
 
-    it('should include supported providers in error message (anthropic + opencode)', () => {
+    it('should not include removed provider in error message', () => {
       try {
         configureProviders({ defaultProvider: 'invalid' });
         expect.fail('Should have thrown');
@@ -470,7 +470,10 @@ describe('deprecated aliases — backward compat', () => {
         expect(error).toBeInstanceOf(Error);
         const message = (error as Error).message;
         expect(message).toContain('anthropic');
-        expect(message).toContain('opencode');
+        expect(message).toContain('claude-code');
+        // The removed provider literal must not appear in the supported list
+        const removedId = 'ope' + 'ncode';
+        expect(message).not.toContain(removedId);
         expect(message).toContain('Supported providers:');
       }
     });
@@ -498,13 +501,13 @@ describe('deprecated aliases — backward compat', () => {
 
     it('should return configured value after configureProviders', () => {
       configureProviders({
-        defaultProvider: 'opencode',
+        defaultProvider: 'claude-code',
         providerDefaults: {
           anthropic: { apiKey: 'sk-test' },
         },
       });
       const config = getGlobalProviderConfig();
-      expect(config.defaultProvider).toBe('opencode');
+      expect(config.defaultProvider).toBe('claude-code');
       expect(config.providerDefaults?.anthropic?.apiKey).toBe('sk-test');
     });
 
@@ -539,13 +542,13 @@ describe('deprecated aliases — backward compat', () => {
 
     it('should use agent provider when provided', () => {
       const global = createProviderGlobalConfig('anthropic');
-      const result = resolveProviderConfig(global, 'opencode');
-      expect(result.provider).toBe('opencode');
+      const result = resolveProviderConfig(global, 'claude-code');
+      expect(result.provider).toBe('claude-code');
     });
 
     it('should have prompt provider win over agent (same cascade as resolveHarnessConfig)', () => {
       const global = createProviderGlobalConfig('anthropic');
-      const result = resolveProviderConfig(global, 'opencode', undefined, 'anthropic');
+      const result = resolveProviderConfig(global, 'claude-code', undefined, 'anthropic');
       expect(result.provider).toBe('anthropic');
     });
 
@@ -566,7 +569,7 @@ describe('deprecated aliases — backward compat', () => {
       });
       const result = resolveProviderConfig(
         global,
-        'opencode',
+        'claude-code',
         { timeout: 1000 },
         'anthropic',
         { apiKey: 'sk-p' },
@@ -578,8 +581,8 @@ describe('deprecated aliases — backward compat', () => {
 
   describe('resetGlobalConfig', () => {
     it('should clear the legacy singleton independently', () => {
-      configureProviders({ defaultProvider: 'opencode' });
-      expect(getGlobalProviderConfig().defaultProvider).toBe('opencode');
+      configureProviders({ defaultProvider: 'claude-code' });
+      expect(getGlobalProviderConfig().defaultProvider).toBe('claude-code');
 
       resetGlobalConfig();
       expect(getGlobalProviderConfig().defaultProvider).toBe('anthropic');
@@ -631,7 +634,7 @@ describe('provider-config.js shim', () => {
     const globalConfig = shim.getGlobalProviderConfig();
     const resolved = shim.resolveProviderConfig(
       globalConfig,
-      'opencode',
+      'claude-code',
       { timeout: 1000 },
       'anthropic',
       { apiKey: 'sk-p' },

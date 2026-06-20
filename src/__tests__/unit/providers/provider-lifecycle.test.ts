@@ -77,10 +77,10 @@ describe('initializeAll() - Success Scenarios', () => {
   it('should initialize all providers successfully with empty config', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -91,35 +91,35 @@ describe('initializeAll() - Success Scenarios', () => {
     // Verify all providers succeeded
     expect(result.success).toHaveLength(2);
     expect(result.success).toContain('anthropic');
-    expect(result.success).toContain('opencode');
+    expect(result.success).toContain('claude-code');
     expect(result.failed).toHaveLength(0);
 
     // Verify initialize was called
     expect(anthropic.initialize).toHaveBeenCalledTimes(1);
-    expect(opencode.initialize).toHaveBeenCalledTimes(1);
+    expect(claudeCode.initialize).toHaveBeenCalledTimes(1);
 
     // Verify options passed (undefined when no providerDefaults)
     expect(anthropic.initialize).toHaveBeenCalledWith(undefined);
-    expect(opencode.initialize).toHaveBeenCalledWith(undefined);
+    expect(claudeCode.initialize).toHaveBeenCalledWith(undefined);
 
     // Verify status
     expect(registry.getStatus('anthropic')).toBe(InitializationStatus.INITIALIZED);
-    expect(registry.getStatus('opencode')).toBe(InitializationStatus.INITIALIZED);
+    expect(registry.getStatus('claude-code')).toBe(InitializationStatus.INITIALIZED);
   });
 
   it('should initialize all providers successfully with provider-specific options', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
       providerDefaults: {
         anthropic: { apiKey: 'sk-test-key', timeout: 5000 },
-        opencode: { endpoint: 'http://localhost:8080' },
+        'claude-code': { endpoint: 'http://localhost:8080' },
       },
     };
 
@@ -134,7 +134,7 @@ describe('initializeAll() - Success Scenarios', () => {
       apiKey: 'sk-test-key',
       timeout: 5000,
     });
-    expect(opencode.initialize).toHaveBeenCalledWith({
+    expect(claudeCode.initialize).toHaveBeenCalledWith({
       endpoint: 'http://localhost:8080',
     });
   });
@@ -142,10 +142,10 @@ describe('initializeAll() - Success Scenarios', () => {
   it('should return BatchInitResult with all providers in success array', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -160,17 +160,17 @@ describe('initializeAll() - Success Scenarios', () => {
     expect(Array.isArray(result.failed)).toBe(true);
 
     // Verify success array contains all provider IDs
-    expect(result.success).toEqual(expect.arrayContaining(['anthropic', 'opencode']));
+    expect(result.success).toEqual(expect.arrayContaining(['anthropic', 'claude-code']));
     expect(result.success).toHaveLength(2);
   });
 
   it('should have all providers with status INITIALIZED after successful initializeAll()', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -180,11 +180,11 @@ describe('initializeAll() - Success Scenarios', () => {
 
     // Verify all providers have INITIALIZED status
     expect(registry.getStatus('anthropic')).toBe(InitializationStatus.INITIALIZED);
-    expect(registry.getStatus('opencode')).toBe(InitializationStatus.INITIALIZED);
+    expect(registry.getStatus('claude-code')).toBe(InitializationStatus.INITIALIZED);
 
     // Verify isReady returns true for all
     expect(registry.isReady('anthropic')).toBe(true);
-    expect(registry.isReady('opencode')).toBe(true);
+    expect(registry.isReady('claude-code')).toBe(true);
   });
 });
 
@@ -196,14 +196,14 @@ describe('initializeAll() - Partial Success', () => {
   it('should handle one provider failing while others succeed', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
-    // Make opencode fail
+    // Make claudeCode fail
     const error = new Error('Connection failed');
-    opencode.initialize = vi.fn().mockRejectedValue(error);
+    claudeCode.initialize = vi.fn().mockRejectedValue(error);
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -215,28 +215,28 @@ describe('initializeAll() - Partial Success', () => {
     expect(result.success).toHaveLength(1);
     expect(result.success).toContain('anthropic');
     expect(result.failed).toHaveLength(1);
-    expect(result.failed[0].providerId).toBe('opencode');
+    expect(result.failed[0].providerId).toBe('claude-code');
     expect(result.failed[0].error).toBe(error);
 
     // Verify status
     expect(registry.getStatus('anthropic')).toBe(InitializationStatus.INITIALIZED);
-    expect(registry.getStatus('opencode')).toBe(InitializationStatus.FAILED);
+    expect(registry.getStatus('claude-code')).toBe(InitializationStatus.FAILED);
   });
 
   it('should handle multiple providers failing while others succeed', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
     const thirdProvider = createMockProvider('anthropic' as ProviderId); // Use valid ProviderId
 
     const anthropicError = new Error('Anthropic auth failed');
-    const opencodeError = new Error('OpenCode connection failed');
+    const claudeCodeError = new Error('claude-code connection failed');
 
     anthropic.initialize = vi.fn().mockRejectedValue(anthropicError);
-    opencode.initialize = vi.fn().mockRejectedValue(opencodeError);
+    claudeCode.initialize = vi.fn().mockRejectedValue(claudeCodeError);
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -249,7 +249,7 @@ describe('initializeAll() - Partial Success', () => {
     expect(result.failed).toHaveLength(2);
 
     const failedIds = result.failed.map((f) => f.providerId).sort();
-    expect(failedIds).toEqual(['anthropic', 'opencode']);
+    expect(failedIds).toEqual(['anthropic', 'claude-code']);
 
     // Verify errors are Error objects
     expect(result.failed[0].error).toBeInstanceOf(Error);
@@ -259,13 +259,13 @@ describe('initializeAll() - Partial Success', () => {
   it('should handle all providers failing', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     anthropic.initialize = vi.fn().mockRejectedValue(new Error('Anthropic failed'));
-    opencode.initialize = vi.fn().mockRejectedValue(new Error('OpenCode failed'));
+    claudeCode.initialize = vi.fn().mockRejectedValue(new Error('claude-code failed'));
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -279,19 +279,19 @@ describe('initializeAll() - Partial Success', () => {
 
     // Verify all have FAILED status
     expect(registry.getStatus('anthropic')).toBe(InitializationStatus.FAILED);
-    expect(registry.getStatus('opencode')).toBe(InitializationStatus.FAILED);
+    expect(registry.getStatus('claude-code')).toBe(InitializationStatus.FAILED);
   });
 
   it('should have failed providers with status FAILED', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     const error = new Error('Initialization failed');
-    opencode.initialize = vi.fn().mockRejectedValue(error);
+    claudeCode.initialize = vi.fn().mockRejectedValue(error);
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -300,8 +300,8 @@ describe('initializeAll() - Partial Success', () => {
     await registry.initializeAll(config);
 
     // Verify failed provider has FAILED status
-    expect(registry.getStatus('opencode')).toBe(InitializationStatus.FAILED);
-    expect(registry.isReady('opencode')).toBe(false);
+    expect(registry.getStatus('claude-code')).toBe(InitializationStatus.FAILED);
+    expect(registry.isReady('claude-code')).toBe(false);
 
     // Verify successful provider has INITIALIZED status
     expect(registry.getStatus('anthropic')).toBe(InitializationStatus.INITIALIZED);
@@ -311,13 +311,13 @@ describe('initializeAll() - Partial Success', () => {
   it('should have successful providers with status INITIALIZED', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     // Make anthropic fail
     anthropic.initialize = vi.fn().mockRejectedValue(new Error('Failed'));
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -326,8 +326,8 @@ describe('initializeAll() - Partial Success', () => {
     await registry.initializeAll(config);
 
     // Verify successful provider has INITIALIZED status
-    expect(registry.getStatus('opencode')).toBe(InitializationStatus.INITIALIZED);
-    expect(registry.isReady('opencode')).toBe(true);
+    expect(registry.getStatus('claude-code')).toBe(InitializationStatus.INITIALIZED);
+    expect(registry.isReady('claude-code')).toBe(true);
   });
 
   it('should have errors in failed array as Error objects with messages', async () => {
@@ -402,17 +402,17 @@ describe('initializeAll() - State Management', () => {
   it('should have isReady() return true only for INITIALIZED providers', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
-    // Make opencode fail
-    opencode.initialize = vi.fn().mockRejectedValue(new Error('Failed'));
+    // Make claudeCode fail
+    claudeCode.initialize = vi.fn().mockRejectedValue(new Error('Failed'));
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     // Before initialization
     expect(registry.isReady('anthropic')).toBe(false);
-    expect(registry.isReady('opencode')).toBe(false);
+    expect(registry.isReady('claude-code')).toBe(false);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -422,16 +422,16 @@ describe('initializeAll() - State Management', () => {
 
     // After initialization
     expect(registry.isReady('anthropic')).toBe(true); // INITIALIZED
-    expect(registry.isReady('opencode')).toBe(false); // FAILED
+    expect(registry.isReady('claude-code')).toBe(false); // FAILED
   });
 
   it('should share initialization promises for concurrent initializeAll() calls', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -448,7 +448,7 @@ describe('initializeAll() - State Management', () => {
 
     // Should only initialize once per provider (promise caching)
     expect(anthropic.initialize).toHaveBeenCalledTimes(1);
-    expect(opencode.initialize).toHaveBeenCalledTimes(1);
+    expect(claudeCode.initialize).toHaveBeenCalledTimes(1);
   });
 
   it('should call provider.initialize() only once despite multiple concurrent initializeAll()', async () => {
@@ -515,10 +515,10 @@ describe('initializeAll() - Edge Cases', () => {
 
     // Create multiple mock providers (we can only register each ID once)
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const config = {
       defaultProvider: 'anthropic' as const,
@@ -539,10 +539,10 @@ describe('terminateAll() - Success Scenarios', () => {
   it('should terminate all providers successfully', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     // Initialize first
     await registry.initializeAll({ defaultProvider: 'anthropic' as const });
@@ -552,23 +552,23 @@ describe('terminateAll() - Success Scenarios', () => {
 
     // Verify terminate was called
     expect(anthropic.terminate).toHaveBeenCalledTimes(1);
-    expect(opencode.terminate).toHaveBeenCalledTimes(1);
+    expect(claudeCode.terminate).toHaveBeenCalledTimes(1);
   });
 
   it('should call terminate() on each provider exactly once', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     await registry.terminateAll();
 
     expect(anthropic.terminate).toHaveBeenCalledWith();
     expect(anthropic.terminate).toHaveBeenCalledTimes(1);
-    expect(opencode.terminate).toHaveBeenCalledWith();
-    expect(opencode.terminate).toHaveBeenCalledTimes(1);
+    expect(claudeCode.terminate).toHaveBeenCalledWith();
+    expect(claudeCode.terminate).toHaveBeenCalledTimes(1);
   });
 
   it('should clear providers map after termination', async () => {
@@ -638,14 +638,14 @@ describe('terminateAll() - Partial Success', () => {
   it('should handle one provider failing to terminate', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
-    // Make opencode fail
+    // Make claudeCode fail
     const error = new Error('Already terminated');
-    opencode.terminate = vi.fn().mockRejectedValue(error);
+    claudeCode.terminate = vi.fn().mockRejectedValue(error);
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     // Initialize first
     await registry.initializeAll({ defaultProvider: 'anthropic' as const });
@@ -655,42 +655,42 @@ describe('terminateAll() - Partial Success', () => {
 
     // Verify both terminate() were called
     expect(anthropic.terminate).toHaveBeenCalledTimes(1);
-    expect(opencode.terminate).toHaveBeenCalledTimes(1);
+    expect(claudeCode.terminate).toHaveBeenCalledTimes(1);
   });
 
   it('should handle multiple providers failing to terminate', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     const anthropicError = new Error('Anthropic terminate failed');
-    const opencodeError = new Error('OpenCode terminate failed');
+    const claudeCodeError = new Error('claude-code terminate failed');
 
     anthropic.terminate = vi.fn().mockRejectedValue(anthropicError);
-    opencode.terminate = vi.fn().mockRejectedValue(opencodeError);
+    claudeCode.terminate = vi.fn().mockRejectedValue(claudeCodeError);
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     // Should not throw
     await expect(registry.terminateAll()).resolves.not.toThrow();
 
     // Both should still be called
     expect(anthropic.terminate).toHaveBeenCalledTimes(1);
-    expect(opencode.terminate).toHaveBeenCalledTimes(1);
+    expect(claudeCode.terminate).toHaveBeenCalledTimes(1);
   });
 
   it('should log errors with console.error for failed terminations', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
-    // Make opencode fail
+    // Make claudeCode fail
     const error = new Error('Termination failed');
-    opencode.terminate = vi.fn().mockRejectedValue(error);
+    claudeCode.terminate = vi.fn().mockRejectedValue(error);
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     await registry.initializeAll({ defaultProvider: 'anthropic' as const });
 
@@ -701,7 +701,7 @@ describe('terminateAll() - Partial Success', () => {
 
     // Verify error was logged
     expect(errorSpy).toHaveBeenCalledWith(
-      "Failed to terminate provider 'opencode':",
+      "Failed to terminate provider 'claude-code':",
       error
     );
 
@@ -711,19 +711,19 @@ describe('terminateAll() - Partial Success', () => {
   it('should call terminate() on all providers regardless of failures', async () => {
     const registry = ProviderRegistry.getInstance();
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
 
     // Make anthropic fail
     anthropic.terminate = vi.fn().mockRejectedValue(new Error('Failed'));
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     await registry.terminateAll();
 
     // Both should be called despite failure
     expect(anthropic.terminate).toHaveBeenCalledTimes(1);
-    expect(opencode.terminate).toHaveBeenCalledTimes(1);
+    expect(claudeCode.terminate).toHaveBeenCalledTimes(1);
   });
 
   it('should clear maps even with termination failures', async () => {
@@ -811,9 +811,9 @@ describe('Full Lifecycle Integration', () => {
 
     // Register
     const anthropic = createMockProvider('anthropic');
-    const opencode = createMockProvider('opencode');
+    const claudeCode = createMockProvider('claude-code');
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     // Initialize all
     const config = {
@@ -826,16 +826,16 @@ describe('Full Lifecycle Integration', () => {
     const initResult = await registry.initializeAll(config);
     expect(initResult.success).toHaveLength(2);
     expect(registry.isReady('anthropic')).toBe(true);
-    expect(registry.isReady('opencode')).toBe(true);
+    expect(registry.isReady('claude-code')).toBe(true);
 
     // Terminate all
     await registry.terminateAll();
     expect(anthropic.terminate).toHaveBeenCalledTimes(1);
-    expect(opencode.terminate).toHaveBeenCalledTimes(1);
+    expect(claudeCode.terminate).toHaveBeenCalledTimes(1);
 
     // Verify clean state
     expect(registry.has('anthropic')).toBe(false);
-    expect(registry.has('opencode')).toBe(false);
+    expect(registry.has('claude-code')).toBe(false);
   });
 
   it('should allow registry reuse after full lifecycle', async () => {
@@ -852,10 +852,10 @@ describe('Full Lifecycle Integration', () => {
     expect(registry.has('anthropic')).toBe(false);
 
     // Second lifecycle (reuse)
-    const provider2 = createMockProvider('opencode');
+    const provider2 = createMockProvider('claude-code');
     registry.register(provider2);
-    await registry.initializeAll({ defaultProvider: 'opencode' as const });
-    expect(registry.isReady('opencode')).toBe(true);
+    await registry.initializeAll({ defaultProvider: 'claude-code' as const });
+    expect(registry.isReady('claude-code')).toBe(true);
     await registry.terminateAll();
 
     expect(provider2.terminate).toHaveBeenCalledTimes(1);
@@ -892,13 +892,13 @@ describe('Full Lifecycle Integration', () => {
     await registry.terminateAll();
 
     // Register different provider after termination
-    const provider2 = createMockProvider('opencode');
+    const provider2 = createMockProvider('claude-code');
     expect(() => {
       registry.register(provider2);
     }).not.toThrow();
 
-    await registry.initializeAll({ defaultProvider: 'opencode' as const });
-    expect(registry.isReady('opencode')).toBe(true);
+    await registry.initializeAll({ defaultProvider: 'claude-code' as const });
+    expect(registry.isReady('claude-code')).toBe(true);
   });
 });
 
@@ -917,14 +917,14 @@ describe('Parallel Execution Verification', () => {
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    const opencode = createMockProvider('opencode');
-    opencode.initialize = vi.fn().mockImplementation(async () => {
+    const claudeCode = createMockProvider('claude-code');
+    claudeCode.initialize = vi.fn().mockImplementation(async () => {
       timestamps.push(Date.now());
       await new Promise((r) => setTimeout(r, 10));
     });
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const startTime = Date.now();
     await registry.initializeAll({ defaultProvider: 'anthropic' as const });
@@ -935,7 +935,7 @@ describe('Parallel Execution Verification', () => {
 
     // Verify both were called
     expect(anthropic.initialize).toHaveBeenCalled();
-    expect(opencode.initialize).toHaveBeenCalled();
+    expect(claudeCode.initialize).toHaveBeenCalled();
 
     // Verify start times are close (parallel execution)
     expect(Math.abs(timestamps[1] - timestamps[0])).toBeLessThan(5);
@@ -951,14 +951,14 @@ describe('Parallel Execution Verification', () => {
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    const opencode = createMockProvider('opencode');
-    opencode.terminate = vi.fn().mockImplementation(async () => {
+    const claudeCode = createMockProvider('claude-code');
+    claudeCode.terminate = vi.fn().mockImplementation(async () => {
       timestamps.push(Date.now());
       await new Promise((r) => setTimeout(r, 10));
     });
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     const startTime = Date.now();
     await registry.terminateAll();
@@ -969,7 +969,7 @@ describe('Parallel Execution Verification', () => {
 
     // Verify both were called
     expect(anthropic.terminate).toHaveBeenCalled();
-    expect(opencode.terminate).toHaveBeenCalled();
+    expect(claudeCode.terminate).toHaveBeenCalled();
 
     // Verify start times are close (parallel execution)
     expect(Math.abs(timestamps[1] - timestamps[0])).toBeLessThan(5);
@@ -985,25 +985,25 @@ describe('Parallel Execution Verification', () => {
       await new Promise((r) => setTimeout(r, 5));
     });
 
-    const opencode = createMockProvider('opencode');
-    opencode.initialize = vi.fn().mockImplementation(async () => {
-      startTimes.set('opencode', Date.now());
+    const claudeCode = createMockProvider('claude-code');
+    claudeCode.initialize = vi.fn().mockImplementation(async () => {
+      startTimes.set('claude-code', Date.now());
       await new Promise((r) => setTimeout(r, 5));
     });
 
     registry.register(anthropic);
-    registry.register(opencode);
+    registry.register(claudeCode);
 
     await registry.initializeAll({ defaultProvider: 'anthropic' as const });
 
     // Both should have start times recorded
     expect(startTimes.size).toBe(2);
     expect(startTimes.has('anthropic')).toBe(true);
-    expect(startTimes.has('opencode')).toBe(true);
+    expect(startTimes.has('claude-code')).toBe(true);
 
     // Start times should be close (parallel execution)
     const anthropicStart = startTimes.get('anthropic')!;
-    const opencodeStart = startTimes.get('opencode')!;
-    expect(Math.abs(anthropicStart - opencodeStart)).toBeLessThan(5);
+    const claudeCodeStart = startTimes.get('claude-code')!;
+    expect(Math.abs(anthropicStart - claudeCodeStart)).toBeLessThan(5);
   });
 });

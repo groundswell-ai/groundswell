@@ -717,7 +717,7 @@
                   "type": "Subtask",
                   "id": "P4.M1.T1.S1",
                   "title": "Delete opencode-provider.ts, tests, literal, and dependency",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M3.T1.S1"

@@ -99,7 +99,7 @@ interface BatchInitResult {
  * // Register harnesses at startup
  * const registry = HarnessRegistry.getInstance();
  * registry.register(new AnthropicProvider());
- * registry.register(new OpenCodeProvider());
+ * registry.register(new ClaudeCodeHarness());
  *
  * // Retrieve harnesses throughout application
  * const anthropic = registry.get('anthropic');
@@ -505,7 +505,7 @@ export class HarnessRegistry {
    *
    * // Register and initialize providers
    * registry.register(anthropicProvider);
-   * registry.register(opencodeProvider);
+   * registry.register(claudeCodeProvider);
    * await registry.initializeAll(config);
    *
    * // Later, during shutdown

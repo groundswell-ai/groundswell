@@ -69,10 +69,10 @@ describe('Agent.prompt()', () => {
 
     // Register mock providers
     const anthropicProvider = createMockProvider('anthropic');
-    const opencodeProvider = createMockProvider('opencode');
+    const claudeCodeProvider = createMockProvider('claude-code');
     const registry = ProviderRegistry.getInstance();
     registry.register(anthropicProvider);
-    registry.register(opencodeProvider);
+    registry.register(claudeCodeProvider);
   });
 
   afterEach(() => {
@@ -112,16 +112,16 @@ describe('Agent.prompt()', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       // Clear previous calls from constructor
       vi.clearAllMocks();
 
-      // Act: Override to opencode at prompt level
-      await agent.prompt(prompt, { provider: 'opencode' });
+      // Act: Override to claude-code at prompt level
+      await agent.prompt(prompt, { provider: 'claude-code' });
 
-      // Assert: opencode provider was used, not anthropic
-      expect(opencodeProvider.execute).toHaveBeenCalled();
+      // Assert: claude-code provider was used, not anthropic
+      expect(claudeCodeProvider.execute).toHaveBeenCalled();
       expect(anthropicProvider.execute).not.toHaveBeenCalled();
     });
 
@@ -148,16 +148,16 @@ describe('Agent.prompt()', () => {
     });
 
     it('should prioritize prompt override over agent and global config', async () => {
-      // Arrange: Set global default to opencode
+      // Arrange: Set global default to claude-code
       configureProviders({
-        defaultProvider: 'opencode',
+        defaultProvider: 'claude-code',
         providerDefaults: {
           anthropic: { timeout: 30000 },
-          opencode: { endpoint: 'http://localhost:8080' }
+          'claude-code': { endpoint: 'http://localhost:8080' }
         }
       });
 
-      // Agent configured with anthropic (overrides global opencode)
+      // Agent configured with anthropic (overrides global claude-code)
       const agent = new Agent({ provider: 'anthropic' });
       const prompt = new Prompt({
         user: 'test',
@@ -167,16 +167,16 @@ describe('Agent.prompt()', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       // Clear previous calls
       vi.clearAllMocks();
 
-      // Act: Prompt override to opencode (highest priority)
-      await agent.prompt(prompt, { provider: 'opencode' });
+      // Act: Prompt override to claude-code (highest priority)
+      await agent.prompt(prompt, { provider: 'claude-code' });
 
       // Assert: Prompt override wins over agent and global config
-      expect(opencodeProvider.execute).toHaveBeenCalled();
+      expect(claudeCodeProvider.execute).toHaveBeenCalled();
       expect(anthropicProvider.execute).not.toHaveBeenCalled();
     });
 
@@ -189,15 +189,15 @@ describe('Agent.prompt()', () => {
       });
 
       // Act: Try to use unregistered provider
-      const response = await agent.prompt(prompt, { provider: 'opencode' as ProviderId });
+      const response = await agent.prompt(prompt, { provider: 'claude-code' as ProviderId });
 
-      // Assert: Error response (opencode was not registered in this test's beforeEach)
-      // Wait, we did register opencode. Let me unregister it first
+      // Assert: Error response (claude-code was not registered in this test's beforeEach)
+      // Wait, we did register claude-code. Let me unregister it first
       ProviderRegistry['_resetForTesting']();
       const anthropicProvider = createMockProvider('anthropic');
       ProviderRegistry.getInstance().register(anthropicProvider);
 
-      const response2 = await agent.prompt(prompt, { provider: 'opencode' as ProviderId });
+      const response2 = await agent.prompt(prompt, { provider: 'claude-code' as ProviderId });
 
       expect(response2.status).toBe('error');
       if (isError(response2)) {
@@ -213,7 +213,7 @@ describe('Agent.prompt()', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       // Clear previous calls
       vi.clearAllMocks();
@@ -226,15 +226,15 @@ describe('Agent.prompt()', () => {
       // Act 1: First prompt with anthropic (agent default)
       await agent.prompt(prompt);
 
-      // Act 2: Second prompt with opencode override
-      await agent.prompt(prompt, { provider: 'opencode' });
+      // Act 2: Second prompt with claude-code override
+      await agent.prompt(prompt, { provider: 'claude-code' });
 
       // Act 3: Third prompt back to anthropic (no override)
       await agent.prompt(prompt);
 
       // Assert: Both providers were used correctly
       expect(anthropicProvider.execute).toHaveBeenCalledTimes(2);
-      expect(opencodeProvider.execute).toHaveBeenCalledTimes(1);
+      expect(claudeCodeProvider.execute).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -356,7 +356,7 @@ describe('Agent.prompt()', () => {
             apiKey: 'sk-global',
             endpoint: 'https://api.global.com'
           },
-          opencode: {
+          'claude-code': {
             timeout: 60000,
             endpoint: 'http://localhost:8080'
           }
@@ -365,7 +365,7 @@ describe('Agent.prompt()', () => {
 
       // Agent with options
       const agent = new Agent({
-        provider: 'opencode',
+        provider: 'claude-code',
         providerOptions: { timeout: 10000, headers: { 'X-Agent': 'agent-value' } }
       });
 
@@ -394,7 +394,7 @@ describe('Agent.prompt()', () => {
       });
 
       // Assert: Full cascade applied correctly
-      // Prompt provider: anthropic (overrides agent opencode)
+      // Prompt provider: anthropic (overrides agent claude-code)
       // Prompt options: { apiKey: 'sk-prompt', timeout: 5000 }
       // Agent options (still applied): { headers: { 'X-Agent': 'agent-value' } }
       // Global anthropic defaults: { endpoint: 'https://api.global.com' }
@@ -454,9 +454,9 @@ describe('Agent.prompt()', () => {
 
   describe('provider switch with options preservation', () => {
     it('should apply agent options when switching providers', async () => {
-      // Arrange: Agent configured with opencode and options
+      // Arrange: Agent configured with claude-code and options
       const agent = new Agent({
-        provider: 'opencode',
+        provider: 'claude-code',
         providerOptions: { timeout: 10000, endpoint: 'https://agent.com' }
       });
 
@@ -489,17 +489,17 @@ describe('Agent.prompt()', () => {
     });
 
     it('should merge prompt options when switching providers', async () => {
-      // Arrange: Agent with opencode options
+      // Arrange: Agent with claude-code options
       configureProviders({
-        defaultProvider: 'opencode',
+        defaultProvider: 'claude-code',
         providerDefaults: {
           anthropic: { timeout: 30000, apiKey: 'sk-anthropic' },
-          opencode: { timeout: 60000, endpoint: 'http://localhost:8080' }
+          'claude-code': { timeout: 60000, endpoint: 'http://localhost:8080' }
         }
       });
 
       const agent = new Agent({
-        provider: 'opencode',
+        provider: 'claude-code',
         providerOptions: { timeout: 10000 }
       });
 
@@ -548,12 +548,12 @@ describe('Agent.prompt()', () => {
         responseFormat: schema
       });
 
-      // Get opencode provider
+      // Get claude-code provider
       const registry = ProviderRegistry.getInstance();
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
-      // Mock opencode to return valid structured data
-      (opencodeProvider.execute as any).mockImplementation(async () => {
+      // Mock claude-code to return valid structured data
+      (claudeCodeProvider.execute as any).mockImplementation(async () => {
         return createSuccessResponse(
           { answer: '4', confidence: 0.99 },
           { agentId: 'test', timestamp: Date.now() }
@@ -562,18 +562,18 @@ describe('Agent.prompt()', () => {
 
       vi.clearAllMocks();
 
-      // Act: Use opencode for this prompt
+      // Act: Use claude-code for this prompt
       const response = await agent.prompt(prompt, {
-        provider: 'opencode'
+        provider: 'claude-code'
       });
 
-      // Assert: Validated response from opencode provider
+      // Assert: Validated response from claude-code provider
       expect(response.status).toBe('success');
       if (response.status === 'success') {
         expect(response.data.answer).toBe('4');
         expect(response.data.confidence).toBe(0.99);
       }
-      expect(opencodeProvider.execute).toHaveBeenCalled();
+      expect(claudeCodeProvider.execute).toHaveBeenCalled();
     });
   });
 
@@ -591,16 +591,16 @@ describe('Agent.prompt()', () => {
         responseFormat: z.object({ result: z.string() })
       });
 
-      // Act: Try to use opencode (not registered)
+      // Act: Try to use claude-code (not registered)
       const response = await agent.prompt(prompt, {
-        provider: 'opencode' as ProviderId
+        provider: 'claude-code' as ProviderId
       });
 
       // Assert: Error response
       expect(response.status).toBe('error');
       if (isError(response)) {
         expect(response.error.code).toBe('PROVIDER_NOT_FOUND');
-        expect(response.error.message).toContain('opencode');
+        expect(response.error.message).toContain('claude-code');
         expect(response.error.message).toContain('not registered');
         expect(response.error.recoverable).toBe(false);
       }
@@ -644,20 +644,20 @@ describe('Agent.prompt()', () => {
       // Get providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       vi.clearAllMocks();
 
       // Act: Multiple prompts with different providers
       await agent.prompt(prompt, { provider: 'anthropic' });
-      await agent.prompt(prompt, { provider: 'opencode' });
+      await agent.prompt(prompt, { provider: 'claude-code' });
       await agent.prompt(prompt); // Uses agent default (anthropic)
-      await agent.prompt(prompt, { provider: 'opencode' });
+      await agent.prompt(prompt, { provider: 'claude-code' });
       await agent.prompt(prompt, { provider: 'anthropic' });
 
       // Assert: Correct provider used for each prompt
       expect(anthropicProvider.execute).toHaveBeenCalledTimes(3);
-      expect(opencodeProvider.execute).toHaveBeenCalledTimes(2);
+      expect(claudeCodeProvider.execute).toHaveBeenCalledTimes(2);
     });
 
     it('should maintain independent state between provider switches', async () => {
@@ -675,10 +675,10 @@ describe('Agent.prompt()', () => {
       // Get providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       let anthropicCallCount = 0;
-      let opencodeCallCount = 0;
+      let claudeCodeCallCount = 0;
 
       (anthropicProvider.execute as any).mockImplementation(async () => {
         anthropicCallCount++;
@@ -688,32 +688,32 @@ describe('Agent.prompt()', () => {
         );
       });
 
-      (opencodeProvider.execute as any).mockImplementation(async () => {
-        opencodeCallCount++;
+      (claudeCodeProvider.execute as any).mockImplementation(async () => {
+        claudeCodeCallCount++;
         return createSuccessResponse(
-          { result: `opencode-${opencodeCallCount}` },
+          { result: `claude-code-${claudeCodeCallCount}` },
           { agentId: 'test', timestamp: Date.now() }
         );
       });
 
       // Act: Alternate between providers
       const r1 = await agent.prompt(prompt);
-      const r2 = await agent.prompt(prompt, { provider: 'opencode' });
+      const r2 = await agent.prompt(prompt, { provider: 'claude-code' });
       const r3 = await agent.prompt(prompt);
-      const r4 = await agent.prompt(prompt, { provider: 'opencode' });
+      const r4 = await agent.prompt(prompt, { provider: 'claude-code' });
 
       // Assert: Each provider maintains independent state
       if (r1.status === 'success') {
         expect(r1.data.result).toBe('anthropic-1');
       }
       if (r2.status === 'success') {
-        expect(r2.data.result).toBe('opencode-1');
+        expect(r2.data.result).toBe('claude-code-1');
       }
       if (r3.status === 'success') {
         expect(r3.data.result).toBe('anthropic-2');
       }
       if (r4.status === 'success') {
-        expect(r4.data.result).toBe('opencode-2');
+        expect(r4.data.result).toBe('claude-code-2');
       }
     });
   });

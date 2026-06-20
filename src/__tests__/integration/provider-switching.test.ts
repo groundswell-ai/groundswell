@@ -14,7 +14,7 @@
  *
  * **Provider Creation Tests**:
  * - Test creating Agent with provider='anthropic'
- * - Test creating Agent with provider='opencode'
+ * - Test creating Agent with provider='claude-code'
  * - Test creating Agent without provider (uses global default)
  * - Test Agent with unregistered provider throws error
  *
@@ -64,7 +64,7 @@ function createMockProvider(
   executeImplementation?: (request: ProviderRequest) => Promise<any>
 ): Provider {
   const capabilities: ProviderCapabilities = {
-    mcp: id === 'anthropic',  // Anthropic has MCP, OpenCode doesn't
+    mcp: id === 'anthropic',  // primary ('anthropic') advertises MCP; the secondary does not
     skills: id === 'anthropic',
     lsp: id === 'anthropic',
     streaming: true,
@@ -130,11 +130,11 @@ describe('Provider Switching Integration', () => {
       expect(agent.id).toBeDefined();
     });
 
-    it('should create Agent with opencode provider', async () => {
-      const provider = createMockProvider('opencode');
+    it('should create Agent with claude-code provider', async () => {
+      const provider = createMockProvider('claude-code');
       ProviderRegistry.getInstance().register(provider);
 
-      const agent = new Agent({ provider: 'opencode' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       expect(agent).toBeDefined();
       expect(agent.id).toBeDefined();
@@ -165,13 +165,13 @@ describe('Provider Switching Integration', () => {
 
     it('should use different providers for different agents', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent1 = new Agent({ provider: 'anthropic' });
-      const agent2 = new Agent({ provider: 'opencode' });
+      const agent2 = new Agent({ provider: 'claude-code' });
 
       expect(agent1).toBeDefined();
       expect(agent2).toBeDefined();
@@ -184,12 +184,12 @@ describe('Provider Switching Integration', () => {
   // ========================================================================
 
   describe('Prompt-Level Provider Overrides', () => {
-    it('should switch to opencode provider for single prompt', async () => {
+    it('should switch to claude-code provider for single prompt', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       // Create agent with anthropic provider
       const agent = new Agent({ provider: 'anthropic' });
@@ -201,25 +201,25 @@ describe('Provider Switching Integration', () => {
 
       // Spy on both providers to verify which one is called
       const anthropicSpy = vi.spyOn(anthropicProvider, 'execute');
-      const opencodeSpy = vi.spyOn(opencodeProvider, 'execute');
+      const claudeCodeSpy = vi.spyOn(claudeCodeProvider, 'execute');
 
-      // Prompt with provider override to opencode
+      // Prompt with provider override to claude-code
       const response = await agent.prompt(prompt, {
-        provider: 'opencode'
+        provider: 'claude-code'
       });
 
-      // Verify opencode provider was called, not anthropic
-      expect(opencodeSpy).toHaveBeenCalledTimes(1);
+      // Verify claude-code provider was called, not anthropic
+      expect(claudeCodeSpy).toHaveBeenCalledTimes(1);
       expect(anthropicSpy).not.toHaveBeenCalled();
       expect(response.status).toBe('success');
     });
 
     it('should use prompt provider override when specified', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       // Agent configured with anthropic
       const agent = new Agent({ provider: 'anthropic' });
@@ -231,25 +231,25 @@ describe('Provider Switching Integration', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const provider1 = registry.get('anthropic')!;
-      const provider2 = registry.get('opencode')!;
+      const provider2 = registry.get('claude-code')!;
 
       // Clear previous calls
       vi.clearAllMocks();
 
-      // Act: Override to opencode at prompt level
-      await agent.prompt(prompt, { provider: 'opencode' });
+      // Act: Override to claude-code at prompt level
+      await agent.prompt(prompt, { provider: 'claude-code' });
 
-      // Assert: opencode provider was used, not anthropic
+      // Assert: claude-code provider was used, not anthropic
       expect(provider2.execute).toHaveBeenCalled();
       expect(provider1.execute).not.toHaveBeenCalled();
     });
 
     it('should use agent provider when no prompt override', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       // Arrange: Agent configured with anthropic
       const agent = new Agent({ provider: 'anthropic' });
@@ -273,21 +273,21 @@ describe('Provider Switching Integration', () => {
     });
 
     it('should prioritize prompt override over agent and global config', async () => {
-      // Arrange: Set global default to opencode
+      // Arrange: Set global default to claude-code
       configureProviders({
-        defaultProvider: 'opencode',
+        defaultProvider: 'claude-code',
         providerDefaults: {
           anthropic: { timeout: 30000 },
-          opencode: { endpoint: 'http://localhost:8080' }
+          'claude-code': { endpoint: 'http://localhost:8080' }
         }
       });
 
-      // Agent configured with anthropic (overrides global opencode)
+      // Agent configured with anthropic (overrides global claude-code)
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({ provider: 'anthropic' });
 
@@ -299,13 +299,13 @@ describe('Provider Switching Integration', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const provider1 = registry.get('anthropic')!;
-      const provider2 = registry.get('opencode')!;
+      const provider2 = registry.get('claude-code')!;
 
       // Clear previous calls
       vi.clearAllMocks();
 
-      // Act: Prompt override to opencode (highest priority)
-      await agent.prompt(prompt, { provider: 'opencode' });
+      // Act: Prompt override to claude-code (highest priority)
+      await agent.prompt(prompt, { provider: 'claude-code' });
 
       // Assert: Prompt override wins over agent and global config
       expect(provider2.execute).toHaveBeenCalled();
@@ -314,10 +314,10 @@ describe('Provider Switching Integration', () => {
 
     it('should switch providers between prompts', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       // Agent configured with anthropic
       const agent = new Agent({ provider: 'anthropic' });
@@ -325,7 +325,7 @@ describe('Provider Switching Integration', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const provider1 = registry.get('anthropic')!;
-      const provider2 = registry.get('opencode')!;
+      const provider2 = registry.get('claude-code')!;
 
       // Clear previous calls
       vi.clearAllMocks();
@@ -338,8 +338,8 @@ describe('Provider Switching Integration', () => {
       // Act 1: First prompt with anthropic (agent default)
       await agent.prompt(prompt);
 
-      // Act 2: Second prompt with opencode override
-      await agent.prompt(prompt, { provider: 'opencode' });
+      // Act 2: Second prompt with claude-code override
+      await agent.prompt(prompt, { provider: 'claude-code' });
 
       // Act 3: Third prompt back to anthropic (no override)
       await agent.prompt(prompt);
@@ -356,21 +356,21 @@ describe('Provider Switching Integration', () => {
 
   describe('Configuration Cascade Priority', () => {
     it('should prioritize prompt override over agent and global config', async () => {
-      // Arrange: Set global default to opencode
+      // Arrange: Set global default to claude-code
       configureProviders({
-        defaultProvider: 'opencode',
+        defaultProvider: 'claude-code',
         providerDefaults: {
           anthropic: { timeout: 30000 },
-          opencode: { timeout: 60000 }
+          'claude-code': { timeout: 60000 }
         }
       });
 
-      // Agent configured with anthropic (overrides global opencode)
+      // Agent configured with anthropic (overrides global claude-code)
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({ provider: 'anthropic' });
 
@@ -382,7 +382,7 @@ describe('Provider Switching Integration', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const provider1 = registry.get('anthropic')!;
-      const provider2 = registry.get('opencode')!;
+      const provider2 = registry.get('claude-code')!;
 
       // Clear previous calls
       vi.clearAllMocks();
@@ -397,10 +397,10 @@ describe('Provider Switching Integration', () => {
 
     it('should use agent override when prompt override not provided', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       // Agent configured with anthropic
       const agent = new Agent({ provider: 'anthropic' });
@@ -458,21 +458,21 @@ describe('Provider Switching Integration', () => {
             apiKey: 'sk-global',
             endpoint: 'https://api.global.com'
           },
-          opencode: {
+          'claude-code': {
             timeout: 60000,
             endpoint: 'http://localhost:8080'
           }
         }
       });
 
-      // Agent with opencode override
+      // Agent with claude-code override
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
-      const agent = new Agent({ provider: 'opencode' });
+      const agent = new Agent({ provider: 'claude-code' });
 
       const prompt = new Prompt({
         user: 'test',
@@ -482,7 +482,7 @@ describe('Provider Switching Integration', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProviderInstance = registry.get('anthropic')!;
-      const opencodeProviderInstance = registry.get('opencode')!;
+      const claudeCodeProviderInstance = registry.get('claude-code')!;
 
       vi.clearAllMocks();
 
@@ -493,7 +493,7 @@ describe('Provider Switching Integration', () => {
 
       // Assert: Prompt override wins - anthropic should be called
       expect(anthropicProviderInstance.execute).toHaveBeenCalledTimes(1);
-      expect(opencodeProviderInstance.execute).not.toHaveBeenCalled();
+      expect(claudeCodeProviderInstance.execute).not.toHaveBeenCalled();
     });
 
     it('should merge prompt options with agent options', async () => {
@@ -543,10 +543,10 @@ describe('Provider Switching Integration', () => {
   describe('Multi-Provider State Isolation', () => {
     it('should maintain independent state between providers', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({ provider: 'anthropic' });
 
@@ -557,7 +557,7 @@ describe('Provider Switching Integration', () => {
 
       // Track call counts per provider
       let anthropicCallCount = 0;
-      let opencodeCallCount = 0;
+      let claudeCodeCallCount = 0;
 
       (anthropicProvider.execute as any).mockImplementation(async () => {
         anthropicCallCount++;
@@ -567,10 +567,10 @@ describe('Provider Switching Integration', () => {
         );
       });
 
-      (opencodeProvider.execute as any).mockImplementation(async () => {
-        opencodeCallCount++;
+      (claudeCodeProvider.execute as any).mockImplementation(async () => {
+        claudeCodeCallCount++;
         return createSuccessResponse(
-          { result: `opencode-${opencodeCallCount}` },
+          { result: `claude-code-${claudeCodeCallCount}` },
           { agentId: 'test', timestamp: Date.now() }
         );
       });
@@ -579,9 +579,9 @@ describe('Provider Switching Integration', () => {
       const r1 = await agent.prompt(prompt);
       expect(r1.status === 'success' && r1.data.result).toBe('anthropic-1');
 
-      // Second prompt with opencode override
-      const r2 = await agent.prompt(prompt, { provider: 'opencode' });
-      expect(r2.status === 'success' && r2.data.result).toBe('opencode-1');
+      // Second prompt with claude-code override
+      const r2 = await agent.prompt(prompt, { provider: 'claude-code' });
+      expect(r2.status === 'success' && r2.data.result).toBe('claude-code-1');
 
       // Third prompt back to anthropic (agent default)
       const r3 = await agent.prompt(prompt);
@@ -589,15 +589,15 @@ describe('Provider Switching Integration', () => {
 
       // Verify independent state
       expect(anthropicCallCount).toBe(2);
-      expect(opencodeCallCount).toBe(1);
+      expect(claudeCodeCallCount).toBe(1);
     });
 
     it('should handle concurrent prompts with different providers', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({ provider: 'anthropic' });
 
@@ -614,7 +614,7 @@ describe('Provider Switching Integration', () => {
       // Execute concurrently with different providers
       const [response1, response2] = await Promise.all([
         agent.prompt(prompt1),  // Uses agent default (anthropic)
-        agent.prompt(prompt2, { provider: 'opencode' })  // Override to opencode
+        agent.prompt(prompt2, { provider: 'claude-code' })  // Override to claude-code
       ]);
 
       expect(response1.status).toBe('success');
@@ -631,7 +631,7 @@ describe('Provider Switching Integration', () => {
             apiKey: 'sk-anthropic',
             endpoint: 'https://api.anthropic.com'
           },
-          opencode: {
+          'claude-code': {
             timeout: 60000,
             endpoint: 'http://localhost:8080'
           }
@@ -639,10 +639,10 @@ describe('Provider Switching Integration', () => {
       });
 
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({
         provider: 'anthropic',
@@ -671,17 +671,17 @@ describe('Provider Switching Integration', () => {
       // Act: Use anthropic provider
       await agent.prompt(prompt);
 
-      // Assert: Options should be merged correctly without leakage from opencode
+      // Assert: Options should be merged correctly without leakage from claude-code
       expect(capturedOptions).toBeDefined();
       expect(anthropicProviderInstance.execute).toHaveBeenCalled();
     });
 
     it('should maintain separate call counts per provider', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({ provider: 'anthropic' });
 
@@ -692,14 +692,14 @@ describe('Provider Switching Integration', () => {
 
       // Execute multiple prompts with different providers
       await agent.prompt(prompt);  // anthropic
-      await agent.prompt(prompt, { provider: 'opencode' });  // opencode
+      await agent.prompt(prompt, { provider: 'claude-code' });  // claude-code
       await agent.prompt(prompt);  // anthropic
-      await agent.prompt(prompt, { provider: 'opencode' });  // opencode
+      await agent.prompt(prompt, { provider: 'claude-code' });  // claude-code
       await agent.prompt(prompt, { provider: 'anthropic' });  // anthropic
 
       // Verify call counts
       expect(anthropicProvider.execute).toHaveBeenCalledTimes(3);
-      expect(opencodeProvider.execute).toHaveBeenCalledTimes(2);
+      expect(claudeCodeProvider.execute).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -721,13 +721,13 @@ describe('Provider Switching Integration', () => {
 
       // Try to use unregistered provider
       const response = await agent.prompt(prompt, {
-        provider: 'opencode' as ProviderId
+        provider: 'claude-code' as ProviderId
       });
 
       expect(isError(response)).toBe(true);
       if (isError(response)) {
         expect(response.error.code).toBe('PROVIDER_NOT_FOUND');
-        expect(response.error.message).toContain('opencode');
+        expect(response.error.message).toContain('claude-code');
         expect(response.error.message).toContain('not registered');
         expect(response.error.recoverable).toBe(false);
       }
@@ -761,10 +761,10 @@ describe('Provider Switching Integration', () => {
 
     it('should handle concurrent provider switches with errors', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({ provider: 'anthropic' });
 
@@ -773,18 +773,18 @@ describe('Provider Switching Integration', () => {
         responseFormat: z.object({ result: z.string() })
       });
 
-      // Make opencode fail
+      // Make claude-code fail
       const registry = ProviderRegistry.getInstance();
-      const opencodeProviderInstance = registry.get('opencode')!;
+      const claudeCodeProviderInstance = registry.get('claude-code')!;
 
-      (opencodeProviderInstance.execute as any).mockImplementation(async () => {
-        throw new Error('OpenCode error');
+      (claudeCodeProviderInstance.execute as any).mockImplementation(async () => {
+        throw new Error('claude-code error');
       });
 
       // Execute concurrent prompts
       const [response1, response2] = await Promise.all([
         agent.prompt(prompt),  // anthropic - succeeds
-        agent.prompt(prompt, { provider: 'opencode' })  // opencode - fails
+        agent.prompt(prompt, { provider: 'claude-code' })  // claude-code - fails
       ]);
 
       expect(response1.status).toBe('success');
@@ -799,10 +799,10 @@ describe('Provider Switching Integration', () => {
   describe('Integration with Structured Output', () => {
     it('should work with prompt-level provider override and schema validation', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({ provider: 'anthropic' });
 
@@ -816,12 +816,12 @@ describe('Provider Switching Integration', () => {
         responseFormat: schema
       });
 
-      // Get opencode provider
+      // Get claude-code provider
       const registry = ProviderRegistry.getInstance();
-      const opencodeProviderInstance = registry.get('opencode')!;
+      const claudeCodeProviderInstance = registry.get('claude-code')!;
 
-      // Mock opencode to return valid structured data
-      (opencodeProviderInstance.execute as any).mockImplementation(async () => {
+      // Mock claude-code to return valid structured data
+      (claudeCodeProviderInstance.execute as any).mockImplementation(async () => {
         return createSuccessResponse(
           { answer: '4', confidence: 0.99 },
           { agentId: 'test', timestamp: Date.now() }
@@ -830,18 +830,18 @@ describe('Provider Switching Integration', () => {
 
       vi.clearAllMocks();
 
-      // Act: Use opencode for this prompt
+      // Act: Use claude-code for this prompt
       const response = await agent.prompt(prompt, {
-        provider: 'opencode'
+        provider: 'claude-code'
       });
 
-      // Assert: Validated response from opencode provider
+      // Assert: Validated response from claude-code provider
       expect(response.status).toBe('success');
       if (response.status === 'success') {
         expect(response.data.answer).toBe('4');
         expect(response.data.confidence).toBe(0.99);
       }
-      expect(opencodeProviderInstance.execute).toHaveBeenCalled();
+      expect(claudeCodeProviderInstance.execute).toHaveBeenCalled();
     });
   });
 
@@ -852,10 +852,10 @@ describe('Provider Switching Integration', () => {
   describe('Multiple Prompts with Different Providers', () => {
     it('should handle sequential prompts with different providers', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({ provider: 'anthropic' });
 
@@ -866,22 +866,22 @@ describe('Provider Switching Integration', () => {
 
       // Act: Multiple prompts with different providers
       await agent.prompt(prompt, { provider: 'anthropic' });
-      await agent.prompt(prompt, { provider: 'opencode' });
+      await agent.prompt(prompt, { provider: 'claude-code' });
       await agent.prompt(prompt);  // Uses agent default (anthropic)
-      await agent.prompt(prompt, { provider: 'opencode' });
+      await agent.prompt(prompt, { provider: 'claude-code' });
       await agent.prompt(prompt, { provider: 'anthropic' });
 
       // Assert: Correct provider used for each prompt
       expect(anthropicProvider.execute).toHaveBeenCalledTimes(3);
-      expect(opencodeProvider.execute).toHaveBeenCalledTimes(2);
+      expect(claudeCodeProvider.execute).toHaveBeenCalledTimes(2);
     });
 
     it('should maintain independent state between provider switches', async () => {
       const anthropicProvider = createMockProvider('anthropic');
-      const opencodeProvider = createMockProvider('opencode');
+      const claudeCodeProvider = createMockProvider('claude-code');
 
       ProviderRegistry.getInstance().register(anthropicProvider);
-      ProviderRegistry.getInstance().register(opencodeProvider);
+      ProviderRegistry.getInstance().register(claudeCodeProvider);
 
       const agent = new Agent({
         provider: 'anthropic',
@@ -894,7 +894,7 @@ describe('Provider Switching Integration', () => {
       });
 
       let anthropicCallCount = 0;
-      let opencodeCallCount = 0;
+      let claudeCodeCallCount = 0;
 
       (anthropicProvider.execute as any).mockImplementation(async () => {
         anthropicCallCount++;
@@ -904,28 +904,28 @@ describe('Provider Switching Integration', () => {
         );
       });
 
-      (opencodeProvider.execute as any).mockImplementation(async () => {
-        opencodeCallCount++;
+      (claudeCodeProvider.execute as any).mockImplementation(async () => {
+        claudeCodeCallCount++;
         return createSuccessResponse(
-          { result: `opencode-${opencodeCallCount}` },
+          { result: `claude-code-${claudeCodeCallCount}` },
           { agentId: 'test', timestamp: Date.now() }
         );
       });
 
       // Act: Alternate between providers
       const r1 = await agent.prompt(prompt);
-      const r2 = await agent.prompt(prompt, { provider: 'opencode' });
+      const r2 = await agent.prompt(prompt, { provider: 'claude-code' });
       const r3 = await agent.prompt(prompt);
-      const r4 = await agent.prompt(prompt, { provider: 'opencode' });
+      const r4 = await agent.prompt(prompt, { provider: 'claude-code' });
 
       // Assert: Each provider maintains independent state
       expect(r1.status === 'success' && r1.data.result).toBe('anthropic-1');
-      expect(r2.status === 'success' && r2.data.result).toBe('opencode-1');
+      expect(r2.status === 'success' && r2.data.result).toBe('claude-code-1');
       expect(r3.status === 'success' && r3.data.result).toBe('anthropic-2');
-      expect(r4.status === 'success' && r4.data.result).toBe('opencode-2');
+      expect(r4.status === 'success' && r4.data.result).toBe('claude-code-2');
 
       expect(anthropicCallCount).toBe(2);
-      expect(opencodeCallCount).toBe(2);
+      expect(claudeCodeCallCount).toBe(2);
     });
   });
 });

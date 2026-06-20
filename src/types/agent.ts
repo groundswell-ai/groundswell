@@ -54,7 +54,7 @@ export interface AgentConfig {
    * ## Model Specification (PRD 7.8)
    *
    * The `parseModelSpec()` utility parses model strings into:
-   * - `provider`: Provider ID (anthropic, opencode, etc.)
+   * - `provider`: Provider ID (anthropic, claude-code, etc.)
    * - `model`: Base model name without prefix
    * - `raw`: Original input string
    *
@@ -74,11 +74,11 @@ export interface AgentConfig {
    * };
    * ```
    *
-   * @example <caption>Qualified format with OpenCode provider</caption>
+   * @example <caption>Qualified format with Claude Code provider</caption>
    * ```ts
    * const config: AgentConfig = {
-   *   model: 'opencode/gpt-4'
-   *   // Explicitly uses OpenCode provider
+   *   model: 'anthropic/claude-sonnet-4'
+   *   // Explicitly uses Anthropic provider
    * };
    * ```
    *

@@ -73,10 +73,10 @@ describe('Agent.stream()', () => {
 
     // Register mock providers
     const anthropicProvider = createMockProvider('anthropic');
-    const opencodeProvider = createMockProvider('opencode');
+    const claudeCodeProvider = createMockProvider('claude-code');
     const registry = ProviderRegistry.getInstance();
     registry.register(anthropicProvider);
-    registry.register(opencodeProvider);
+    registry.register(claudeCodeProvider);
   });
 
   afterEach(() => {
@@ -122,18 +122,18 @@ describe('Agent.stream()', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       vi.clearAllMocks();
 
-      // Act: Override to opencode at prompt level
-      const { stream } = agent.stream(prompt, { provider: 'opencode' });
+      // Act: Override to claude-code at prompt level
+      const { stream } = agent.stream(prompt, { provider: 'claude-code' });
       for await (const _event of stream) {
         // Just consume
       }
 
-      // Assert: opencode provider was used, not anthropic
-      expect(opencodeProvider.execute).toHaveBeenCalled();
+      // Assert: claude-code provider was used, not anthropic
+      expect(claudeCodeProvider.execute).toHaveBeenCalled();
       expect(anthropicProvider.execute).not.toHaveBeenCalled();
     });
 
@@ -162,16 +162,16 @@ describe('Agent.stream()', () => {
     });
 
     it('should prioritize prompt override over agent and global config', async () => {
-      // Arrange: Set global default to opencode
+      // Arrange: Set global default to claude-code
       configureProviders({
-        defaultProvider: 'opencode',
+        defaultProvider: 'claude-code',
         providerDefaults: {
           anthropic: { timeout: 30000 },
-          opencode: { endpoint: 'http://localhost:8080' }
+          'claude-code': { endpoint: 'http://localhost:8080' }
         }
       });
 
-      // Agent configured with anthropic (overrides global opencode)
+      // Agent configured with anthropic (overrides global claude-code)
       const agent = new Agent({ provider: 'anthropic' });
       const prompt = new Prompt({
         user: 'test',
@@ -181,18 +181,18 @@ describe('Agent.stream()', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       vi.clearAllMocks();
 
-      // Act: Prompt override to opencode (highest priority)
-      const { stream } = agent.stream(prompt, { provider: 'opencode' });
+      // Act: Prompt override to claude-code (highest priority)
+      const { stream } = agent.stream(prompt, { provider: 'claude-code' });
       for await (const _event of stream) {
         // Just consume
       }
 
       // Assert: Prompt override wins over agent and global config
-      expect(opencodeProvider.execute).toHaveBeenCalled();
+      expect(claudeCodeProvider.execute).toHaveBeenCalled();
       expect(anthropicProvider.execute).not.toHaveBeenCalled();
     });
 
@@ -211,11 +211,11 @@ describe('Agent.stream()', () => {
 
       // Act & Assert: Try to use unregistered provider
       await expect(async () => {
-        const { stream } = agent.stream(prompt, { provider: 'opencode' as ProviderId });
+        const { stream } = agent.stream(prompt, { provider: 'claude-code' as ProviderId });
         for await (const _event of stream) {
           // Just consume
         }
-      }).rejects.toThrow(/Harness 'opencode' is not registered/);
+      }).rejects.toThrow(/Harness 'claude-code' is not registered/);
     });
 
     it('should switch providers between streams', async () => {
@@ -225,7 +225,7 @@ describe('Agent.stream()', () => {
       // Get mock providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       vi.clearAllMocks();
 
@@ -238,8 +238,8 @@ describe('Agent.stream()', () => {
       const { stream: s1 } = agent.stream(prompt);
       for await (const _event of s1) { /* consume */ }
 
-      // Act 2: Second stream with opencode override
-      const { stream: s2 } = agent.stream(prompt, { provider: 'opencode' });
+      // Act 2: Second stream with claude-code override
+      const { stream: s2 } = agent.stream(prompt, { provider: 'claude-code' });
       for await (const _event of s2) { /* consume */ }
 
       // Act 3: Third stream back to anthropic (no override)
@@ -248,7 +248,7 @@ describe('Agent.stream()', () => {
 
       // Assert: Both providers were used correctly
       expect(anthropicProvider.execute).toHaveBeenCalledTimes(2);
-      expect(opencodeProvider.execute).toHaveBeenCalledTimes(1);
+      expect(claudeCodeProvider.execute).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -376,7 +376,7 @@ describe('Agent.stream()', () => {
             apiKey: 'sk-global',
             endpoint: 'https://api.global.com'
           },
-          opencode: {
+          'claude-code': {
             timeout: 60000,
             endpoint: 'http://localhost:8080'
           }
@@ -385,7 +385,7 @@ describe('Agent.stream()', () => {
 
       // Agent with options
       const agent = new Agent({
-        provider: 'opencode',
+        provider: 'claude-code',
         providerOptions: { timeout: 10000, headers: { 'X-Agent': 'agent-value' } }
       });
 
@@ -458,36 +458,36 @@ describe('Agent.stream()', () => {
         responseFormat: z.object({ result: z.string() })
       });
 
-      // Get opencode provider and mock streaming behavior
+      // Get claude-code provider and mock streaming behavior
       const registry = ProviderRegistry.getInstance();
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
-      (opencodeProvider.execute as any).mockImplementation(async function* () {
+      (claudeCodeProvider.execute as any).mockImplementation(async function* () {
         yield { type: 'text_delta', delta: 'Open' } as StreamEvent;
         yield { type: 'text_delta', delta: 'Code' } as StreamEvent;
         yield { type: 'done', finishReason: 'stop' } as StreamEvent;
         return createSuccessResponse(
-          { result: 'OpenCode' },
+          { result: 'claude-code' },
           { agentId: 'test', timestamp: Date.now() }
         );
       });
 
       vi.clearAllMocks();
 
-      // Act: Stream with opencode override
-      const { stream } = agent.stream(prompt, { provider: 'opencode' });
+      // Act: Stream with claude-code override
+      const { stream } = agent.stream(prompt, { provider: 'claude-code' });
       const events: StreamEvent[] = [];
 
       for await (const event of stream) {
         events.push(event);
       }
 
-      // Assert: Events came from opencode provider
+      // Assert: Events came from claude-code provider
       expect(events).toHaveLength(3);
       expect(events[0]).toEqual({ type: 'text_delta', delta: 'Open' });
       expect(events[1]).toEqual({ type: 'text_delta', delta: 'Code' });
       expect(events[2]).toEqual({ type: 'done', finishReason: 'stop' });
-      expect(opencodeProvider.execute).toHaveBeenCalled();
+      expect(claudeCodeProvider.execute).toHaveBeenCalled();
     });
 
     it('should yield complete response from overridden provider', async () => {
@@ -499,14 +499,14 @@ describe('Agent.stream()', () => {
       });
 
       const registry = ProviderRegistry.getInstance();
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       const mockResponse = createSuccessResponse(
         { result: 'final result' },
         { agentId: 'test', timestamp: Date.now(), duration: 123 }
       );
 
-      (opencodeProvider.execute as any).mockImplementation(async function* () {
+      (claudeCodeProvider.execute as any).mockImplementation(async function* () {
         yield { type: 'text_delta', delta: 'streaming' } as StreamEvent;
         return mockResponse;
       });
@@ -514,17 +514,17 @@ describe('Agent.stream()', () => {
       vi.clearAllMocks();
 
       // Act
-      const { stream } = agent.stream(prompt, { provider: 'opencode' });
+      const { stream } = agent.stream(prompt, { provider: 'claude-code' });
       const events: StreamEvent[] = [];
 
       for await (const event of stream) {
         events.push(event);
       }
 
-      // Assert: Events were yielded from opencode provider
+      // Assert: Events were yielded from claude-code provider
       expect(events).toHaveLength(1);
       expect(events[0]).toEqual({ type: 'text_delta', delta: 'streaming' });
-      expect(opencodeProvider.execute).toHaveBeenCalled();
+      expect(claudeCodeProvider.execute).toHaveBeenCalled();
     });
   });
 
@@ -544,11 +544,11 @@ describe('Agent.stream()', () => {
 
       // Act & Assert: Try to stream with unregistered provider
       await expect(async () => {
-        const { stream } = agent.stream(prompt, { provider: 'opencode' as ProviderId });
+        const { stream } = agent.stream(prompt, { provider: 'claude-code' as ProviderId });
         for await (const _event of stream) {
           // Just consume
         }
-      }).rejects.toThrow(/Harness 'opencode' is not registered/);
+      }).rejects.toThrow(/Harness 'claude-code' is not registered/);
     });
 
     it('should yield error event on provider execution failure', async () => {
@@ -597,7 +597,7 @@ describe('Agent.stream()', () => {
       // Get providers
       const registry = ProviderRegistry.getInstance();
       const anthropicProvider = registry.get('anthropic')!;
-      const opencodeProvider = registry.get('opencode')!;
+      const claudeCodeProvider = registry.get('claude-code')!;
 
       vi.clearAllMocks();
 
@@ -605,7 +605,7 @@ describe('Agent.stream()', () => {
       const { stream: s1 } = agent.stream(prompt, { provider: 'anthropic' });
       for await (const _event of s1) { /* consume */ }
 
-      const { stream: s2 } = agent.stream(prompt, { provider: 'opencode' });
+      const { stream: s2 } = agent.stream(prompt, { provider: 'claude-code' });
       for await (const _event of s2) { /* consume */ }
 
       const { stream: s3 } = agent.stream(prompt); // Uses agent default (anthropic)
@@ -613,7 +613,7 @@ describe('Agent.stream()', () => {
 
       // Assert: Correct provider used for each stream
       expect(anthropicProvider.execute).toHaveBeenCalledTimes(2);
-      expect(opencodeProvider.execute).toHaveBeenCalledTimes(1);
+      expect(claudeCodeProvider.execute).toHaveBeenCalledTimes(1);
     });
   });
 });

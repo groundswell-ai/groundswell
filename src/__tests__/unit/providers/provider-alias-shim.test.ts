@@ -8,7 +8,7 @@
  *   ProviderRequest are type-identical to their Harness* counterparts.
  * - ToolExecutionRequest / ToolExecutionResult are the harness types (re-export).
  * - ModelSpec accepts the open ModelProviderId set.
- * - Bucket B: ProviderId is a superset (HarnessId | 'anthropic' | 'opencode').
+ * - Bucket B: ProviderId is a superset (HarnessId | 'anthropic').
  * - Bucket C: Concrete types still expose the fields consumers rely on.
  *
  * PRP: P1.M1.T3.S1 — Provider* → Harness* deprecated alias shim
@@ -98,9 +98,9 @@ describe('Provider* deprecated alias shim', () => {
   // ── Bucket B: ProviderId superset ─────────────────────────────────────────────
 
   describe('Bucket B — ProviderId superset', () => {
-    it('ProviderId accepts all four literals (harness + legacy)', () => {
-      const ids: ProviderId[] = ['pi', 'claude-code', 'anthropic', 'opencode'];
-      expect(ids).toHaveLength(4);
+    it('ProviderId accepts all three literals (harness + legacy)', () => {
+      const ids: ProviderId[] = ['pi', 'claude-code', 'anthropic'];
+      expect(ids).toHaveLength(3);
     });
 
     it('ProviderId accepts new harness axis literals', () => {
@@ -112,9 +112,7 @@ describe('Provider* deprecated alias shim', () => {
 
     it('ProviderId accepts legacy adapter literals', () => {
       const legacyAnthropic: ProviderId = 'anthropic';
-      const legacyOpencode: ProviderId = 'opencode';
       expect(legacyAnthropic).toBe('anthropic');
-      expect(legacyOpencode).toBe('opencode');
     });
   });
 
