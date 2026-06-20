@@ -5,6 +5,7 @@
 
 import type { Tool, MCPServer, Skill, AgentHooks, TokenUsage } from './sdk-primitives.js';
 import type { ProviderId, ProviderOptions } from './providers.js';
+import type { HarnessId, HarnessOptions } from './harnesses.js';
 import { z } from 'zod';
 
 /**
@@ -93,36 +94,16 @@ export interface AgentConfig {
   /** Temperature for response generation */
   temperature?: number;
 
+  /** Harness to use (inherits from global; default 'pi'). PRD §7.9. */
+  harness?: HarnessId;
+
+  /** Harness-specific options. PRD §7.9. */
+  harnessOptions?: HarnessOptions;
+
   /**
    * Provider to use for this agent
    *
-   * Overrides the global default provider configured via
-   * `configureProviders()`. If not specified, uses the global
-   * default provider.
-   *
-   * ## Configuration Cascade (PRD 7.7)
-   *
-   * Priority order for provider resolution (highest to lowest):
-   * 1. Prompt-level provider override (highest)
-   * 2. AgentConfig.provider (this field)
-   * 3. GlobalProviderConfig.defaultProvider (lowest)
-   *
-   * @example <caption>Explicit Anthropic provider</caption>
-   * ```ts
-   * const config: AgentConfig = {
-   *   provider: 'anthropic'
-   * };
-   * ```
-   *
-   * @example <caption>Explicit OpenCode provider</caption>
-   * ```ts
-   * const config: AgentConfig = {
-   *   provider: 'opencode'
-   * };
-   * ```
-   *
-   * @see {@link GlobalProviderConfig} for global provider configuration
-   * @see {@link parseModelSpec} for model specification parsing
+   * @deprecated Use `harness` instead. Retained for backward compatibility during the v1.2 migration.
    */
   provider?: ProviderId;
 

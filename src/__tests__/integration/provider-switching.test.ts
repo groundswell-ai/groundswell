@@ -154,13 +154,13 @@ describe('Provider Switching Integration', () => {
     it('should throw when provider is not registered', () => {
       expect(() => {
         new Agent({ provider: 'anthropic' });
-      }).toThrow('Provider');
+      }).toThrow('Harness');
     });
 
     it('should throw with descriptive error message for unregistered provider', () => {
       expect(() => {
         new Agent({ provider: 'nonexistent-provider' as ProviderId });
-      }).toThrow("Provider 'nonexistent-provider' is not registered");
+      }).toThrow("Harness 'nonexistent-provider' is not registered");
     });
 
     it('should use different providers for different agents', async () => {

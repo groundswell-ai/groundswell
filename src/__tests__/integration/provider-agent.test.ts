@@ -155,13 +155,13 @@ describe('Agent → Provider → SDK Integration', () => {
     it('should throw when provider is not registered', () => {
       expect(() => {
         new Agent({ provider: 'claude-code' });
-      }).toThrow('Provider');
+      }).toThrow('Harness');
     });
 
     it('should throw with descriptive error message for unregistered provider', () => {
       expect(() => {
         new Agent({ provider: 'nonexistent-provider' });
-      }).toThrow("Provider 'nonexistent-provider' is not registered");
+      }).toThrow("Harness 'nonexistent-provider' is not registered");
     });
 
     it('should create Agent with registered Anthropic provider', async () => {

@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Agent } from '../../core/agent.js';
 import { MCPHandler } from '../../core/mcp-handler.js';
 import { Prompt } from '../../core/prompt.js';
-import { ProviderRegistry } from '../../harnesses/harness-registry.js';
-import type { Provider, ProviderId, ProviderCapabilities } from '../../types/providers.js';
+import { HarnessRegistry } from '../../harnesses/harness-registry.js';
+import type { Harness, HarnessId, HarnessCapabilities } from '../../types/harnesses.js';
 import type { ModelSpec } from '../../types/providers.js';
+import { configureHarnesses, resetGlobalHarnessConfig } from '../../utils/harness-config.js';
 import { z } from 'zod';
 import {
   isSuccess,
@@ -14,10 +15,10 @@ import {
 } from '../../types/agent.js';
 
 /**
- * Helper function to create mock Provider for testing
+ * Helper function to create mock Harness for testing
  */
-function createMockProvider(id: ProviderId): Provider {
-  const capabilities: ProviderCapabilities = {
+function createMockHarness(id: HarnessId): Harness {
+  const capabilities: HarnessCapabilities = {
     mcp: true,
     skills: true,
     lsp: false,
@@ -35,23 +36,25 @@ function createMockProvider(id: ProviderId): Provider {
     registerMCPs: vi.fn().mockResolvedValue([]),
     loadSkills: vi.fn().mockResolvedValue(undefined),
     normalizeModel: vi.fn((model: string): ModelSpec => ({
-      provider: id,
+      provider: id as any,
       model,
       raw: model,
     })),
+    supports: vi.fn(() => true),
+    requiresFeatures: vi.fn(() => true),
   };
 }
 
 describe('Agent', () => {
   beforeEach(() => {
-    // Register mock anthropic provider before each test
-    const mockProvider = createMockProvider('anthropic');
-    ProviderRegistry.getInstance().register(mockProvider);
+    // Register mock anthropic harness before each test (legacy compat)
+    const mockHarness = createMockHarness('anthropic' as HarnessId);
+    HarnessRegistry.getInstance().register(mockHarness);
   });
 
   afterEach(() => {
     // Clean up registry after each test
-    ProviderRegistry['_resetForTesting']();
+    HarnessRegistry['_resetForTesting']();
   });
   it('should create with unique id', () => {
     const a1 = new Agent();
@@ -95,6 +98,45 @@ describe('Agent', () => {
     const handler = agent.getMcpHandler();
     expect(handler.getServerNames()).toContain('test-mcp');
     expect(handler.hasTool('test-mcp__test_tool')).toBe(true);
+  });
+});
+
+describe('Agent harness resolution', () => {
+  beforeEach(() => {
+    resetGlobalHarnessConfig();
+    HarnessRegistry['_resetForTesting']();
+  });
+
+  afterEach(() => {
+    resetGlobalHarnessConfig();
+    HarnessRegistry['_resetForTesting']();
+  });
+
+  it('resolves an explicit harness from AgentConfig.harness', () => {
+    HarnessRegistry.getInstance().register(createMockHarness('claude-code'));
+    configureHarnesses({ defaultHarness: 'claude-code' });
+    const agent = new Agent({ harness: 'claude-code' }); // no throw
+    expect(agent.getMcpHandler()).toBeInstanceOf(MCPHandler);
+  });
+
+  it('falls back to the legacy provider field', () => {
+    HarnessRegistry.getInstance().register(createMockHarness('anthropic' as HarnessId));
+    const agent = new Agent({ provider: 'anthropic' as any }); // no throw
+    expect(agent.id).toBeDefined();
+  });
+
+  it('uses the configured global default harness', () => {
+    // The constructor reads getGlobalProviderConfig() (legacy singleton, default 'anthropic').
+    // Register the legacy default so new Agent() resolves without throwing.
+    HarnessRegistry.getInstance().register(createMockHarness('anthropic' as HarnessId));
+    const agent = new Agent(); // no throw — resolves 'anthropic' from legacy default
+    expect(agent.name).toBe('Agent');
+  });
+
+  it('throws when the resolved harness is not registered', () => {
+    // The constructor reads getGlobalProviderConfig() (legacy singleton, default 'anthropic').
+    // No 'anthropic' stub registered → throw.
+    expect(() => new Agent()).toThrow(/Harness 'anthropic' is not registered/);
   });
 });
 
@@ -222,14 +264,14 @@ describe('MCPHandler', () => {
 // using mock responses to avoid real API calls
 describe('Agent.prompt()', () => {
   beforeEach(() => {
-    // Register mock provider before each test
-    const mockProvider = createMockProvider('anthropic');
-    ProviderRegistry.getInstance().register(mockProvider);
+    // Register mock harness before each test
+    const mockHarness = createMockHarness('anthropic' as HarnessId);
+    HarnessRegistry.getInstance().register(mockHarness);
   });
 
   afterEach(() => {
     // Clean up registry after each test
-    ProviderRegistry['_resetForTesting']();
+    HarnessRegistry['_resetForTesting']();
   });
 
   describe('Success Cases', () => {
@@ -626,15 +668,15 @@ describe('Agent.prompt() response validation', () => {
   let agent: Agent;
 
   beforeEach(() => {
-    // Register mock provider before creating Agent
-    const mockProvider = createMockProvider('anthropic');
-    ProviderRegistry.getInstance().register(mockProvider);
+    // Register mock harness before creating Agent
+    const mockHarness = createMockHarness('anthropic' as HarnessId);
+    HarnessRegistry.getInstance().register(mockHarness);
     agent = new Agent({ name: 'Test Agent' });
   });
 
   afterEach(() => {
     // Clean up registry after each test
-    ProviderRegistry['_resetForTesting']();
+    HarnessRegistry['_resetForTesting']();
   });
 
   it('should have INTERNAL_ERROR in AGENT_ERROR_CODES', async () => {

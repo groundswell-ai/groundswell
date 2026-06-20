@@ -515,14 +515,14 @@
               "type": "Task",
               "id": "P3.M1.T1",
               "title": "Agent constructor harness resolution",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Rewire the Agent constructor to resolve the harness via the dual cascade and fetch it from HarnessRegistry.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M1.T1.S1",
                   "title": "Agent: harness field + cascade + HarnessRegistry.get",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T2.S1",

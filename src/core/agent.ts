@@ -40,8 +40,8 @@ import type {
   ToolExecutionRequest,
   ToolExecutionResult,
 } from '../types/providers.js';
-import { ProviderRegistry } from '../harnesses/index.js';
-import type { Provider } from '../types/providers.js';
+import { HarnessRegistry } from '../harnesses/index.js';
+import type { Harness, HarnessId, HarnessOptions } from '../types/harnesses.js';
 import { resolveProviderConfig, getGlobalProviderConfig } from '../utils/provider-config.js';
 import type { AsyncStream, StreamEvent } from '../types/streaming.js';
 
@@ -81,14 +81,14 @@ export class Agent {
   /** Default model to use */
   private readonly model: string;
 
-  /** Provider to use for this agent (optional) */
-  private readonly providerId?: ProviderId;
+  /** Harness to use for this agent (resolved at construction) */
+  private readonly harnessId?: HarnessId;
 
-  /** Provider-specific options for this agent (optional) */
-  private readonly providerOptions?: ProviderOptions;
+  /** Harness-specific options for this agent */
+  private readonly harnessOptions?: HarnessOptions;
 
-  /** Provider instance from registry (resolved at construction) */
-  private readonly provider: Provider;
+  /** Harness instance from registry (resolved at construction) */
+  private readonly harness: Harness;
 
   /**
    * Create a new Agent instance
@@ -100,28 +100,35 @@ export class Agent {
     this.config = config;
     this.model = config.model ?? 'claude-sonnet-4-20250514';
 
-    // Store provider configuration from AgentConfig
-    // Full provider resolution (global + agent + prompt) happens later during execution
-    this.providerId = config.provider;
-    this.providerOptions = config.providerOptions;
+    // Store harness configuration from AgentConfig (PRD §7.9).
+    // Backward-compat bridge: prefer the new `harness` field; fall back to the legacy `provider`
+    // field so existing callers (`new Agent({ provider: 'anthropic' })`) keep working during the
+    // v1.2 migration. The fallback + legacy global-config singleton are removed by T2 (P3.M1.T2)
+    // when executePrompt/stream + the test suite move to configureHarnesses/getGlobalHarnessConfig.
+    this.harnessId = config.harness ?? (config.provider as HarnessId | undefined);
+    this.harnessOptions = config.harnessOptions ?? config.providerOptions;
 
-    // Resolve effective provider using configuration cascade
-    // Priority: agent provider -> global default provider
+    // Resolve the effective harness via the configuration cascade (PRD §7.7).
+    // resolveProviderConfig DELEGATES to resolveHarnessConfig (harness-config.ts L367-368);
+    // getGlobalProviderConfig is used as the global source to honour the legacy configureProviders()
+    // singleton still consumed by executePrompt/stream + the existing test suite.
     const globalConfig = getGlobalProviderConfig();
     const resolved = resolveProviderConfig(
       globalConfig,
-      this.providerId,
-      this.providerOptions
+      this.harnessId,
+      this.harnessOptions,
     );
-    const effectiveProvider = resolved.provider;
+    const effectiveHarness = resolved.provider;
 
-    // Get provider instance from registry
-    const registry = ProviderRegistry.getInstance();
-    const providerInstance = registry.get(effectiveProvider);
-    if (!providerInstance) {
-      throw new Error(`Provider '${effectiveProvider}' is not registered`);
+    // Fetch the harness instance from HarnessRegistry (the v1.2 rename of ProviderRegistry).
+    // The cast bridges the legacy Provider return type to the Harness contract — structurally
+    // identical at runtime; the cast exists only because Provider.id is a wider type than Harness.id.
+    const registry = HarnessRegistry.getInstance();
+    const harnessInstance = registry.get(effectiveHarness) as Harness | undefined;
+    if (!harnessInstance) {
+      throw new Error(`Harness '${effectiveHarness}' is not registered`);
     }
-    this.provider = providerInstance;
+    this.harness = harnessInstance;
 
     // Initialize MCP handler
     this.mcpHandler = new MCPHandler();
@@ -356,14 +363,14 @@ export class Agent {
     const globalConfig = getGlobalProviderConfig();
     const { provider: resolvedProvider, options: resolvedProviderOptions } = resolveProviderConfig(
       globalConfig,
-      this.providerId,
-      this.providerOptions,
+      this.harnessId,
+      this.harnessOptions,
       promptProvider,
       promptProviderOptions
     );
 
-    // Get provider instance for resolved provider (may differ from this.provider)
-    const registry = ProviderRegistry.getInstance();
+    // Get provider instance for resolved provider (may differ from this.harness)
+    const registry = HarnessRegistry.getInstance();
     const providerInstance = registry.get(resolvedProvider);
     if (!providerInstance) {
       throw new Error(`Provider '${resolvedProvider}' is not registered`);
@@ -586,14 +593,14 @@ export class Agent {
     const globalConfig = getGlobalProviderConfig();
     const { provider: resolvedProvider, options: resolvedProviderOptions } = resolveProviderConfig(
       globalConfig,
-      this.providerId,
-      this.providerOptions,
+      this.harnessId,
+      this.harnessOptions,
       promptProvider,
       promptProviderOptions
     );
 
-    // Get provider instance for resolved provider (may differ from this.provider)
-    const registry = ProviderRegistry.getInstance();
+    // Get provider instance for resolved provider (may differ from this.harness)
+    const registry = HarnessRegistry.getInstance();
     const providerInstance = registry.get(resolvedProvider);
     if (!providerInstance) {
       return createErrorResponse(
