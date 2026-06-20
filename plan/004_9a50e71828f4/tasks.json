@@ -508,7 +508,7 @@
           "type": "Milestone",
           "id": "P3.M1",
           "title": "Agent Harness Rewire",
-          "status": "Researching",
+          "status": "Complete",
           "description": "Migrate src/core/agent.ts — the central consumer — from Provider/ProviderRegistry/provider-config to Harness/HarnessRegistry/harness-config across the constructor, executePrompt, and stream, and thread harness+provider into the cache key.",
           "tasks": [
             {
@@ -542,7 +542,7 @@
               "type": "Task",
               "id": "P3.M1.T2",
               "title": "Agent executePrompt + stream + cache key rewire",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Update executePrompt() and stream() to resolve the harness per-call (prompt override), build HarnessRequest, and thread harness+provider into the cache key.",
               "subtasks": [
                 {
@@ -580,7 +580,7 @@
                   "type": "Subtask",
                   "id": "P3.M1.T2.S3",
                   "title": "Thread harness + provider into the cache key build-site",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M3.T1.S1",
@@ -607,14 +607,14 @@
               "type": "Task",
               "id": "P3.M2.T1",
               "title": "AgentConfig harness fields",
-              "status": "Planned",
+              "status": "Researching",
               "description": "Add harness?: HarnessId and harnessOptions?: HarnessOptions to AgentConfig; deprecate provider/providerOptions.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P3.M2.T1.S1",
                   "title": "Add harness/harnessOptions to AgentConfig",
-                  "status": "Planned",
+                  "status": "Researching",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S2"

@@ -43,6 +43,8 @@ import type {
 import { HarnessRegistry } from '../harnesses/index.js';
 import type { Harness, HarnessId, HarnessOptions, HarnessRequest, HarnessHookEvents } from '../types/harnesses.js';
 import { resolveProviderConfig, getGlobalProviderConfig } from '../utils/provider-config.js';
+import { getGlobalHarnessConfig } from '../utils/harness-config.js';
+import { parseModelSpec } from '../utils/model-spec.js';
 import type { AsyncStream, StreamEvent } from '../types/streaming.js';
 
 /**
@@ -651,11 +653,21 @@ export class Agent {
     let cacheKey: string | undefined;
 
     if (cacheEnabled) {
+      // PRD §7.14.5: isolate cache entries per (harness, provider, model).
+      // - harness: the resolved HarnessId (PRD §7.7 cascade, resolved above).
+      // - provider: the LLM host parsed from the effective model spec (PRD §7.8). Bare models
+      //   resolve against the global defaultModelProvider (defaults to 'anthropic' when unset).
+      //   NOTE: parseModelSpec throws on invalid model strings — intentional fail-fast.
+      const defaultModelProvider = getGlobalHarnessConfig().defaultModelProvider;
+      const modelSpec = parseModelSpec(effectiveModel, defaultModelProvider);
+
       const cacheInputs: CacheKeyInputs = {
         user: prompt.buildUserMessage(),
         data: prompt.getData(),
         system: effectiveSystem,
         model: effectiveModel,
+        harness: resolvedHarness as HarnessId,  // PRD §7.14.5 — harness axis (ProviderId ⊃ HarnessId; cast safe)
+        provider: modelSpec.provider,    // PRD §7.14.5 — LLM provider axis (from ModelSpec, §7.8)
         temperature: effectiveTemperature,
         maxTokens: effectiveMaxTokens,
         tools: this.config.tools,
