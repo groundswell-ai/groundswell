@@ -152,7 +152,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S2",
                   "title": "Thread toolExecutor into PiHarness.buildCustomTools and rebind each tool's execute to invoke it; update both call sites",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P1.M2.T1.S1"

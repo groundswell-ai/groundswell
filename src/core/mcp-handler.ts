@@ -18,7 +18,7 @@ import type {
 } from '@earendil-works/pi-coding-agent';
 import { jsonSchemaToTypebox } from '../harnesses/pi-schema-converter.js';
 import { z } from 'zod';
-import type { MCPServer, Tool, ToolResult, ToolExecutionResult } from '../types/index.js';
+import type { MCPServer, Tool, ToolResult, ToolExecutionResult, ToolExecutionRequest } from '../types/index.js';
 
 /**
  * Tool executor function type
@@ -232,8 +232,14 @@ export class MCPHandler {
    * `registered.executor` returns the RAW executor output (unknown) — stringified
    * via {@link toAgentToolResult} (mirrors toAgentSDKServer's handler). Errors are
    * caught → isError:true (never re-thrown), matching Claude-path semantics.
+   *
+   * When `toolExecutor` is provided (PRD §7.10 bridge), each tool's `execute` dispatches
+   * through the caller-supplied executor instead of `registered.executor`. The result is
+   * converted via {@link toAgentToolResultFromExecResult} (reads `result.content`/`result.isError`).
    */
-  public toPiCustomTools(): ToolDefinition[] {
+  public toPiCustomTools(
+    toolExecutor?: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
+  ): ToolDefinition[] {
     const tools = this.getTools();
     if (tools.length === 0) return [];
     return Array.from(this.registeredTools.entries()).map(([fullName, registered]) =>
@@ -250,6 +256,11 @@ export class MCPHandler {
           _ctx: ExtensionContext,
         ): Promise<AgentToolResult<{ isError: boolean }>> => {
           try {
+            if (toolExecutor) {
+              // PRD §7.10 bridge: caller's toolExecutor (Agent.toolExecutor) is the dispatch target.
+              const res = await toolExecutor({ name: fullName, input: params });
+              return this.toAgentToolResultFromExecResult(res);
+            }
             const result = await registered.executor(params);
             return this.toAgentToolResult(result, false);
           } catch (error) {

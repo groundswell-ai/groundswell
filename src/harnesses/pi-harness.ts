@@ -247,7 +247,7 @@ export class PiHarness implements Harness {
         model,
         modelRegistry: this.modelRegistry,
         authStorage: this.authStorage,
-        customTools: this.buildCustomTools(),
+        customTools: this.buildCustomTools(toolExecutor),
         ...(resourceLoader ? { resourceLoader } : {}), // skills injection; omitted when no skills
       });
 
@@ -367,7 +367,7 @@ export class PiHarness implements Harness {
       model,
       modelRegistry: this.modelRegistry,
       authStorage: this.authStorage,
-      customTools: this.buildCustomTools(),
+      customTools: this.buildCustomTools(toolExecutor),
       ...(resourceLoader ? { resourceLoader } : {}), // skills injection; omitted when no skills
     });
 
@@ -655,9 +655,15 @@ export class PiHarness implements Harness {
    * Delegates to `MCPHandler.toPiCustomTools()` (P2.M4.T1.S2) which produces schema-faithful
    * ToolDefinitions with REAL TypeBox `parameters` (converted via `jsonSchemaToTypebox`) and
    * `execute` delegating to `registered.executor` (Claude parity).
+   *
+   * When `toolExecutor` is provided (PRD §7.10 bridge), forwards it to `toPiCustomTools` so
+   * each tool's `execute` dispatches through the caller-supplied executor instead of the
+   * harness's internal `registered.executor`.
    */
-  private buildCustomTools(): ToolDefinition[] {
-    return this.mcpHandler.toPiCustomTools();
+  private buildCustomTools(
+    toolExecutor?: (req: ToolExecutionRequest) => Promise<ToolExecutionResult>,
+  ): ToolDefinition[] {
+    return this.mcpHandler.toPiCustomTools(toolExecutor);
   }
 
   /**
