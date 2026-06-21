@@ -5,29 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.5.0] - 2026-01-26
-
-### Deprecated
-
-- **OpenCodeProvider** (Major): OpenCodeProvider is deprecated and will be removed in v2.0.0.
-  - **Reason**: Architectural mismatch with PRD requirements, high maintenance burden, and lack of full feature parity
-  - **Migration Path**: Use `AnthropicProvider` for full MCP and LSP integration
-  - **Timeline**: 6-month migration period (January 2026 - July 2026)
-  - See [Migration Guide](docs/migration-opencode-removal.md) for detailed instructions.
-
-### Changed
-
-- **Documentation updates**: Removed all OpenCode and multi-provider references from:
-  - PRD.md
-  - docs/providers.md
-  - examples/providers/README.md
-
-### Added
-
-- **Deprecation warnings**: OpenCodeProvider now shows deprecation warning on first `initialize()` call
-- **Migration guide**: Comprehensive migration documentation at `docs/migration-opencode-removal.md`
-- **Deprecation test coverage**: New test file `opencode-provider-deprecation.test.ts` verifies warning behavior
-
 ## [0.0.3] - 2026-01-12
 
 ### Fixed

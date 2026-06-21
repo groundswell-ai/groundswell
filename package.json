@@ -1,6 +1,6 @@
 {
   "name": "groundswell",
-  "version": "0.0.4",
+  "version": "0.0.3",
   "url": "https://github.com/groundswell-ai/groundswell",
   "description": "Hierarchical workflow orchestration engine with full observability",
   "keywords": [
@@ -78,6 +78,7 @@
     "node": ">=20"
   },
   "files": [
-    "dist"
+    "dist",
+    "LICENSE"
   ]
 }

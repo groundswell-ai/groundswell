@@ -8,7 +8,7 @@ Hierarchical workflow orchestration engine with full observability.
 npm install groundswell
 ```
 
-**Requirements:** Node.js 18+, TypeScript 5.2+
+**Requirements:** Node.js 20+, TypeScript 5.2+
 
 ## Quick Start
 
@@ -311,6 +311,12 @@ See [examples/](examples/) for source code.
 ## Contributing
 
 Contributions and issues are welcome.
+
+### Releasing
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please). When `feat:` / `fix:` / `BREAKING CHANGE` commits land on `main`, release-please opens a release PR that bumps the version, updates `CHANGELOG.md`, and tags a release. Merging that PR publishes to npm.
+
+One-time setup: add an **`NPM_TOKEN`** secret to the repository (an npm *automation* access token, or a granular access token with publish permission).
 
 ## Support
 
