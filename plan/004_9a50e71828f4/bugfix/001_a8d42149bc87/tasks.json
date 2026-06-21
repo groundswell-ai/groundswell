@@ -4,7 +4,7 @@
       "type": "Phase",
       "id": "P1",
       "title": "Harness System Integration Bugfix",
-      "status": "Planned",
+      "status": "Complete",
       "description": "End-to-end validation and repair of the Harness System (PRD §7) integration bugs delivered in plan/004_9a50e71828f4. Four in-scope issues: (1) CRITICAL — configureHarnesses() global default never reaches the Agent, so default/no-harness Agent construction throws 'Harness anthropic is not registered'; (2) MAJOR — PiHarness ignores the toolExecutor callback, making Agent-configured tools invisible/non-executable (PRD §7.10); (3) MINOR — streaming metadata.provider reports the harness id instead of the LLM provider; (4) MINOR — registerDefaultHarnesses() is not exported from the public barrel and never auto-invoked (compounds Issue 1). Issue 5 (unicode workflow names) is explicitly OUT OF SCOPE. Success criterion: the shipped example examples/harnesses/02-harness-configuration.ts and the PRD §7.6 quickstart (configureHarnesses + new Agent({model})) work end-to-end, and the full npm test suite is green.",
       "milestones": [
         {
@@ -190,21 +190,21 @@
           "type": "Milestone",
           "id": "P1.M3",
           "title": "Minor — Streaming Metadata Provider Semantics (Issue 3)",
-          "status": "Planned",
+          "status": "Complete",
           "description": "The streaming metadata StreamEvent reports the harness id as provider (pi-harness emits 'pi', claude-code-harness emits 'claude-code') instead of the resolved LLM provider (e.g. 'anthropic'). Both harnesses set `provider: this.id`. While shape-parity holds (PRD §7.14.4), the value is semantically wrong per PRD §7.8 ('the harness is never part of the model string' / harness ⊥ provider). Fix both emission sites to use modelSpec.provider, and update the two value-asserting tests that will break.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M3.T1",
               "title": "Fix metadata.provider conflation in both harnesses and update the two affected tests",
-              "status": "Planned",
+              "status": "Complete",
               "description": "One-token semantic fix at both streaming metadata emission sites (this.id → modelSpec.provider), plus updating the two existing tests that assert the old (wrong) harness-id values.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P1.M3.T1.S1",
                   "title": "Change metadata.provider from this.id to modelSpec.provider in PiHarness + ClaudeCodeHarness; update the two breaking value assertions",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [],
                   "context_scope": "CONTRACT DEFINITION:\n1. RESEARCH NOTE: See architecture/issue3-4-metadata-and-exports.md (Issue 3 section). Two emission sites set `provider: this.id`:\n   - src/harnesses/pi-harness.ts L374-382 (inside executeStreaming): `yield { type:'metadata', metadata: { requestId: \\`${this.id}-${Date.now()}\\`, model: modelSpec.model, provider: this.id } }`. modelSpec is in scope at L358 (`const modelSpec = this.normalizeModel(request.options.model ?? 'claude-sonnet-4-20250514')`).\n   - src/harnesses/claude-code-harness.ts L696-704 (inside executeStreaming): same shape, `provider: this.id`. modelSpec in scope at L666-669.\n   StreamEvent type (src/types/streaming.ts L41): { type:'metadata'; metadata:{ requestId?:string; model?:string; provider:string } } — provider is the only REQUIRED field. ModelSpec.provider (types/harnesses.ts L229-238) is the correct LLM host (ModelProviderId).\n2. INPUT: modelSpec is already computed and in scope at both sites. No new imports needed (modelSpec is a local const).\n3. LOGIC: At BOTH sites, change `provider: this.id` → `provider: modelSpec.provider`. Leave model: modelSpec.model unchanged (already correct). Do not touch requestId (it intentionally includes this.id).\n4. OUTPUT: Streaming metadata now reports the LLM provider. CRITICAL — TWO EXISTING TESTS ASSERT THE OLD VALUE AND MUST BE UPDATED (verified via grep):\n   - src/__tests__/unit/providers/pi-harness-streaming.test.ts:210: `expect(events[0].metadata.provider).toBe('pi');` → change to the modelSpec.provider the test's model resolves to (e.g. 'anthropic' if the test uses a default/anthropic model — inspect the test's input model and the normalizeModel output to set the correct expected value).\n   - src/__tests__/unit/providers/claude-code-harness-execute.test.ts:1218: `expect(events[0].metadata.provider).toBe('claude-code');` → change to the resolved modelSpec.provider (e.g. 'anthropic').\n   Inspect each test's actual model input to compute the precise expected provider value before updating (do not assume 'anthropic' — read the test fixture). Run `grep -rn \"metadata.provider\\|metadata: { provider\" src/__tests__/` after the edit to confirm no other assertion references the old harness-id values.\n5. MOCKING: None beyond the existing Pi/Anthropic SDK mocks already in those test files.\n6. VERIFICATION: npm run lint + npm test green. The two updated tests pass with modelSpec.provider values.",

@@ -377,7 +377,7 @@ export class PiHarness implements Harness {
       metadata: {
         requestId: `${this.id}-${Date.now()}`,
         model: modelSpec.model,
-        provider: this.id,
+        provider: modelSpec.provider,
       },
     } satisfies Extract<StreamEvent, { type: "metadata" }>;
 

@@ -1215,7 +1215,7 @@ describe('ClaudeCodeHarness - execute()', () => {
 
       expect(events[0].type).toBe('metadata');
       if (events[0].type === 'metadata') {
-        expect(events[0].metadata.provider).toBe('claude-code');
+        expect(events[0].metadata.provider).toBe('anthropic');
       }
     });
 

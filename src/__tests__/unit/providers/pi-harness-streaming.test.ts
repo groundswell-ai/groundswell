@@ -195,7 +195,7 @@ describe('PiHarness - executeStreaming()', () => {
 
   // ── Metadata first ────────────────────────────────────────────────────
 
-  it('should yield metadata event first with provider=pi and model', async () => {
+  it('should yield metadata event first with provider=anthropic (modelSpec.provider) and model', async () => {
     wireFakeSession(harness, [SESSION_START, messageUpdate('Hi'), AGENT_END]);
 
     const result = harness.execute(
@@ -207,7 +207,7 @@ describe('PiHarness - executeStreaming()', () => {
     expect(events.length).toBeGreaterThanOrEqual(1);
     expect(events[0].type).toBe('metadata');
     if (events[0].type === 'metadata') {
-      expect(events[0].metadata.provider).toBe('pi');
+      expect(events[0].metadata.provider).toBe('anthropic');
       expect(events[0].metadata.model).toBeTruthy();
     }
   });
