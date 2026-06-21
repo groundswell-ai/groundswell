@@ -809,14 +809,14 @@
               "type": "Task",
               "id": "P4.M3.T1",
               "title": "Harness documentation rewrite",
-              "status": "Researching",
+              "status": "Complete",
               "description": "Author docs/harnesses.md (from docs/providers.md) covering the two-axis model, configuration cascade, and both adapters; update the agent-response migration guide.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P4.M3.T1.S1",
                   "title": "Write docs/harnesses.md + update migration guides",
-                  "status": "Researching",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P3.M3.T1.S1"

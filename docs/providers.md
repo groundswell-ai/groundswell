@@ -2,6 +2,8 @@
 
 Groundswell supports the Anthropic Agent SDK provider through a unified abstraction layer. The provider encapsulates SDK-specific details while presenting a consistent API for LLM execution, tool delegation, and session management.
 
+> ⚠️ **DEPRECATED since v0.0.4 (PRD v1.2).** This document uses the pre-v1.2 `Provider*` vocabulary and documents only the `anthropic` runtime. It is superseded by **[Harnesses](harnesses.md)** — the authoritative harness reference (PRD §7). See the **[Provider → Harness Migration Guide](migration-provider-to-harness.md)**. The content below is retained for reference during the deprecation window.
+
 ## Table of Contents
 
 - [Basic Usage](#basic-usage)

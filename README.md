@@ -94,6 +94,8 @@ console.log(response.data.bugs);
 ## Documentation
 
 - [Migration Guide](docs/migration-guide-agent-response.md) - Upgrading from v1.x ⚠️
+- [Harnesses](docs/harnesses.md) - Pluggable agent runtime (pi default, claude-code optional)
+- [Provider → Harness Migration](docs/migration-provider-to-harness.md) - v1.2 vocabulary migration
 - [Workflows](docs/workflow.md) - Hierarchical task orchestration
 - [Agents](docs/agent.md) - LLM execution with caching and reflection
 - [Prompts](docs/prompt.md) - Type-safe prompt definitions with Zod
