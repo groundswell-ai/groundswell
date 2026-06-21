@@ -123,14 +123,14 @@
           "type": "Milestone",
           "id": "P1.M2",
           "title": "Major — PiHarness toolExecutor Wiring (Issue 2)",
-          "status": "Planned",
+          "status": "Complete",
           "description": "PiHarness.execute()/executeStreaming() declare a toolExecutor parameter (the Agent.toolExecutor bridge to the Agent's MCPHandler) but never invoke it — it is a dead parameter. Tools are dispatched exclusively through the harness's OWN internal MCPHandler.registered.executor, which the Agent never populates for the Agent-driven path. Result: any tool configured at the Agent level (config.mcps, config.tools, or request.options.tools) is invisible and non-executable by PiHarness, directly violating PRD §7.10 and the P2.M3.T1.S1 contract. This milestone wires the caller-supplied toolExecutor into PiHarness's tool dispatch so Agent-configured tools round-trip through the real bridge.",
           "tasks": [
             {
               "type": "Task",
               "id": "P1.M2.T1",
               "title": "Wire toolExecutor into PiHarness tool dispatch (PRD §7.10)",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Make PiHarness's customTools dispatch through the caller-supplied toolExecutor callback instead of (or in safe addition to) the harness's internal registered.executor. Add a ToolExecutionResult-aware converter to MCPHandler, thread toolExecutor into buildCustomTools, rebind each tool's execute to invoke it, and update both call sites.",
               "subtasks": [
                 {
@@ -169,7 +169,7 @@
                   "type": "Subtask",
                   "id": "P1.M2.T1.S3",
                   "title": "Regression test — PiHarness tool call invokes toolExecutor with {name, input} and returns its result (PRD §7.10 contract)",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M2.T1.S2"
