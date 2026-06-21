@@ -18,7 +18,7 @@
               "type": "Task",
               "id": "P1.M1.T1",
               "title": "Rewire Agent harness resolution to the new cascade (Issue 1)",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Replace the legacy harness resolution in src/core/agent.ts (getGlobalProviderConfig + resolveProviderConfig, which read the wrong singleton defaulting to 'anthropic') with the new cascade utilities (getGlobalHarnessConfig + resolveHarnessConfig, defaulting to 'pi') at all three call sites: the constructor, stream(), and executePrompt(). Remove the now-dead legacy import. Preserve the 'is not registered' substring contract so existing regex-based throw assertions still match. This is the root-cause fix for the Critical bug.",
               "subtasks": [
                 {
@@ -57,7 +57,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T1.S3",
                   "title": "Add the 4-scenario cascade matrix regression test at the Agent level (global / agent / prompt combinations)",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
