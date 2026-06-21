@@ -21,6 +21,7 @@ import { AnthropicProvider } from '../../harnesses/claude-code-harness.js';
 import { ProviderRegistry } from '../../harnesses/harness-registry.js';
 import { isSuccess, isError } from '../../types/agent.js';
 import { resetGlobalConfig, configureProviders } from '../../utils/provider-config.js';
+import { configureHarnesses } from '../../utils/harness-config.js';
 
 // Mock SDK types (from @anthropic-ai/claude-agent-sdk)
 type SDKMessage =
@@ -179,7 +180,7 @@ describe('Agent → Provider → SDK Integration', () => {
       ProviderRegistry.getInstance().register(provider);
 
       // Configure the global default to 'claude-code' (the new harness id)
-      configureProviders({ defaultProvider: 'claude-code' });
+      configureHarnesses({ defaultHarness: 'claude-code' });
 
       // Agent without explicit provider config uses the configured global default
       // which is now 'claude-code', so it should work

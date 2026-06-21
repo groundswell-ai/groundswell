@@ -282,6 +282,7 @@ describe('Agent.prompt() harness override', () => {
     });
     HarnessRegistry['_resetForTesting']();
     HarnessRegistry.getInstance().register(createMockHarness('anthropic'));
+    HarnessRegistry.getInstance().register(createMockHarness('pi'));
     HarnessRegistry.getInstance().register(claudeCodeHarness);
 
     const agent = new Agent();

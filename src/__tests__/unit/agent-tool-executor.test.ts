@@ -43,8 +43,8 @@ function getToolExecutor(agent: Agent) {
 
 describe('Agent.toolExecutor', () => {
   beforeEach(() => {
-    // Register mock anthropic provider before each test
-    const mockProvider = createMockProvider('anthropic');
+    // Register mock pi provider before each test (new global default is 'pi')
+    const mockProvider = createMockProvider('pi' as ProviderId);
     ProviderRegistry.getInstance().register(mockProvider);
   });
 

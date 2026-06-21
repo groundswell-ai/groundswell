@@ -45,6 +45,7 @@ import { Agent } from '../../core/agent.js';
 import { Prompt } from '../../core/prompt.js';
 import { ProviderRegistry } from '../../harnesses/harness-registry.js';
 import { configureProviders, resetGlobalConfig } from '../../utils/provider-config.js';
+import { configureHarnesses, resetGlobalHarnessConfig } from '../../utils/harness-config.js';
 import type { Provider, ProviderId, ProviderCapabilities, ProviderRequest } from '../../types/providers.js';
 import type { ModelSpec } from '../../types/providers.js';
 import { createSuccessResponse, isError } from '../../types/agent.js';
@@ -141,10 +142,10 @@ describe('Provider Switching Integration', () => {
     });
 
     it('should create Agent without provider (uses global default)', async () => {
-      const anthropicProvider = createMockProvider('anthropic');
-      ProviderRegistry.getInstance().register(anthropicProvider);
+      const piProvider = createMockProvider('pi' as ProviderId);
+      ProviderRegistry.getInstance().register(piProvider);
 
-      // Agent without explicit provider uses global default ('anthropic')
+      // Agent without explicit provider uses global default ('pi')
       const agent = new Agent({});
 
       expect(agent).toBeDefined();
@@ -424,10 +425,10 @@ describe('Provider Switching Integration', () => {
     });
 
     it('should use global default when agent has no provider', async () => {
-      const anthropicProvider = createMockProvider('anthropic');
-      ProviderRegistry.getInstance().register(anthropicProvider);
+      const piProvider = createMockProvider('pi' as ProviderId);
+      ProviderRegistry.getInstance().register(piProvider);
 
-      // Agent without provider override (uses global default)
+      // Agent without provider override (uses global default 'pi')
       const agent = new Agent({});
 
       const prompt = new Prompt({
@@ -437,15 +438,15 @@ describe('Provider Switching Integration', () => {
 
       // Get mock provider
       const registry = ProviderRegistry.getInstance();
-      const anthropicProviderInstance = registry.get('anthropic')!;
+      const piProviderInstance = registry.get('pi')!;
 
       vi.clearAllMocks();
 
       // Act
       await agent.prompt(prompt);
 
-      // Assert: global default provider (anthropic) was used
-      expect(anthropicProviderInstance.execute).toHaveBeenCalled();
+      // Assert: global default provider (pi) was used
+      expect(piProviderInstance.execute).toHaveBeenCalled();
     });
 
     it('should handle full cascade: global → agent → prompt', async () => {

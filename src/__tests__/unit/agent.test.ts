@@ -47,9 +47,11 @@ function createMockHarness(id: HarnessId): Harness {
 
 describe('Agent', () => {
   beforeEach(() => {
-    // Register mock anthropic harness before each test (legacy compat)
-    const mockHarness = createMockHarness('anthropic' as HarnessId);
-    HarnessRegistry.getInstance().register(mockHarness);
+    // Register mock pi harness (new global default) and legacy anthropic harness before each test
+    const mockPiHarness = createMockHarness('pi' as HarnessId);
+    const mockAnthropicHarness = createMockHarness('anthropic' as HarnessId);
+    HarnessRegistry.getInstance().register(mockPiHarness);
+    HarnessRegistry.getInstance().register(mockAnthropicHarness);
   });
 
   afterEach(() => {
@@ -126,17 +128,17 @@ describe('Agent harness resolution', () => {
   });
 
   it('uses the configured global default harness', () => {
-    // The constructor reads getGlobalProviderConfig() (legacy singleton, default 'anthropic').
-    // Register the legacy default so new Agent() resolves without throwing.
-    HarnessRegistry.getInstance().register(createMockHarness('anthropic' as HarnessId));
-    const agent = new Agent(); // no throw — resolves 'anthropic' from legacy default
+    // The constructor reads getGlobalHarnessConfig() (new cascade, default 'pi').
+    // Register the new default so new Agent() resolves without throwing.
+    HarnessRegistry.getInstance().register(createMockHarness('pi' as HarnessId));
+    const agent = new Agent(); // no throw — resolves 'pi' from global default
     expect(agent.name).toBe('Agent');
   });
 
   it('throws when the resolved harness is not registered', () => {
-    // The constructor reads getGlobalProviderConfig() (legacy singleton, default 'anthropic').
-    // No 'anthropic' stub registered → throw.
-    expect(() => new Agent()).toThrow(/Harness 'anthropic' is not registered/);
+    // The constructor reads getGlobalHarnessConfig() (new cascade, default 'pi').
+    // No 'pi' stub registered → throw.
+    expect(() => new Agent()).toThrow(/Harness 'pi' is not registered/);
   });
 });
 
@@ -264,9 +266,11 @@ describe('MCPHandler', () => {
 // using mock responses to avoid real API calls
 describe('Agent.prompt()', () => {
   beforeEach(() => {
-    // Register mock harness before each test
-    const mockHarness = createMockHarness('anthropic' as HarnessId);
-    HarnessRegistry.getInstance().register(mockHarness);
+    // Register mock harness before each test (new default is 'pi')
+    const mockPiHarness = createMockHarness('pi' as HarnessId);
+    const mockAnthropicHarness = createMockHarness('anthropic' as HarnessId);
+    HarnessRegistry.getInstance().register(mockPiHarness);
+    HarnessRegistry.getInstance().register(mockAnthropicHarness);
   });
 
   afterEach(() => {
@@ -668,9 +672,11 @@ describe('Agent.prompt() response validation', () => {
   let agent: Agent;
 
   beforeEach(() => {
-    // Register mock harness before creating Agent
-    const mockHarness = createMockHarness('anthropic' as HarnessId);
-    HarnessRegistry.getInstance().register(mockHarness);
+    // Register mock harness before creating Agent (new default is 'pi')
+    const mockPiHarness = createMockHarness('pi' as HarnessId);
+    const mockAnthropicHarness = createMockHarness('anthropic' as HarnessId);
+    HarnessRegistry.getInstance().register(mockPiHarness);
+    HarnessRegistry.getInstance().register(mockAnthropicHarness);
     agent = new Agent({ name: 'Test Agent' });
   });
 

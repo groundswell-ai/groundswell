@@ -70,9 +70,11 @@ describe('Agent.prompt()', () => {
     // Register mock providers
     const anthropicProvider = createMockProvider('anthropic');
     const claudeCodeProvider = createMockProvider('claude-code');
+    const piProvider = createMockProvider('pi' as ProviderId);
     const registry = ProviderRegistry.getInstance();
     registry.register(anthropicProvider);
     registry.register(claudeCodeProvider);
+    registry.register(piProvider);
   });
 
   afterEach(() => {
@@ -126,7 +128,7 @@ describe('Agent.prompt()', () => {
     });
 
     it('should use global default provider when agent has no provider', async () => {
-      // Arrange: Agent without provider override (uses global default)
+      // Arrange: Agent without provider override (uses global default 'pi')
       const agent = new Agent();
       const prompt = new Prompt({
         user: 'test',
@@ -135,7 +137,7 @@ describe('Agent.prompt()', () => {
 
       // Get mock provider
       const registry = ProviderRegistry.getInstance();
-      const anthropicProvider = registry.get('anthropic')!;
+      const piProvider = registry.get('pi')!;
 
       // Clear previous calls
       vi.clearAllMocks();
@@ -143,8 +145,8 @@ describe('Agent.prompt()', () => {
       // Act
       await agent.prompt(prompt);
 
-      // Assert: global default provider (anthropic) was used
-      expect(anthropicProvider.execute).toHaveBeenCalled();
+      // Assert: global default provider (pi) was used
+      expect(piProvider.execute).toHaveBeenCalled();
     });
 
     it('should prioritize prompt override over agent and global config', async () => {
@@ -309,15 +311,15 @@ describe('Agent.prompt()', () => {
     });
 
     it('should merge prompt options with global defaults', async () => {
-      // Arrange: Configure global defaults
+      // Arrange: Configure global defaults for the new cascade default 'pi'
       configureProviders({
-        defaultProvider: 'anthropic',
+        defaultProvider: 'pi',
         providerDefaults: {
-          anthropic: { timeout: 30000, apiKey: 'sk-global', endpoint: 'https://api.global.com' }
+          pi: { timeout: 30000, apiKey: 'sk-global', endpoint: 'https://api.global.com' }
         }
       });
 
-      const agent = new Agent(); // No agent options
+      const agent = new Agent(); // No agent options — resolves 'pi' (new global default)
       const prompt = new Prompt({
         user: 'test',
         responseFormat: z.object({ result: z.string() })
@@ -325,10 +327,10 @@ describe('Agent.prompt()', () => {
 
       // Get mock provider and capture the options
       const registry = ProviderRegistry.getInstance();
-      const anthropicProvider = registry.get('anthropic')!;
+      const piProvider = registry.get('pi')!;
       let capturedOptions: any = {};
 
-      (anthropicProvider.execute as any).mockImplementation(async (request: ProviderRequest) => {
+      (piProvider.execute as any).mockImplementation(async (request: ProviderRequest) => {
         capturedOptions = request.options;
         return createSuccessResponse(
           { result: 'test' },

@@ -42,8 +42,7 @@ import type {
 } from '../types/providers.js';
 import { HarnessRegistry } from '../harnesses/index.js';
 import type { Harness, HarnessId, HarnessOptions, HarnessRequest, HarnessHookEvents } from '../types/harnesses.js';
-import { resolveProviderConfig, getGlobalProviderConfig } from '../utils/provider-config.js';
-import { getGlobalHarnessConfig } from '../utils/harness-config.js';
+import { getGlobalHarnessConfig, resolveHarnessConfig } from '../utils/harness-config.js';
 import { parseModelSpec } from '../utils/model-spec.js';
 import type { AsyncStream, StreamEvent } from '../types/streaming.js';
 
@@ -111,16 +110,14 @@ export class Agent {
     this.harnessOptions = config.harnessOptions ?? config.providerOptions;
 
     // Resolve the effective harness via the configuration cascade (PRD §7.7).
-    // resolveProviderConfig DELEGATES to resolveHarnessConfig (harness-config.ts L367-368);
-    // getGlobalProviderConfig is used as the global source to honour the legacy configureProviders()
-    // singleton still consumed by executePrompt/stream + the existing test suite.
-    const globalConfig = getGlobalProviderConfig();
-    const resolved = resolveProviderConfig(
+    // getGlobalHarnessConfig reads the correct singleton (default 'pi') written by configureHarnesses().
+    const globalConfig = getGlobalHarnessConfig();
+    const resolved = resolveHarnessConfig(
       globalConfig,
       this.harnessId,
       this.harnessOptions,
     );
-    const effectiveHarness = resolved.provider;
+    const effectiveHarness = resolved.harness;
 
     // Fetch the harness instance from HarnessRegistry (the v1.2 rename of ProviderRegistry).
     // The cast bridges the legacy Provider return type to the Harness contract — structurally
@@ -366,11 +363,9 @@ export class Agent {
     const promptHarnessOptions = overrides?.harnessOptions ?? overrides?.providerOptions;
 
     // Resolve the effective harness via the configuration cascade (PRD §7.7): global → agent → prompt.
-    // resolveProviderConfig DELEGATES to resolveHarnessConfig (harness-config.ts L367-368);
-    // getGlobalProviderConfig is used as the global source to honour the legacy configureProviders()
-    // singleton still consumed by executePrompt + the existing test suite.
-    const globalConfig = getGlobalProviderConfig();
-    const { provider: resolvedHarness, options: resolvedHarnessOptions } = resolveProviderConfig(
+    // getGlobalHarnessConfig reads the correct singleton (default 'pi') written by configureHarnesses().
+    const globalConfig = getGlobalHarnessConfig();
+    const { harness: resolvedHarness, options: resolvedHarnessOptions } = resolveHarnessConfig(
       globalConfig,
       this.harnessId,
       this.harnessOptions,
@@ -610,11 +605,9 @@ export class Agent {
     const promptHarnessOptions = overrides?.harnessOptions ?? overrides?.providerOptions;
 
     // Resolve the effective harness via the configuration cascade (PRD §7.7): global → agent → prompt.
-    // resolveProviderConfig DELEGATES to resolveHarnessConfig (harness-config.ts L367-368);
-    // getGlobalProviderConfig is used as the global source to honour the legacy configureProviders()
-    // singleton still consumed by stream() + the existing test suite.
-    const globalConfig = getGlobalProviderConfig();
-    const { provider: resolvedHarness, options: resolvedHarnessOptions } = resolveProviderConfig(
+    // getGlobalHarnessConfig reads the correct singleton (default 'pi') written by configureHarnesses().
+    const globalConfig = getGlobalHarnessConfig();
+    const { harness: resolvedHarness, options: resolvedHarnessOptions } = resolveHarnessConfig(
       globalConfig,
       this.harnessId,
       this.harnessOptions,
