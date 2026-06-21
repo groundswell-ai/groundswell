@@ -1,0 +1,13 @@
+h1.0 Bug Fix Requirements
+ h2.0 Overview
+ h2.1 Critical Issues (Must Fix)
+  h3.0 Issue 1: configureHarnesses() global default never reaches the Agent — default/no-harness Agent construction throws "Harness 'anthropic' is not registered"
+ h2.2 Major Issues (Should Fix)
+  h3.1 Issue 2: PiHarness ignores the toolExecutor callback — Agent-configured tools are invisible and non-executable (PRD §7.10 violation)
+ h2.3 Minor Issues (Nice to Fix)
+  h3.2 Issue 3: Streaming metadata event reports the harness id as provider (harness/provider conflation)
+  h3.3 Issue 4: registerDefaultHarnesses() not exported from the public barrel and never auto-invoked
+  h3.4 Issue 5: Pre-existing test failure — unicode in workflow names (OUT OF SCOPE for the harness work)
+ h2.4 Testing Summary
+---
+code:6 para:35 list:4
