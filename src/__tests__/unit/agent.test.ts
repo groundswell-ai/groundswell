@@ -142,6 +142,52 @@ describe('Agent harness resolution', () => {
   });
 });
 
+describe('Agent default harness resolution via configureHarnesses() (PRD §7.7 scenario 1)', () => {
+  beforeEach(() => {
+    resetGlobalHarnessConfig();
+    HarnessRegistry['_resetForTesting']();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    resetGlobalHarnessConfig();
+    HarnessRegistry['_resetForTesting']();
+  });
+
+  it('resolves new Agent({model}) with no harness to the global default "pi" after configureHarnesses()', () => {
+    // Arrange: register ONLY a 'pi' mock (NO 'anthropic' mock). This is what makes the test
+    // fail on pre-fix code — pre-fix Agent read the legacy singleton (default 'anthropic')
+    // and would throw "Harness 'anthropic' is not registered".
+    HarnessRegistry.getInstance().register(createMockHarness('pi'));
+
+    // Act: the EXACT public API documented in PRD §7.6 (the one disconnected in Issue 1).
+    configureHarnesses({ defaultHarness: 'pi', defaultModelProvider: 'anthropic' });
+
+    // Construct with a realistic model and NO harness field (mirrors examples/harnesses/02).
+    const agent = new Agent({ model: 'anthropic/claude-sonnet-4-20250514' });
+
+    // Assert: did not throw, and the RESOLVED harness is 'pi' (not just "some harness").
+    expect(agent).toBeDefined();
+    // @ts-expect-error - private field access for testing
+    expect(agent.harness.id).toBe('pi');
+  });
+
+  it('uses the global default "pi" even when only "claude-code" is registered (default is config-driven, not registry-driven)', () => {
+    // Arrange: do NOT call configureHarnesses → getGlobalHarnessConfig() returns the
+    // DEFAULT_HARNESS_CONFIG { defaultHarness: 'pi' }. Register ONLY 'claude-code'.
+    HarnessRegistry.getInstance().register(createMockHarness('claude-code'));
+
+    // Assert: the resolved default is 'pi' (from global config), NOT 'claude-code' (registry).
+    expect(() => new Agent()).toThrow(/Harness 'pi' is not registered/);
+
+    // Now register 'pi' → the same construction resolves to 'pi'.
+    HarnessRegistry.getInstance().register(createMockHarness('pi'));
+    const agent = new Agent();
+    // @ts-expect-error - private field access for testing
+    expect(agent.harness.id).toBe('pi');
+  });
+});
+
 describe('MCPHandler', () => {
   it('should register and unregister servers', () => {
     const handler = new MCPHandler();
