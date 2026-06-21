@@ -211,13 +211,13 @@ describe('Agent.stream()', () => {
         responseFormat: z.object({ result: z.string() })
       });
 
-      // Act & Assert: Try to use unregistered provider
+      // Act & Assert: 'claude-code' auto-registers (P1.M1.T2.S1); use a non-built-in id to exercise the throw path.
       await expect(async () => {
-        const { stream } = agent.stream(prompt, { provider: 'claude-code' as ProviderId });
+        const { stream } = agent.stream(prompt, { provider: 'nonexistent-provider' as ProviderId });
         for await (const _event of stream) {
           // Just consume
         }
-      }).rejects.toThrow(/Harness 'claude-code' is not registered/);
+      }).rejects.toThrow(/Harness 'nonexistent-provider' is not registered/);
     });
 
     it('should switch providers between streams', async () => {
@@ -544,13 +544,13 @@ describe('Agent.stream()', () => {
         responseFormat: z.object({ result: z.string() })
       });
 
-      // Act & Assert: Try to stream with unregistered provider
+      // Act & Assert: 'claude-code' auto-registers (P1.M1.T2.S1); use a non-built-in id to exercise the throw path.
       await expect(async () => {
-        const { stream } = agent.stream(prompt, { provider: 'claude-code' as ProviderId });
+        const { stream } = agent.stream(prompt, { provider: 'nonexistent-provider' as ProviderId });
         for await (const _event of stream) {
           // Just consume
         }
-      }).rejects.toThrow(/Harness 'claude-code' is not registered/);
+      }).rejects.toThrow(/Harness 'nonexistent-provider' is not registered/);
     });
 
     it('should yield error event on provider execution failure', async () => {

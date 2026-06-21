@@ -131,6 +131,8 @@ export { PiHarness } from './harnesses/pi-harness.js';
 
 // Harness configuration & model-spec utilities (PRD §7.6 / §7.8)
 export { configureHarnesses } from './utils/harness-config.js';
+// Built-in harness registration helper (PRD §7.6 / Issue 4). Re-exported through the harnesses barrel.
+export { registerDefaultHarnesses } from './harnesses/index.js';
 export { parseModelSpec, formatModelForProvider } from './utils/model-spec.js';
 
 // Context and event tree

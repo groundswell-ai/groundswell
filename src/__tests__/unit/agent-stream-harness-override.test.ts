@@ -153,10 +153,11 @@ describe('Agent.stream() harness override', () => {
       responseFormat: z.object({ result: z.string() }),
     });
 
+    // 'claude-code' auto-registers (P1.M1.T2.S1); use a non-built-in id to exercise the throw path.
     await expect(async () => {
-      const { stream } = agent.stream(prompt, { harness: 'claude-code' as HarnessId });
+      const { stream } = agent.stream(prompt, { harness: 'nonexistent' as HarnessId });
       for await (const _event of stream) { /* consume */ }
-    }).rejects.toThrow(/Harness 'claude-code' is not registered/);
+    }).rejects.toThrow(/Harness 'nonexistent' is not registered/);
   });
 
   it('builds a HarnessRequest with streaming: true and the expected options shape', async () => {

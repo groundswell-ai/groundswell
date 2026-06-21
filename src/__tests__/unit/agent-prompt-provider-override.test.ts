@@ -190,16 +190,13 @@ describe('Agent.prompt()', () => {
         responseFormat: z.object({ result: z.string() })
       });
 
-      // Act: Try to use unregistered provider
-      const response = await agent.prompt(prompt, { provider: 'claude-code' as ProviderId });
-
-      // Assert: Error response (claude-code was not registered in this test's beforeEach)
-      // Wait, we did register claude-code. Let me unregister it first
+      // 'claude-code' auto-registers (P1.M1.T2.S1); reset and register only 'anthropic'.
+      // Use a non-built-in id ('nonexistent-provider') so the PROVIDER_NOT_FOUND path still fires.
       ProviderRegistry['_resetForTesting']();
       const anthropicProvider = createMockProvider('anthropic');
       ProviderRegistry.getInstance().register(anthropicProvider);
 
-      const response2 = await agent.prompt(prompt, { provider: 'claude-code' as ProviderId });
+      const response2 = await agent.prompt(prompt, { provider: 'nonexistent-provider' as ProviderId });
 
       expect(response2.status).toBe('error');
       if (isError(response2)) {
@@ -593,16 +590,16 @@ describe('Agent.prompt()', () => {
         responseFormat: z.object({ result: z.string() })
       });
 
-      // Act: Try to use claude-code (not registered)
+      // Act: 'claude-code' auto-registers (P1.M1.T2.S1); use a non-built-in id.
       const response = await agent.prompt(prompt, {
-        provider: 'claude-code' as ProviderId
+        provider: 'nonexistent-provider' as ProviderId
       });
 
       // Assert: Error response
       expect(response.status).toBe('error');
       if (isError(response)) {
         expect(response.error.code).toBe('PROVIDER_NOT_FOUND');
-        expect(response.error.message).toContain('claude-code');
+        expect(response.error.message).toContain('nonexistent-provider');
         expect(response.error.message).toContain('not registered');
         expect(response.error.recoverable).toBe(false);
       }

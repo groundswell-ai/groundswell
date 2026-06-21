@@ -135,10 +135,9 @@ describe('Agent harness resolution', () => {
     expect(agent.name).toBe('Agent');
   });
 
-  it('throws when the resolved harness is not registered', () => {
-    // The constructor reads getGlobalHarnessConfig() (new cascade, default 'pi').
-    // No 'pi' stub registered → throw.
-    expect(() => new Agent()).toThrow(/Harness 'pi' is not registered/);
+  it('throws when the resolved harness is not registered (non-built-in id)', () => {
+    // 'pi'/'claude-code' auto-register (P1.M1.T2.S1); use a non-built-in id to exercise the throw path.
+    expect(() => new Agent({ harness: 'nonexistent' as HarnessId })).toThrow(/Harness 'nonexistent' is not registered/);
   });
 });
 
@@ -172,19 +171,14 @@ describe('Agent default harness resolution via configureHarnesses() (PRD §7.7 s
     expect(agent.harness.id).toBe('pi');
   });
 
-  it('uses the global default "pi" even when only "claude-code" is registered (default is config-driven, not registry-driven)', () => {
-    // Arrange: do NOT call configureHarnesses → getGlobalHarnessConfig() returns the
-    // DEFAULT_HARNESS_CONFIG { defaultHarness: 'pi' }. Register ONLY 'claude-code'.
+  it('uses the global default "pi" even when only "claude-code" is registered (auto-registration materializes the missing default)', () => {
+    // Do NOT call configureHarnesses → getGlobalHarnessConfig() returns DEFAULT { defaultHarness: 'pi' }.
+    // Register ONLY 'claude-code'. 'pi' is missing but is a built-in default → the constructor's
+    // lazy safety net (P1.M1.T2.S1) auto-registers a REAL PiHarness.
     HarnessRegistry.getInstance().register(createMockHarness('claude-code'));
-
-    // Assert: the resolved default is 'pi' (from global config), NOT 'claude-code' (registry).
-    expect(() => new Agent()).toThrow(/Harness 'pi' is not registered/);
-
-    // Now register 'pi' → the same construction resolves to 'pi'.
-    HarnessRegistry.getInstance().register(createMockHarness('pi'));
-    const agent = new Agent();
+    const agent = new Agent();   // no throw — 'pi' auto-registered
     // @ts-expect-error - private field access for testing
-    expect(agent.harness.id).toBe('pi');
+    expect(agent.harness.id).toBe('pi');   // default is 'pi' (config), NOT 'claude-code' (registry)
   });
 });
 

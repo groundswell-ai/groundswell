@@ -183,9 +183,9 @@ describe('Agent.prompt() harness override', () => {
       responseFormat: z.object({ result: z.string() }),
     });
 
-    // Act: Try to use unregistered harness
+    // Act: 'claude-code' auto-registers (P1.M1.T2.S1); use a non-built-in id to exercise PROVIDER_NOT_FOUND.
     const response = await agent.prompt(prompt, {
-      harness: 'claude-code' as HarnessId,
+      harness: 'nonexistent' as HarnessId,
     });
 
     // Assert
@@ -193,7 +193,7 @@ describe('Agent.prompt() harness override', () => {
     if (isError(response)) {
       expect(response.error.code).toBe('PROVIDER_NOT_FOUND');
       expect(response.error.message).toContain('not registered');
-      expect(response.error.message).toContain('claude-code');
+      expect(response.error.message).toContain('nonexistent');
       expect(response.error.recoverable).toBe(false);
     }
   });

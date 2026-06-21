@@ -40,7 +40,7 @@ import type {
   ToolExecutionRequest,
   ToolExecutionResult,
 } from '../types/providers.js';
-import { HarnessRegistry } from '../harnesses/index.js';
+import { HarnessRegistry, registerDefaultHarnesses } from '../harnesses/index.js';
 import type { Harness, HarnessId, HarnessOptions, HarnessRequest, HarnessHookEvents } from '../types/harnesses.js';
 import { getGlobalHarnessConfig, resolveHarnessConfig } from '../utils/harness-config.js';
 import { parseModelSpec } from '../utils/model-spec.js';
@@ -123,7 +123,14 @@ export class Agent {
     // The cast bridges the legacy Provider return type to the Harness contract — structurally
     // identical at runtime; the cast exists only because Provider.id is a wider type than Harness.id.
     const registry = HarnessRegistry.getInstance();
-    const harnessInstance = registry.get(effectiveHarness) as Harness | undefined;
+    let harnessInstance = registry.get(effectiveHarness) as Harness | undefined;
+    // Lazy auto-registration safety net (PRD §7.6 / Issue 4 h3.3): if the resolved harness is a
+    // built-in default ('pi' | 'claude-code') that isn't registered yet, materialize the defaults
+    // once. registerDefaultHarnesses is idempotent (has() guards) → never overwrites a test's mock.
+    if (!harnessInstance && (effectiveHarness === 'pi' || effectiveHarness === 'claude-code')) {
+      registerDefaultHarnesses(registry);
+      harnessInstance = registry.get(effectiveHarness) as Harness | undefined;
+    }
     if (!harnessInstance) {
       throw new Error(`Harness '${effectiveHarness}' is not registered`);
     }
@@ -377,7 +384,14 @@ export class Agent {
     // override is supplied). The cast bridges the legacy Provider return type to the Harness contract
     // — structurally identical at runtime; the cast exists only because Provider.id is wider than Harness.id.
     const registry = HarnessRegistry.getInstance();
-    const harnessInstance = registry.get(resolvedHarness) as Harness | undefined;
+    let harnessInstance = registry.get(resolvedHarness) as Harness | undefined;
+    // Lazy auto-registration safety net (PRD §7.6 / Issue 4 h3.3): if the resolved harness is a
+    // built-in default ('pi' | 'claude-code') that isn't registered yet, materialize the defaults
+    // once. registerDefaultHarnesses is idempotent (has() guards) → never overwrites a test's mock.
+    if (!harnessInstance && (resolvedHarness === 'pi' || resolvedHarness === 'claude-code')) {
+      registerDefaultHarnesses(registry);
+      harnessInstance = registry.get(resolvedHarness) as Harness | undefined;
+    }
     if (!harnessInstance) {
       // THROW (synchronous at call time, before the generator is created) — preserves the existing
       // .rejects.toThrow(...) contract. Reworded to harness vocab; message still contains the id +
@@ -619,7 +633,14 @@ export class Agent {
     // override is supplied). The cast bridges the legacy Provider return type to the Harness contract
     // — structurally identical at runtime; the cast exists only because Provider.id is wider than Harness.id.
     const registry = HarnessRegistry.getInstance();
-    const harnessInstance = registry.get(resolvedHarness) as Harness | undefined;
+    let harnessInstance = registry.get(resolvedHarness) as Harness | undefined;
+    // Lazy auto-registration safety net (PRD §7.6 / Issue 4 h3.3): if the resolved harness is a
+    // built-in default ('pi' | 'claude-code') that isn't registered yet, materialize the defaults
+    // once. registerDefaultHarnesses is idempotent (has() guards) → never overwrites a test's mock.
+    if (!harnessInstance && (resolvedHarness === 'pi' || resolvedHarness === 'claude-code')) {
+      registerDefaultHarnesses(registry);
+      harnessInstance = registry.get(resolvedHarness) as Harness | undefined;
+    }
     if (!harnessInstance) {
       return createErrorResponse(
         'PROVIDER_NOT_FOUND',

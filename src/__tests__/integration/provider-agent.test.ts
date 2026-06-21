@@ -154,8 +154,9 @@ describe('Agent → Provider → SDK Integration', () => {
 
   describe('Agent Creation with Provider Configuration', () => {
     it('should throw when provider is not registered', () => {
+      // 'claude-code' auto-registers (P1.M1.T2.S1); use a non-built-in id to exercise the throw path.
       expect(() => {
-        new Agent({ provider: 'claude-code' });
+        new Agent({ provider: 'nonexistent-provider' });
       }).toThrow('Harness');
     });
 
