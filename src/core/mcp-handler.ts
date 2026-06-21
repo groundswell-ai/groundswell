@@ -18,7 +18,7 @@ import type {
 } from '@earendil-works/pi-coding-agent';
 import { jsonSchemaToTypebox } from '../harnesses/pi-schema-converter.js';
 import { z } from 'zod';
-import type { MCPServer, Tool, ToolResult } from '../types/index.js';
+import type { MCPServer, Tool, ToolResult, ToolExecutionResult } from '../types/index.js';
 
 /**
  * Tool executor function type
@@ -275,6 +275,29 @@ export class MCPHandler {
   ): AgentToolResult<{ isError: boolean }> {
     const text = typeof result === 'string' ? result : JSON.stringify(result);
     return { content: [{ type: 'text' as const, text }], details: { isError } };
+  }
+
+  /**
+   * Convert a `ToolExecutionResult` (the `{ content, isError }` envelope returned by a
+   * caller-supplied `toolExecutor`, e.g. `Agent.toolExecutor`) into a Pi
+   * `AgentToolResult<{ isError: boolean }>`.
+   *
+   * Unlike {@link toAgentToolResult} (which stringifies the RAW executor output blindly),
+   * this reads `result.content` as the semantic payload and `result.isError` as the error
+   * flag. Used by the PiHarness toolExecutor bridge (PRD §7.10) — see P1.M2.T1.S2.
+   *
+   * String content passes through unchanged; non-string content is JSON.stringified
+   * (mirrors `toAgentToolResult`'s stringification, but applied to `content` only).
+   */
+  public toAgentToolResultFromExecResult(
+    result: ToolExecutionResult,
+  ): AgentToolResult<{ isError: boolean }> {
+    const content = result.content;
+    const text = typeof content === 'string' ? content : JSON.stringify(content);
+    return {
+      content: [{ type: 'text' as const, text }],
+      details: { isError: result.isError },
+    };
   }
 
   /**
