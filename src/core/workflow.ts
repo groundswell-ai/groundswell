@@ -161,29 +161,37 @@ export class Workflow<T = unknown> {
         throw new Error('Workflow name cannot exceed 100 characters');
       }
 
+      // Shared message for all security validations below.
+      const invalidNameMessage =
+        'Invalid workflow name. Names may contain letters, numbers, spaces, hyphens, underscores, and emoji.';
+
       // Security validation: control characters (ASCII 0x00-0x1F, 0x7F)
       if (/[\x00-\x1F\x7F]/.test(trimmedName)) {
-        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+        throw new Error(invalidNameMessage);
       }
 
       // Security validation: HTML/JavaScript injection patterns
       if (/<[^>]*>/.test(trimmedName) || /javascript:/i.test(trimmedName)) {
-        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+        throw new Error(invalidNameMessage);
       }
 
       // Security validation: path traversal patterns
       if (/\.\./.test(trimmedName)) {
-        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+        throw new Error(invalidNameMessage);
       }
 
       // Security validation: file system special characters
       if (/[\/\\:*?"<>|]/.test(trimmedName)) {
-        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+        throw new Error(invalidNameMessage);
       }
 
       // Security validation: allowed characters (allowlist - defense in depth)
-      if (!/^[a-zA-Z0-9 _-]+$/.test(trimmedName)) {
-        throw new Error('Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.');
+      // Unicode-aware: permits letters (\p{L}), numbers (\p{N}), and emoji
+      // (including pictographic bases, variation selectors U+FE0F, and ZWJ
+      // sequences U+200D) from any script, while still blocking exotic or
+      // symbolic characters not covered by the targeted checks above.
+      if (!/^[\p{L}\p{N}\p{Emoji_Presentation}\p{Extended_Pictographic}\u200D\uFE0F _-]+$/u.test(trimmedName)) {
+        throw new Error(invalidNameMessage);
       }
     }
 

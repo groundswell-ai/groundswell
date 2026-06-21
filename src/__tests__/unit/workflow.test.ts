@@ -84,7 +84,8 @@ describe('Workflow Name Validation', () => {
   });
 
   // Security validation tests
-  const INVALID_NAME_MESSAGE = 'Invalid workflow name. Please use only letters, numbers, spaces, hyphens, and underscores.';
+  const INVALID_NAME_MESSAGE =
+    'Invalid workflow name. Names may contain letters, numbers, spaces, hyphens, underscores, and emoji.';
 
   describe('Security - Control Characters', () => {
     it('should reject names with null byte', () => {
@@ -555,9 +556,7 @@ describe('Workflow Name Validation', () => {
       ['my¥workflow', 'yen sign'],
       ['my¢workflow', 'cent sign'],
       ['my§workflow', 'section sign'],
-      ['my©workflow', 'copyright sign'],
-      ['my®workflow', 'registered sign'],
-      ['my™workflow', 'trademark sign'],
+      ['my€workflow', 'euro sign (currency symbol, not emoji)'],
       ['my@workflow', 'at symbol'],
       ['my#workflow', 'hash/pound'],
       ['my$workflow', 'dollar'],
@@ -607,25 +606,28 @@ describe('Workflow Name Validation', () => {
       expect(() => new SimpleWorkflow('workflow#')).toThrow(INVALID_NAME_MESSAGE);
     });
 
-    it('should reject Unicode characters outside ASCII', () => {
-      expect(() => new SimpleWorkflow('workflow©')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('workflow™')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('workflow€')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('workflow®')).toThrow(INVALID_NAME_MESSAGE);
+    it('should accept Unicode emoji symbols (©, ®, ™)', () => {
+      // These are classified as Unicode emoji and are therefore allowed.
+      expect(() => new SimpleWorkflow('workflow©')).not.toThrow();
+      expect(() => new SimpleWorkflow('workflow™')).not.toThrow();
+      expect(() => new SimpleWorkflow('workflow®')).not.toThrow();
     });
 
-    it('should reject emojis', () => {
-      expect(() => new SimpleWorkflow('workflow😀')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('workflow🚀')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('workflow✨')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('workflow❤️')).toThrow(INVALID_NAME_MESSAGE);
+    it('should accept emojis', () => {
+      expect(() => new SimpleWorkflow('workflow😀')).not.toThrow();
+      expect(() => new SimpleWorkflow('workflow🚀')).not.toThrow();
+      expect(() => new SimpleWorkflow('workflow✨')).not.toThrow();
+      expect(() => new SimpleWorkflow('workflow❤️')).not.toThrow(); // VS-16 sequence
+      expect(() => new SimpleWorkflow('👨‍👩‍👧 Family')).not.toThrow(); // ZWJ sequence
     });
 
-    it('should reject non-ASCII letters', () => {
-      expect(() => new SimpleWorkflow('workflowé')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('workflöw')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('workfløw')).toThrow(INVALID_NAME_MESSAGE);
-      expect(() => new SimpleWorkflow('工作流')).toThrow(INVALID_NAME_MESSAGE);
+    it('should accept non-ASCII letters from any script', () => {
+      expect(() => new SimpleWorkflow('workflowé')).not.toThrow();
+      expect(() => new SimpleWorkflow('workflöw')).not.toThrow();
+      expect(() => new SimpleWorkflow('workfløw')).not.toThrow();
+      expect(() => new SimpleWorkflow('工作流')).not.toThrow();
+      expect(() => new SimpleWorkflow('测试工作流')).not.toThrow();
+      expect(() => new SimpleWorkflow('العملية')).not.toThrow();
     });
 
     it('should reject null bytes and other control characters', () => {
