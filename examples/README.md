@@ -150,83 +150,83 @@ Workflow reparenting with detach-then-attach pattern:
 - Dual-tree synchronization (workflow tree + node tree)
 - Error handling for invalid reparenting operations
 
-## Provider Examples
+## Harness Examples
 
-Comprehensive examples demonstrating Groundswell's multi-provider system.
+Comprehensive examples demonstrating Groundswell's harness system — the Harness ⊥ ModelProvider split (PRD §7).
 
 **Quick Start:**
 ```bash
 export ANTHROPIC_API_KEY=sk-...
-npm run start:provider-basic
-npm run start:provider-config
-npm run start:provider-switching
-npm run start:provider-scenarios
-npm run start:provider-sessions
-npm run start:provider-features
+npm run start:harness-basic
+npm run start:harness-config
+npm run start:harness-switching
+npm run start:harness-scenarios
+npm run start:harness-sessions
+npm run start:harness-features
 ```
 
-### 12. Basic Provider Usage (`providers/01-basic-provider-usage.ts`)
+### 12. Basic Harness Usage (`harnesses/01-basic-harness-usage.ts`)
 
-Run: `npx tsx examples/providers/01-basic-provider-usage.ts`
+Run: `npx tsx examples/harnesses/01-basic-harness-usage.ts`
 
-Minimal provider setup and usage:
-- Provider registration with ProviderRegistry
-- Provider initialization before use
-- Creating Agent with provider configuration
-- Executing prompts through configured providers
+Minimal harness setup and usage:
+- Harness registration with HarnessRegistry (ClaudeCodeHarness + PiHarness)
+- Harness initialization before use
+- Creating Agent with harness configuration
+- Executing prompts through configured harnesses
 
-### 13. Provider Configuration (`providers/02-provider-configuration.ts`)
+### 13. Harness Configuration (`harnesses/02-harness-configuration.ts`)
 
-Run: `npx tsx examples/providers/02-provider-configuration.ts`
+Run: `npx tsx examples/harnesses/02-harness-configuration.ts`
 
-Three levels of provider configuration:
-- Global configuration with `configureProviders()`
-- Agent-level configuration in `new Agent({ provider })`
-- Prompt-level overrides in `agent.prompt(prompt, { provider })`
-- Configuration cascade priority (Prompt > Agent > Global)
+Dual configuration cascade:
+- Global configuration with `configureHarnesses()`
+- Agent-level configuration in `new Agent({ harness, harnessOptions })`
+- Prompt-level overrides in `agent.prompt(prompt, { harness, harnessOptions })`
+- Dual cascade: harness axis + model axis are independent (PRD §7.7)
 
-### 14. Provider Switching (`providers/03-provider-switching.ts`)
+### 14. Harness Switching (`harnesses/03-harness-switching.ts`)
 
-Run: `npx tsx examples/providers/03-provider-switching.ts`
+Run: `npx tsx examples/harnesses/03-harness-switching.ts`
 
-Switching between providers at runtime:
-- Agent-level switching for different agent instances
-- Prompt-level switching for temporary provider changes
-- Verifying which provider is being used
-- Choosing the right switching pattern
+Switching between harnesses and models at runtime:
+- Agent-level harness switching
+- Prompt-level harness switch (§7.13)
+- Model-only override — harness unchanged (§7.13)
+- Verifying which harness is being used
 
-### 15. Multi-Provider Scenarios (`providers/04-multi-provider-scenarios.ts`)
+### 15. Multi-Provider Scenarios (`harnesses/04-multi-provider-scenarios.ts`)
 
-Run: `npx tsx examples/providers/04-multi-provider-scenarios.ts`
+Run: `npx tsx examples/harnesses/04-multi-provider-scenarios.ts`
 
-Real-world multi-provider use cases:
-- Cost optimization based on task complexity
+Model axis scenarios — harness stays CONSTANT (pi):
+- Cost optimization by model selection
+- Multi-provider: anthropic vs openai on the same pi harness
 - Fallback patterns for resilience
-- A/B testing between providers
-- Production architecture patterns
+- A/B testing between models
 
-### 16. Provider Sessions (`providers/05-provider-sessions.ts`)
+### 16. Harness Sessions (`harnesses/05-harness-sessions.ts`)
 
-Run: `npx tsx examples/providers/05-provider-sessions.ts`
+Run: `npx tsx examples/harnesses/05-harness-sessions.ts`
 
 Session management for multi-turn conversations:
-- Creating sessions with sessionId
+- Creating sessions with `harnessOptions.sessionId`
 - Continuing existing sessions
-- Retrieving session state and history
-- Provider session model differences
+- Retrieving session state with `harness.getSession()` (claude-code)
+- Session model differences: claude-code vs pi
 
-### 17. Provider Features (`providers/06-provider-with-mcp-skills.ts`)
+### 17. Harness Features (`harnesses/06-harness-with-mcp-skills.ts`)
 
-Run: `npx tsx examples/providers/06-provider-with-mcp-skills.ts`
+Run: `npx tsx examples/harnesses/06-harness-with-mcp-skills.ts`
 
-Advanced provider features:
-- MCP server registration (AnthropicProvider)
+Advanced harness features:
+- MCP server registration on both harnesses (parity, §7.4)
 - Using MCP tools in agent prompts
-- Loading skills from SKILL.md files
-- Provider hooks for observability
-- Feature comparison across providers
+- Loading skills (cc: system prompt; pi: native agentskills.io)
+- Harness hooks for observability
+- Capability matrix: pi vs claude-code (PRD §7.4)
 
-See [providers/README.md](./providers/README.md) for detailed provider examples documentation.
+See [harnesses/README.md](./harnesses/README.md) for detailed harness examples documentation.
 
 ## Project Structure
 
@@ -244,13 +244,13 @@ examples/
 │   ├── 09-reflection.ts
 │   ├── 10-introspection.ts
 │   └── 11-reparenting-workflows.ts
-├── providers/
-│   ├── 01-basic-provider-usage.ts
-│   ├── 02-provider-configuration.ts
-│   ├── 03-provider-switching.ts
+├── harnesses/
+│   ├── 01-basic-harness-usage.ts
+│   ├── 02-harness-configuration.ts
+│   ├── 03-harness-switching.ts
 │   ├── 04-multi-provider-scenarios.ts
-│   ├── 05-provider-sessions.ts
-│   ├── 06-provider-with-mcp-skills.ts
+│   ├── 05-harness-sessions.ts
+│   ├── 06-harness-with-mcp-skills.ts
 │   └── README.md
 ├── utils/
 │   └── helpers.ts

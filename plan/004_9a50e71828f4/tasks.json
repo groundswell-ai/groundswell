@@ -696,7 +696,7 @@
       "type": "Phase",
       "id": "P4",
       "title": "Cleanup, Parity & Documentation",
-      "status": "Planned",
+      "status": "Complete",
       "description": "Remove the deprecated OpenCodeProvider and @opencode-ai/sdk dependency, add the cross-harness feature-parity + adversarial test suites mandated by PRD §7.14, and rewrite documentation and examples to the harness vocabulary.",
       "milestones": [
         {
@@ -802,7 +802,7 @@
           "type": "Milestone",
           "id": "P4.M3",
           "title": "Documentation & Examples",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Rewrite documentation to the harness vocabulary (docs/harnesses.md superseding docs/providers.md) and migrate the examples from provider-focused to harness-focused (pi vs claude-code) demonstrating the orthogonal provider/model selection.",
           "tasks": [
             {
@@ -837,14 +837,14 @@
               "type": "Task",
               "id": "P4.M3.T2",
               "title": "Migrate examples to harness vocabulary",
-              "status": "Planned",
+              "status": "Complete",
               "description": "Rewrite examples/providers/* → examples/harnesses/* demonstrating pi (default) vs claude-code and orthogonal provider/model selection; update package.json start scripts.",
               "subtasks": [
                 {
                   "type": "Subtask",
                   "id": "P4.M3.T2.S1",
                   "title": "Rewrite provider examples as harness examples + update scripts",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 2,
                   "dependencies": [
                     "P4.M1.T1.S2",

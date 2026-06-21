@@ -27,12 +27,12 @@ import { runSDKFeaturesExample } from './examples/08-sdk-features.js';
 import { runReflectionExample } from './examples/09-reflection.js';
 import { runIntrospectionExample } from './examples/10-introspection.js';
 import { runReparentingExample } from './examples/11-reparenting-workflows.js';
-import { runBasicProviderUsageExample } from './providers/01-basic-provider-usage.js';
-import { runProviderConfigurationExample } from './providers/02-provider-configuration.js';
-import { runProviderSwitchingExample } from './providers/03-provider-switching.js';
-import { runMultiProviderScenariosExample } from './providers/04-multi-provider-scenarios.js';
-import { runProviderSessionsExample } from './providers/05-provider-sessions.js';
-import { runProviderWithMcpSkillsExample } from './providers/06-provider-with-mcp-skills.js';
+import { runBasicHarnessUsageExample } from './harnesses/01-basic-harness-usage.js';
+import { runHarnessConfigurationExample } from './harnesses/02-harness-configuration.js';
+import { runHarnessSwitchingExample } from './harnesses/03-harness-switching.js';
+import { runMultiProviderScenariosExample } from './harnesses/04-multi-provider-scenarios.js';
+import { runHarnessSessionsExample } from './harnesses/05-harness-sessions.js';
+import { runHarnessWithMcpSkillsExample } from './harnesses/06-harness-with-mcp-skills.js';
 
 const BANNER = `
 ╔═══════════════════════════════════════════════════════════════════════════════════════════════════╗
@@ -65,13 +65,13 @@ Workflow Examples:
  10. Introspection Tools     - Agent self-awareness and hierarchy navigation
  11. Reparenting Workflows   - Detach-then-attach pattern for moving workflows
 
-Provider Examples:
- 12. Basic Provider Usage    - Provider registration and initialization
- 13. Provider Configuration  - Global, agent, and prompt-level config
- 14. Provider Switching      - Switch between providers at runtime
- 15. Multi-Provider Scenarios - Cost optimization, fallback, A/B testing
- 16. Provider Sessions       - Multi-turn conversation management
- 17. Provider Features       - MCP integration, skills, and hooks
+Harness Examples:
+ 12. Basic Harness Usage    - Harness registration and initialization
+ 13. Harness Configuration  - Global, agent, and prompt-level config (dual cascade)
+ 14. Harness Switching      - Switch between harnesses and models at runtime
+ 15. Multi-Provider Scenarios - Model axis: anthropic vs openai via pi
+ 16. Harness Sessions       - Multi-turn conversation management
+ 17. Harness Features       - MCP integration, skills, hooks, capability matrix
 
   A. Run All Examples
   Q. Quit
@@ -106,12 +106,12 @@ async function runAllExamples(): Promise<void> {
     { name: '9. Multi-level Reflection', fn: runReflectionExample },
     { name: '10. Introspection Tools', fn: runIntrospectionExample },
     { name: '11. Reparenting Workflows', fn: runReparentingExample },
-    { name: '12. Basic Provider Usage', fn: runBasicProviderUsageExample },
-    { name: '13. Provider Configuration', fn: runProviderConfigurationExample },
-    { name: '14. Provider Switching', fn: runProviderSwitchingExample },
+    { name: '12. Basic Harness Usage', fn: runBasicHarnessUsageExample },
+    { name: '13. Harness Configuration', fn: runHarnessConfigurationExample },
+    { name: '14. Harness Switching', fn: runHarnessSwitchingExample },
     { name: '15. Multi-Provider Scenarios', fn: runMultiProviderScenariosExample },
-    { name: '16. Provider Sessions', fn: runProviderSessionsExample },
-    { name: '17. Provider Features', fn: runProviderWithMcpSkillsExample },
+    { name: '16. Harness Sessions', fn: runHarnessSessionsExample },
+    { name: '17. Harness Features', fn: runHarnessWithMcpSkillsExample },
   ];
 
   for (const example of examples) {
@@ -158,19 +158,18 @@ Workflow Features:
 ✓ Cache integration with metrics
 ✓ Reparenting workflows with detach-then-attach pattern
 
-Provider Features:
-✓ Provider registration and initialization
-✓ Global provider configuration with configureProviders()
-✓ Agent-level provider configuration
-✓ Prompt-level provider overrides
-✓ Configuration cascade (Prompt > Agent > Global)
-✓ Provider switching at runtime
-✓ Multi-provider scenarios (cost optimization, fallback, A/B testing)
-✓ Session management for multi-turn conversations
-✓ MCP server integration (AnthropicProvider)
-✓ Skills loading from SKILL.md files
-✓ Provider hooks for observability
-✓ Provider capability detection
+Harness Features:
+✓ Harness registration (ClaudeCodeHarness + PiHarness)
+✓ Dual configuration cascade with configureHarnesses() (harness axis + model axis)
+✓ Agent-level harness configuration
+✓ Prompt-level harness and model overrides (§7.13)
+✓ Per-call harness switching + model-only override
+✓ Multi-provider scenarios via the model axis (pi harness)
+✓ Session management (claude-code: getSession; pi: SessionManager)
+✓ MCP server integration (both harnesses — parity)
+✓ Skills loading (cc: system prompt; pi: native agentskills.io)
+✓ Harness hooks for observability
+✓ Capability matrix: pi vs claude-code (§7.4)
 `);
 }
 
