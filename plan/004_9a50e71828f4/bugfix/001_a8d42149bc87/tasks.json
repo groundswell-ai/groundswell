@@ -11,7 +11,7 @@
           "type": "Milestone",
           "id": "P1.M1",
           "title": "Critical — Default/No-Harness Agent Construction (Issues 1 + 4)",
-          "status": "Planned",
+          "status": "Complete",
           "description": "Deliver the documented primary user journey: constructing an Agent that relies on the global default harness (the exact pattern in PRD §7.6/§7.7, docs, and example 02) must work. Issue 1 rewires the Agent's harness resolution from the legacy getGlobalProviderConfig singleton (default 'anthropic') to the new getGlobalHarnessConfig/resolveHarnessConfig cascade (default 'pi'). Issue 4 adds the registration safety net (export registerDefaultHarnesses + lazy auto-register) so the resolved 'pi' harness actually exists in the registry with zero user setup. These two issues are coupled: the PRD states 'even after the cascade fix, new Agent({ model }) will fail unless the user has registered a pi harness somewhere.' Together they make scenario 1 (global 'pi' default, no explicit harness) and scenario 4 (nothing configured) both succeed.",
           "tasks": [
             {
@@ -77,7 +77,7 @@
               "type": "Task",
               "id": "P1.M1.T2",
               "title": "Default harness registration safety net — export registerDefaultHarnesses and lazy auto-registration (Issue 4)",
-              "status": "Planned",
+              "status": "Complete",
               "description": "The registry starts EMPTY (HarnessRegistry.getInstance() does not auto-register). configureHarnesses({defaultHarness:'pi'}) makes the cascade resolve 'pi', but registry.get('pi') returns undefined unless the user manually registers. Deliver the PRD §7.1/§7.6 convenience: export registerDefaultHarnesses from the public barrel src/index.ts AND add a guarded lazy auto-registration so new Agent({model}) works with zero setup. This is the safety net that makes Issue 1's fix deliver the documented UX end-to-end.",
               "subtasks": [
                 {
@@ -99,7 +99,7 @@
                   "type": "Subtask",
                   "id": "P1.M1.T2.S2",
                   "title": "End-to-end regression test — new Agent({model}) with ZERO setup works; smoke-test example 02 launch",
-                  "status": "Planned",
+                  "status": "Complete",
                   "story_points": 1,
                   "dependencies": [
                     "P1.M1.T1.S1",
