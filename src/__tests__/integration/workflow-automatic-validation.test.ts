@@ -263,11 +263,15 @@ describe('Workflow Automatic Validation', () => {
     });
 
     it('should pass through invalid AgentResponse when validation disabled', async () => {
+      // Capture the response once so the assertion compares against the exact
+      // object returned by the step. Re-invoking createInvalidResponse() here
+      // would roll a new Date.now() timestamp and flake under load.
+      const invalidResponse = createInvalidResponse();
       const workflow = createWorkflow(
         { name: 'TestValidation', autoValidateResponses: false },
         async (ctx) => {
           const result = await ctx.step('test-step', async () => {
-            return createInvalidResponse();
+            return invalidResponse;
           });
           return result;
         }
@@ -275,9 +279,10 @@ describe('Workflow Automatic Validation', () => {
 
       const result = await workflow.run();
 
-      // Invalid response should pass through unchanged
+      // Invalid response should pass through unchanged — the exact same object
+      // reference, proving no transformation occurred.
       const data = 'data' in result ? result.data : result;
-      expect(data).toEqual(createInvalidResponse());
+      expect(data).toBe(invalidResponse);
     });
   });
 
