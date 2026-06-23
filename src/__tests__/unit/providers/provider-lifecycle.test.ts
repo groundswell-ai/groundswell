@@ -930,8 +930,9 @@ describe('Parallel Execution Verification', () => {
     await registry.initializeAll({ defaultProvider: 'anthropic' as const });
     const totalTime = Date.now() - startTime;
 
-    // Parallel execution should take ~10ms, not ~20ms
-    expect(totalTime).toBeLessThan(20);
+    // Parallel execution should take ~10ms. Generous CI headroom: a serial
+    // implementation is independently rejected by the start-gap assertion below.
+    expect(totalTime).toBeLessThan(50);
 
     // Verify both were called
     expect(anthropic.initialize).toHaveBeenCalled();
@@ -964,8 +965,9 @@ describe('Parallel Execution Verification', () => {
     await registry.terminateAll();
     const totalTime = Date.now() - startTime;
 
-    // Parallel execution should take ~10ms, not ~20ms
-    expect(totalTime).toBeLessThan(20);
+    // Parallel execution should take ~10ms. Generous CI headroom: a serial
+    // implementation is independently rejected by the start-gap assertion below.
+    expect(totalTime).toBeLessThan(50);
 
     // Verify both were called
     expect(anthropic.terminate).toHaveBeenCalled();
