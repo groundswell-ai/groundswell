@@ -23,6 +23,9 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -65,11 +68,18 @@
     "zod-to-json-schema": "^3.23.0"
   },
   "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^12.0.0",
+    "@semantic-release/npm": "^13.0.0",
+    "@semantic-release/release-notes-generator": "^14.0.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.2.9",
     "@vitest/coverage-v8": "^1.6.1",
     "ink-testing-library": "^4.0.0",
     "markdownlint-cli": "^0.47.0",
+    "semantic-release": "^25.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.2.0",
     "vitest": "^1.0.0"
