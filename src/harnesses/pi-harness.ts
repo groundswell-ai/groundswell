@@ -240,7 +240,9 @@ export class PiHarness implements Harness {
 
       // PiHarness creates a fresh AgentSession per execute() call, so loadSkills() state
       // takes effect on the next execute() — no session rebuild is required.
-      const resourceLoader = await this.buildSkillsResourceLoader();
+      const resourceLoader = await this.buildSkillsResourceLoader(
+        request.options.systemPrompt
+      );
 
       // Create the Pi session. customTools: [] — Groundswell tools wired in P2.M3.T1.
       const { session } = await this.sdk!.createAgentSession({
@@ -360,7 +362,9 @@ export class PiHarness implements Harness {
 
     // PiHarness creates a fresh AgentSession per execute() call, so loadSkills() state
     // takes effect on the next execute() — no session rebuild is required.
-    const resourceLoader = await this.buildSkillsResourceLoader();
+    const resourceLoader = await this.buildSkillsResourceLoader(
+      request.options.systemPrompt
+    );
 
     // REUSE P2.M3.T1.S1's customTools seam (Decision 1) — do NOT pass customTools: [].
     const { session } = await this.sdk!.createAgentSession({
@@ -743,18 +747,29 @@ export class PiHarness implements Harness {
    * @returns A configured DefaultResourceLoader, or undefined when no skills are loaded.
    * @throws {Error} /not initialized/i if called before initialize() (defensive — execute() guards too).
    */
-  private async buildSkillsResourceLoader(): Promise<
+  private async buildSkillsResourceLoader(
+    systemPrompt?: string
+  ): Promise<
     import("@earendil-works/pi-coding-agent").DefaultResourceLoader | undefined
   > {
-    if (!this.skillsPrompt) return undefined; // no skills → omit loader (preserve current behavior)
     if (!this.sdk) {
       throw new Error("PiHarness not initialized. Call initialize() first.");
     }
+    // Forward BOTH the harness system prompt (the agent persona, e.g.
+    // TASK_BREAKDOWN_PROMPT) AND the loaded skills to Pi via appendSystemPrompt.
+    // Without this, HarnessRequest.options.systemPrompt is silently dropped —
+    // createAgentSession never receives it — so every agent runs under Pi's
+    // generic coding persona (e.g. the architect implements the PRD directly
+    // instead of decomposing it into tasks.json).
+    const appendParts: string[] = [];
+    if (systemPrompt) appendParts.push(systemPrompt);
+    if (this.skillsPrompt) appendParts.push(this.skillsPrompt);
+    if (appendParts.length === 0) return undefined; // nothing to inject → let Pi use its default loader
     // cwd/agentDir are REQUIRED by DefaultResourceLoaderOptions. agentDir = Pi's default (~/.pi/agent).
     const loader = new this.sdk.DefaultResourceLoader({
       cwd: process.cwd(),
       agentDir: this.sdk.getAgentDir(),
-      appendSystemPrompt: [this.skillsPrompt], // our agentskills.io XML appended to the system prompt
+      appendSystemPrompt: appendParts, // persona + agentskills.io XML appended to the system prompt
       noSkills: true, // parity: don't ALSO load Pi's default skills
     });
     await loader.reload(); // createAgentSession will NOT reload a caller-provided loader
