@@ -6,22 +6,32 @@
  * SEPARATE file (pi-harness-resolvemodel.test.ts) because vi.mock is hoisted file-scope.
  *
  * PRP: P2.M2.T1.S2 — Implement initialize/terminate + model resolution.
+ * PRP: P7.M1.T2.S2 — Cross-repo Groundswell: honor ~/.pi/agent/auth.json (PI_CODING_AGENT_DIR
+ *   isolation + inject seam tests).
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PiHarness } from '../../../harnesses/pi-harness.js';
 import { HarnessRegistry } from '../../../harnesses/harness-registry.js';
-import { ModelRegistry } from '@earendil-works/pi-coding-agent';
+import { ModelRegistry, AuthStorage } from '@earendil-works/pi-coding-agent';
 import type { HarnessOptions } from '../../../types/harnesses.js';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 describe('PiHarness - initialize()', () => {
   let harness: PiHarness;
+  let tmpAgentDir: string;
 
   beforeEach(() => {
+    tmpAgentDir = mkdtempSync(join(tmpdir(), 'pi-auth-'));
+    vi.stubEnv('PI_CODING_AGENT_DIR', tmpAgentDir);
     harness = new PiHarness();
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
+    rmSync(tmpAgentDir, { recursive: true, force: true });
     const r = HarnessRegistry.getInstance();
     r._resetInitStateForTesting();
     HarnessRegistry._resetForTesting();
@@ -171,6 +181,39 @@ describe('PiHarness - initialize()', () => {
     });
   });
 
+  describe('auth.json support + injectable storage (PRD §9.2.6)', () => {
+    it('uses an injected authStorage as-is (reference identity)', async () => {
+      const auth = AuthStorage.inMemory({ zai: { type: 'api_key', key: 'injected-key' } });
+      await harness.initialize({ authStorage: auth });
+      // @ts-expect-error - Testing private property
+      expect(harness.authStorage).toBe(auth); // SAME ref — not rebuilt
+    });
+
+    it('uses an injected modelRegistry as-is (reference identity)', async () => {
+      const auth = AuthStorage.inMemory({ zai: { type: 'api_key', key: 'injected-key' } });
+      const reg = ModelRegistry.create(auth);
+      await harness.initialize({ authStorage: auth, modelRegistry: reg });
+      // @ts-expect-error - Testing private property
+      expect(harness.modelRegistry).toBe(reg);
+    });
+
+    it('default (no options) consults a seeded auth.json (file-backed)', async () => {
+      writeFileSync(
+        join(tmpAgentDir, 'auth.json'),
+        JSON.stringify({ zai: { type: 'api_key', key: 'from-file-key' } }),
+      );
+      await harness.initialize(); // no options → AuthStorage.create() → reads file
+      // @ts-expect-error - Testing private property
+      expect(await harness.authStorage.getApiKey('zai')).toBe('from-file-key');
+    });
+
+    it('tolerates a missing auth.json (no throw, no creds)', async () => {
+      await expect(harness.initialize()).resolves.not.toThrow();
+      // @ts-expect-error - Testing private property
+      expect(await harness.authStorage.getApiKey('zai')).toBeUndefined();
+    });
+  });
+
   describe('HarnessRegistry Integration', () => {
     it('should work with HarnessRegistry.register()', () => {
       const registry = HarnessRegistry.getInstance();
@@ -231,12 +274,17 @@ describe('PiHarness - initialize()', () => {
 
 describe('PiHarness - terminate()', () => {
   let harness: PiHarness;
+  let tmpAgentDir: string;
 
   beforeEach(() => {
+    tmpAgentDir = mkdtempSync(join(tmpdir(), 'pi-auth-'));
+    vi.stubEnv('PI_CODING_AGENT_DIR', tmpAgentDir);
     harness = new PiHarness();
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
+    rmSync(tmpAgentDir, { recursive: true, force: true });
     const r = HarnessRegistry.getInstance();
     r._resetInitStateForTesting();
     HarnessRegistry._resetForTesting();

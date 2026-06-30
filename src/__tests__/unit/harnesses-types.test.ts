@@ -112,6 +112,16 @@ describe('Harness Types', () => {
   });
 
   describe('HarnessOptions', () => {
+    it('accepts optional authStorage/modelRegistry (pi inject seam)', () => {
+      // Proves the type compiles when the new fields are omitted.
+      const opts: HarnessOptions = {
+        apiKey: 'sk-test',
+        // authStorage and modelRegistry intentionally omitted
+      };
+      expect(opts.authStorage).toBeUndefined();
+      expect(opts.modelRegistry).toBeUndefined();
+    });
+
     it('should have slimmed fields (no session-store)', () => {
       const options: HarnessOptions = {
         endpoint: 'https://api.example.com',
@@ -143,6 +153,8 @@ describe('Harness Types', () => {
       expect(empty.sessionId).toBeUndefined();
       expect(empty.timeout).toBeUndefined();
       expect(empty.headers).toBeUndefined();
+      expect(empty.authStorage).toBeUndefined();
+      expect(empty.modelRegistry).toBeUndefined();
     });
   });
 

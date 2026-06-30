@@ -2,6 +2,7 @@
 import type { Tool, MCPServer, Skill } from './sdk-primitives.js';
 import type { AgentResponse } from './agent.js';
 import type { StreamEvent } from './streaming.js';
+import type { AuthStorage, ModelRegistry } from '@earendil-works/pi-coding-agent';
 
 /**
  * Harness identifier (PRD §7.2).
@@ -78,6 +79,27 @@ export interface HarnessOptions {
   timeout?: number;
   /** Custom headers */
   headers?: Record<string, string>;
+
+  /**
+   * Caller-supplied Pi `AuthStorage` (pi harness only; PRD §7.5 per-harness extension).
+   *
+   * When omitted, the pi harness builds a file-backed `AuthStorage.create()` whose default
+   * path is `getAgentDir()/auth.json` (= `~/.pi/agent/auth.json`, overridable via
+   * `PI_CODING_AGENT_DIR`) — so a credential written by `pi /login` is honored
+   * (PRD §9.2.6). Pass an in-memory store
+   * (`AuthStorage.inMemory({ zai: { type:'api_key', key:'...' } })`) to inject/seed
+   * auth for tests.
+   */
+  authStorage?: AuthStorage;
+
+  /**
+   * Caller-supplied Pi `ModelRegistry` (pi harness only; PRD §7.5 per-harness extension).
+   *
+   * When omitted, the pi harness builds a file-backed
+   * `ModelRegistry.create(this.authStorage)` (reads `getAgentDir()/models.json`).
+   * Must be paired with a compatible `authStorage`.
+   */
+  modelRegistry?: ModelRegistry;
 }
 
 /**

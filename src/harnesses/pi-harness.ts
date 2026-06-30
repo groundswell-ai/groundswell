@@ -92,7 +92,7 @@ export class PiHarness implements Harness {
   // ── S2: SDK + registry state (all nullable for idempotent terminate) ───────────────────────
   /** Lazily-imported Pi SDK module (mirrors ClaudeCodeHarness.sdk). Null until initialize(). */
   private sdk: typeof import("@earendil-works/pi-coding-agent") | null = null;
-  /** Headless auth store (env/runtime API-key resolution). Null until initialize(). */
+  /** File-backed auth store (default: reads ~/.pi/agent/auth.json). Null until initialize(). */
   private authStorage: AuthStorage | null = null;
   /** Model registry (built-in + custom models; per-provider auth). Null until initialize(). */
   private modelRegistry: ModelRegistry | null = null;
@@ -112,11 +112,17 @@ export class PiHarness implements Harness {
 
   // ── S2: lifecycle ──────────────────────────────────────────────────────────────────────────
   /**
-   * Initialize the Pi harness (PRD §7.3).
+   * Initialize the Pi harness (PRD §7.3, §9.2.6).
    *
-   * Lazily `await import`s the Pi SDK, builds a headless `ModelRegistry.inMemory(...)`, and stores
-   * the caller's options. Does NOT call `createAgentSession` — that is T2 (P2.M2.T2.S1), which
-   * consumes `this.sdk`, `this.modelRegistry`, and `this.resolveModel(spec)`.
+   * Lazily `await import`s the Pi SDK, builds a file-backed `AuthStorage.create()` and
+   * `ModelRegistry.create(authStorage)` honoring `~/.pi/agent/auth.json` (PRD §9.2.6),
+   * and stores the caller's options. Does NOT call `createAgentSession` — that is T2
+   * (P2.M2.T2.S1), which consumes `this.sdk`, `this.modelRegistry`, and
+   * `this.resolveModel(spec)`.
+   *
+   * Callers MAY inject their own `authStorage` / `modelRegistry` via `HarnessOptions`
+   * (PRD §7.5 per-harness extension) — e.g. tests seed `AuthStorage.inMemory({ zai: {...} })`
+   * to avoid touching disk.
    *
    * Idempotent: a no-op if already initialized. API keys are resolved per-provider at
    * `resolveModel` time (the provider is unknown until a model string is parsed — GOTCHA #8).
@@ -139,10 +145,12 @@ export class PiHarness implements Harness {
       throw new Error("Failed to load @earendil-works/pi-coding-agent: Import returned null");
     }
 
-    // Headless registry: no disk (no agentDir/models.json/auth.json). Env-var key resolution
-    // is built into AuthStorage.getApiKey (GOTCHA #7).
-    this.authStorage = AuthStorage.inMemory();
-    this.modelRegistry = ModelRegistry.inMemory(this.authStorage);
+    // File-backed by default (PRD §9.2.6): AuthStorage.create() reads ~/.pi/agent/auth.json
+    // (overridable via PI_CODING_AGENT_DIR); ModelRegistry.create() reads models.json. Callers
+    // MAY inject their own (PRD §7.5) — e.g. tests seed AuthStorage.inMemory({ zai: {...} }).
+    // getApiKey() priority: runtime override → auth.json api_key → auth.json oauth → env → fallback.
+    this.authStorage = options?.authStorage ?? AuthStorage.create();
+    this.modelRegistry = options?.modelRegistry ?? ModelRegistry.create(this.authStorage);
 
     // Store options; apiKey is applied per-provider in resolveModel (GOTCHA #8).
     this.options = options ?? null;

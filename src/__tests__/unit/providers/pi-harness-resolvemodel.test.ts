@@ -29,6 +29,12 @@ const fakeModel = {
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   ModelRegistry: {
+    create: vi.fn(() => ({
+      find: fakeFind,
+      getApiKeyForProvider: vi.fn(),
+      getAll: vi.fn(() => []),
+      getAvailable: vi.fn(() => []),
+    })),
     inMemory: vi.fn(() => ({
       find: fakeFind,
       getApiKeyForProvider: vi.fn(),
@@ -37,6 +43,10 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
     })),
   },
   AuthStorage: {
+    create: vi.fn(() => ({
+      setRuntimeApiKey: fakeSetKey,
+      getApiKey: fakeGetApiKey,
+    })),
     inMemory: vi.fn(() => ({
       setRuntimeApiKey: fakeSetKey,
       getApiKey: fakeGetApiKey,
