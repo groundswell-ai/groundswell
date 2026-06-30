@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/groundswell-ai/groundswell/compare/v1.0.0...v1.0.1) (2026-06-30)
+
+
+### Bug Fixes
+
+* **harnesses:** use file-backed AuthStorage.create() over inMemory() to honor ~/.pi/agent/auth.json (PRD §9.2.6) ([a026a1c](https://github.com/groundswell-ai/groundswell/commit/a026a1cd8a8ff7e5805987db32dd8bb16e05a912))
+
 # 1.0.0 (2026-06-23)
 
 
